@@ -493,12 +493,16 @@
       window.App.renderCurrent();
     });
 
+    bindCalendarHolidayNameField(container);
+
     container.querySelector("#calendarHolidayForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
+      const name = resolveCalendarHolidayName(formData);
+      if (!name) return;
       const scope = formData.get("companyScope");
       ScaleRules.addCalendarHoliday({
-        name: formData.get("name"),
+        name,
         date: formData.get("date"),
         type: formData.get("type"),
         companies: scope === "ambas" ? ["ambas"] : [scope]
@@ -549,6 +553,72 @@
     container.querySelector("#exportCurrentJsonFeriados")?.addEventListener("click", () => {
       ImportUtils.downloadJSON("chez-pitu-dados.json", JSON.parse(AppData.exportCurrentDataJSON()));
     });
+  }
+
+  function collectRegisteredHolidayNames() {
+    const names = new Set();
+    (AppData.state.calendarHolidays || []).forEach((holiday) => {
+      const label = String(holiday.name || "").trim();
+      if (label) names.add(label);
+    });
+    AppData.COMPANIES.forEach((company) => {
+      (AppData.getCompanyData(company).holidays || []).forEach((holiday) => {
+        const label = String(holiday.name || "").trim();
+        if (label) names.add(label);
+      });
+    });
+    return [...names].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }
+
+  function renderCalendarHolidayNameField() {
+    const names = collectRegisteredHolidayNames();
+    if (!names.length) {
+      return `<label>Nome do feriado<input name="name" required placeholder="Ex.: Corpus Christi"></label>`;
+    }
+
+    const options = [
+      `<option value="" disabled selected>Selecione o feriado</option>`,
+      ...names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`),
+      `<option value="__novo__">— Outro nome —</option>`
+    ].join("");
+
+    return `
+      <label>Nome do feriado
+        <select name="name" id="calendarHolidayNameSelect" required>
+          ${options}
+        </select>
+        <input type="text" name="nameCustom" id="calendarHolidayNameCustom" placeholder="Ex.: Corpus Christi" hidden>
+      </label>
+    `;
+  }
+
+  function bindCalendarHolidayNameField(container) {
+    const select = container.querySelector("#calendarHolidayNameSelect");
+    const custom = container.querySelector("#calendarHolidayNameCustom");
+    if (!select || !custom) return;
+
+    const sync = () => {
+      const isOther = select.value === "__novo__";
+      custom.hidden = !isOther;
+      custom.required = isOther;
+      select.required = !isOther;
+      if (!isOther) custom.value = "";
+    };
+
+    select.addEventListener("change", sync);
+    sync();
+  }
+
+  function resolveCalendarHolidayName(formData) {
+    let name = String(formData.get("name") || "").trim();
+    if (name === "__novo__") {
+      name = String(formData.get("nameCustom") || "").trim();
+      if (!name) {
+        alert("Informe o nome do feriado.");
+        return null;
+      }
+    }
+    return name;
   }
 
   function renderCalendarHolidays() {
@@ -613,7 +683,7 @@
           </div>
         </div>
         <form id="calendarHolidayForm" class="form-grid form-grid-compact">
-          <label>Nome do feriado<input name="name" required placeholder="Ex.: Corpus Christi"></label>
+          ${renderCalendarHolidayNameField()}
           <label>Data<input type="date" name="date" required value="${AppData.todayISO()}"></label>
           <label>Tipo
             <select name="type">
