@@ -1,0 +1,14 @@
+{
+  "name": "sistema-rh-chez-pitu",
+  "private": true,
+  "description": "Sistema de Gestão de Pessoal — Grupo Chez Pitu",
+  "scripts": {
+    "bump-cache": "node scripts/bump-cache.js",
+    "deploy:preview": "netlify deploy --dir .",
+    "deploy": "npm run bump-cache && netlify deploy --prod --dir .",
+    "deploy:ci": "netlify deploy --prod --dir ."
+  },
+  "devDependencies": {
+    "netlify-cli": "^23.5.0"
+  }
+}

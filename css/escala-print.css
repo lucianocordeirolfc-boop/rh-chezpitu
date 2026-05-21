@@ -1,0 +1,688 @@
+.scale-print-preview-card {
+  display: none;
+  overflow: hidden;
+}
+
+.scale-print-preview-card.is-visible {
+  display: block;
+}
+
+.scale-print-preview-scroll {
+  overflow: auto;
+  padding: 22px;
+  border-radius: 18px;
+  background:
+    linear-gradient(45deg, rgba(13, 95, 124, 0.06) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(13, 95, 124, 0.06) 25%, transparent 25%),
+    #dcecf1;
+  background-size: 24px 24px;
+}
+
+.scale-print-area {
+  display: block;
+  width: 297mm;
+  min-height: 210mm;
+  margin: 0 auto;
+  padding: 5mm 6mm;
+  color: #17313b;
+  border: 1px solid #bfdbe4;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(6, 54, 74, 0.24);
+}
+
+.scale-print-header {
+  display: grid;
+  grid-template-columns: 1fr 1.45fr 1fr;
+  align-items: start;
+  gap: 8mm;
+  margin-bottom: 5mm;
+  padding-bottom: 4mm;
+  border-bottom: 2px solid #c9edf6;
+}
+
+.scale-print-header-corporate {
+  grid-template-columns: 1.2fr 1.35fr 0.75fr;
+  gap: 5mm;
+  margin-bottom: 3.5mm;
+  padding-bottom: 3mm;
+}
+
+.scale-print-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+}
+
+.scale-print-legal-name {
+  margin: 0;
+  color: #06364a;
+  font-size: 9.2pt;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.scale-print-cnpj {
+  margin: 0;
+  color: #47616b;
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.scale-print-logo-slot {
+  display: grid;
+  width: 36mm;
+  height: 14mm;
+  place-items: center;
+  color: #7aa9b8;
+  border: 1px dashed #8bbccb;
+  border-radius: 2mm;
+  background: linear-gradient(135deg, #f7fbfc, #eaf8fb);
+  font-size: 8pt;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.scale-print-logo-img {
+  max-width: 36mm;
+  max-height: 14mm;
+  object-fit: contain;
+  display: block;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.scale-print-month-display {
+  margin: 0 0 1mm;
+  color: #06364a;
+  font-size: 11pt;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scale-print-sector-sub {
+  margin: 0;
+  color: #47616b;
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.scale-print-meta-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1mm;
+}
+
+.scale-print-issue-print {
+  display: none;
+  margin: 0;
+  color: #47616b;
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.scale-print-month-edit {
+  margin-top: 1mm;
+}
+
+.scale-print-signature-simple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28mm;
+  padding: 3mm;
+  border: 1px solid #cfe3ea;
+  border-radius: 3mm;
+  background: #ffffff;
+}
+
+.scale-print-sign-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
+}
+
+.scale-print-sign-line {
+  width: clamp(280px, 42%, 380px);
+  max-width: 100%;
+  height: 0;
+  margin: 0 0 2.5mm;
+  padding: 0;
+  border: 0;
+  border-top: 0.35mm solid #2a4a56;
+}
+
+.scale-print-sign-name {
+  margin: 0;
+  color: #06364a;
+  font-size: 9.5pt;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.scale-print-sign-name-empty {
+  min-height: 1.2em;
+}
+
+.scale-print-sign-role {
+  margin: 1.2mm 0 0;
+  color: #6d8290;
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.scale-print-side {
+  display: grid;
+  gap: 2mm;
+}
+
+.scale-print-side label,
+.scale-print-title label,
+.scale-print-signature label {
+  display: grid;
+  gap: 1mm;
+  color: #47616b;
+  font-size: 7.4pt;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scale-print-field {
+  width: 100%;
+  min-height: 8mm;
+  padding: 1.5mm 2mm;
+  color: #06364a;
+  border: 1px solid #cfe3ea;
+  border-radius: 2mm;
+  background: #f7fbfc;
+  font-size: 9pt;
+  font-weight: 700;
+}
+
+.scale-print-title {
+  text-align: center;
+}
+
+.scale-print-title h2 {
+  margin: 0 0 3mm;
+  color: #06364a;
+  font-size: 22pt;
+  letter-spacing: 0.12em;
+}
+
+.scale-print-month {
+  max-width: 72mm;
+  margin: 0 auto;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.scale-print-logo {
+  display: grid;
+  width: 44mm;
+  height: 24mm;
+  justify-self: end;
+  place-items: center;
+  color: #7aa9b8;
+  border: 1px dashed #8bbccb;
+  border-radius: 3mm;
+  background: linear-gradient(135deg, #f7fbfc, #eaf8fb);
+  font-size: 10pt;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+.scale-print-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.scale-print-table th,
+.scale-print-table td {
+  height: 5.8mm;
+  padding: 0.45mm 0.35mm;
+  border: 0.2mm solid #d6e7ec;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 6.2pt;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.scale-print-table th:first-child,
+.scale-print-table td:first-child {
+  width: 44mm;
+  min-width: 44mm;
+  max-width: 44mm;
+  padding: 0.6mm 1.2mm;
+  color: #06364a;
+  text-align: left;
+}
+
+.scale-print-table thead th {
+  color: #06364a;
+  background: #eaf8fb;
+}
+
+.scale-print-table thead th span,
+.scale-print-table thead th small {
+  display: block;
+}
+
+.scale-print-table thead th span {
+  font-size: 7.6pt;
+}
+
+.scale-print-table thead th small {
+  margin-top: 0.4mm;
+  color: #6d8290;
+  font-size: 6pt;
+}
+
+.scale-print-table .sector-divider-print {
+  padding: 2.2mm 1.5mm;
+  color: #06364a;
+  background: linear-gradient(90deg, #eaf8fb, #ffffff);
+  font-size: 8pt;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.scale-print-table .print-employee-name {
+  font-weight: 700;
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  font-size: 6pt;
+  line-height: 1.1;
+  vertical-align: middle;
+}
+
+.scale-print-table th.print-day-sunday,
+.scale-print-table td.print-day-sunday {
+  color: #b42318 !important;
+  box-shadow: inset 0 0 0 999px rgba(220, 38, 38, 0.18) !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.scale-print-table th.print-day-holiday,
+.scale-print-table td.print-day-holiday {
+  color: #92400e !important;
+  box-shadow: inset 0 0 0 999px rgba(234, 179, 8, 0.28) !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.scale-print-table td.code-work {
+  color: transparent;
+  background: #ffffff;
+}
+
+.scale-print-table td.code-folga {
+  background: #eaf8fb;
+}
+
+.scale-print-table td.code-ferias {
+  background: #e8f7ef;
+}
+
+.scale-print-table td.code-co {
+  background: #fff4d8;
+}
+
+.scale-print-table td.code-tm,
+.scale-print-table td.code-mm,
+.scale-print-table td.code-mn,
+.scale-print-table td.code-tn,
+.scale-print-table td.code-no {
+  background: #edf0ff;
+}
+
+.scale-print-table td.code-atestado {
+  background: #f4ecff;
+}
+
+.scale-print-table td.code-falta {
+  background: #fde8e7;
+}
+
+.scale-print-footer {
+  display: grid;
+  grid-template-columns: 1.25fr 0.95fr;
+  gap: 6mm;
+  margin-top: 5mm;
+}
+
+.scale-print-observations,
+.scale-print-signature,
+.scale-print-legend,
+.scale-print-instructions {
+  border: 1px solid #cfe3ea;
+  border-radius: 3mm;
+  background: #ffffff;
+}
+
+.scale-print-observations,
+.scale-print-signature {
+  padding: 3mm;
+}
+
+.scale-print-observations h3,
+.scale-print-signature h3 {
+  margin: 0 0 2mm;
+  color: #06364a;
+  font-size: 9pt;
+  letter-spacing: 0.1em;
+}
+
+.scale-print-observations textarea {
+  min-height: 28mm;
+  resize: vertical;
+  font-size: 8.5pt;
+  line-height: 1.35;
+}
+
+.scale-print-manual-lines {
+  display: none;
+}
+
+.scale-print-signature {
+  overflow: hidden;
+}
+
+.scale-print-bottom {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 5mm;
+  margin-top: 4mm;
+}
+
+.scale-print-legend,
+.scale-print-instructions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.8mm 3mm;
+  padding: 2.5mm;
+  color: #38515b;
+  font-size: 6.8pt;
+  line-height: 1.2;
+}
+
+.scale-print-legend strong,
+.scale-print-instructions strong {
+  flex: 0 0 100%;
+  color: #06364a;
+  font-size: 8pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scale-print-instructions {
+  display: grid;
+  gap: 1mm;
+  background: #f7fbfc;
+}
+
+/* ═══════════════════ TEMA CHEZ PITU (impressão) ═══════════════════ */
+
+.scale-company-chez-pitu .scale-print-area {
+  border-color: #a8d4ec;
+}
+
+.scale-company-chez-pitu .scale-print-header {
+  border-bottom-color: #a8d4ec;
+}
+
+.scale-company-chez-pitu .scale-print-legal-name {
+  color: #062d4a;
+}
+
+.scale-company-chez-pitu .scale-print-table thead th {
+  background: linear-gradient(180deg, #daeeff, #bbd8f5);
+  color: #062d4a;
+}
+
+.scale-company-chez-pitu .scale-print-table .sector-divider-print {
+  background: linear-gradient(90deg, #c8e6f5 0%, #f0f8fd 100%);
+  color: #062d4a;
+}
+
+.scale-company-chez-pitu .scale-print-title h2 {
+  color: #062d4a;
+}
+
+/* ═══════════════════ TEMA PENGOLD (impressão) ═══════════════════ */
+
+.scale-company-pengold .scale-print-area {
+  border-color: #a0d8b8;
+}
+
+.scale-company-pengold .scale-print-header {
+  border-bottom-color: #a0d8b8;
+}
+
+.scale-company-pengold .scale-print-legal-name {
+  color: #0e2b1e;
+}
+
+.scale-company-pengold .scale-print-table thead th {
+  background: linear-gradient(180deg, #d4f0e0, #b8e4cc);
+  color: #0e2b1e;
+}
+
+.scale-company-pengold .scale-print-table .sector-divider-print {
+  background: linear-gradient(90deg, #c2e8d4 0%, #eef8f3 100%);
+  color: #0e2b1e;
+}
+
+.scale-company-pengold .scale-print-title h2 {
+  color: #0e2b1e;
+}
+
+.scale-company-pengold .scale-print-month-display {
+  color: #0e2b1e;
+}
+
+.scale-company-pengold .scale-print-sign-line {
+  border-top-color: #1a5c38;
+}
+
+.scale-company-pengold .scale-print-area {
+  box-shadow: 0 24px 70px rgba(6, 74, 32, 0.20);
+}
+
+@media screen and (max-width: 1366px) {
+  .scale-print-preview-scroll {
+    padding: 10px;
+  }
+
+  .scale-print-area {
+    transform: scale(0.62);
+    transform-origin: top left;
+    margin-right: -110mm;
+    margin-bottom: -72mm;
+  }
+}
+
+@media screen and (max-width: 1180px) {
+  .scale-print-preview-scroll {
+    padding: 12px;
+  }
+
+  .scale-print-area {
+    transform: scale(0.72);
+    transform-origin: top left;
+    margin-right: -82mm;
+    margin-bottom: -58mm;
+  }
+}
+
+@page scaleLandscape {
+  size: A4 landscape;
+  margin: 0;
+}
+
+@media print {
+  body.printing-scale,
+  body.printing-scale html {
+    width: 297mm !important;
+    min-width: 297mm !important;
+    background: #ffffff !important;
+  }
+
+  body.printing-scale .sidebar,
+  body.printing-scale .topbar,
+  body.printing-scale .scale-card,
+  body.printing-scale .no-print,
+  body.printing-scale button {
+    display: none !important;
+  }
+
+  body.printing-scale .app-shell,
+  body.printing-scale .module.active,
+  body.printing-scale .card.scale-print-preview-card,
+  body.printing-scale .scale-print-preview-scroll {
+    display: block !important;
+    width: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  body.printing-scale .scale-print-area {
+    display: block !important;
+    page: scaleLandscape;
+    width: 297mm !important;
+    min-height: 210mm !important;
+    margin: 0 !important;
+    padding: 5mm 6mm !important;
+    border: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  body.printing-scale .no-print {
+    display: none !important;
+  }
+
+  body.printing-scale .scale-print-month-display,
+  body.printing-scale .scale-print-issue-print {
+    display: block !important;
+  }
+
+  body.printing-scale .scale-print-field {
+    padding: 0 !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.printing-scale .scale-print-observations textarea {
+    min-height: 24mm;
+    color: #17313b !important;
+    line-height: 6mm;
+  }
+
+  body.printing-scale .scale-print-manual-lines {
+    display: grid;
+    gap: 5mm;
+    margin-top: -20mm;
+    pointer-events: none;
+  }
+
+  body.printing-scale .scale-print-manual-lines span {
+    display: block;
+    border-bottom: 0.25mm solid #cfe3ea;
+  }
+
+  body.printing-scale .scale-print-table tr,
+  body.printing-scale .scale-print-footer,
+  body.printing-scale .scale-print-bottom {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.printing-scale .scale-print-signature-simple {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: visible !important;
+  }
+
+  body.printing-scale .scale-print-sign-line {
+    width: 88mm !important;
+    max-width: 88mm !important;
+    border-top: 0.3mm solid #2a4a56 !important;
+  }
+
+  body.printing-scale .scale-print-sign-name,
+  body.printing-scale .scale-print-sign-role {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Domingo e feriado — forçar cores na impressão */
+  body.printing-scale .scale-print-table th.print-day-sunday,
+  body.printing-scale .scale-print-table td.print-day-sunday {
+    color: #b42318 !important;
+    background-color: rgba(220, 38, 38, 0.12) !important;
+    box-shadow: inset 0 0 0 999px rgba(220, 38, 38, 0.18) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.printing-scale .scale-print-table th.print-day-holiday,
+  body.printing-scale .scale-print-table td.print-day-holiday {
+    color: #92400e !important;
+    background-color: rgba(234, 179, 8, 0.20) !important;
+    box-shadow: inset 0 0 0 999px rgba(234, 179, 8, 0.28) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Tema Pengold — impressão */
+  body.printing-scale .scale-company-pengold .scale-print-table thead th {
+    background: linear-gradient(180deg, #d4f0e0, #b8e4cc) !important;
+    color: #0e2b1e !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.printing-scale .scale-company-pengold .scale-print-table .sector-divider-print {
+    background: linear-gradient(90deg, #c2e8d4 0%, #eef8f3 100%) !important;
+    color: #0e2b1e !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.printing-scale .scale-company-pengold .scale-print-title h2 {
+    color: #0e2b1e !important;
+  }
+
+  body.printing-scale .scale-company-pengold .scale-print-legal-name {
+    color: #0e2b1e !important;
+  }
+}

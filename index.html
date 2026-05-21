@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Sistema de Gestão de Pessoal — Grupo Chez Pitu</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/funcionarios.css" />
+  <link rel="stylesheet" href="css/ausencias.css" />
+  <link rel="stylesheet" href="css/print.css" />
+  <link rel="stylesheet" href="css/escala-print.css" />
+</head>
+
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="brand">
+      <span class="brand-mark">CP</span>
+
+      <div class="brand-text">
+        <strong>Grupo Chez Pitu</strong>
+        <small>Gestão de Pessoal</small>
+      </div>
+    </div>
+
+    <nav class="menu" aria-label="Módulos">
+
+      <button class="menu-item active" data-module="dashboard" type="button">
+        <span class="menu-icon">◉</span>
+        <span class="menu-label">Dashboard</span>
+      </button>
+
+      <button class="menu-item" data-module="funcionarios" type="button">
+        <span class="menu-icon">◎</span>
+        <span class="menu-label">Cadastro de Funcionários</span>
+      </button>
+
+      <button class="menu-item" data-module="escala" type="button">
+        <span class="menu-icon">▦</span>
+        <span class="menu-label">Escala de Folga</span>
+      </button>
+
+      <button class="menu-item" data-module="ferias" type="button">
+        <span class="menu-icon">◇</span>
+        <span class="menu-label">Ausências</span>
+      </button>
+
+      <button class="menu-item" data-module="vale-transporte" type="button">
+        <span class="menu-icon">▤</span>
+        <span class="menu-label">Recibo de Vale-transporte</span>
+      </button>
+
+      <button class="menu-item" data-module="feriados" type="button">
+        <span class="menu-icon">★</span>
+        <span class="menu-label">Controle de Feriados</span>
+      </button>
+
+    </nav>
+
+    <button
+      id="sidebarToggle"
+      class="sidebar-toggle"
+      type="button"
+      aria-label="Recolher menu"
+    >
+      <span class="sidebar-toggle-icon">‹</span>
+    </button>
+
+  </aside>
+
+  <!-- CONTEÚDO -->
+  <main class="app-shell">
+
+    <!-- TOPO -->
+    <header class="topbar">
+
+      <div>
+        <p class="eyebrow">Sistema unificado</p>
+        <h1 id="pageTitle">Dashboard</h1>
+      </div>
+
+      <div class="topbar-actions">
+
+        <span
+          id="syncStatus"
+          class="sync-status"
+          data-status="syncing"
+          title="Sincronização"
+        >
+          Sincronizando...
+        </span>
+
+        <label class="company-switcher">
+
+          Empresa
+
+          <select id="companySelect" aria-label="Selecionar empresa">
+          </select>
+
+        </label>
+
+      </div>
+
+    </header>
+
+    <!-- MÓDULOS -->
+    <section id="dashboard" class="module active"></section>
+
+    <section id="funcionarios" class="module"></section>
+
+    <section id="escala" class="module"></section>
+
+    <section id="ferias" class="module"></section>
+
+    <section id="vale-transporte" class="module"></section>
+
+    <section id="feriados" class="module"></section>
+
+  </main>
+
+  <!-- TOAST -->
+  <div id="toastContainer" aria-live="polite"></div>
+
+  <!-- TEMPLATE -->
+  <template id="emptyStateTemplate">
+
+    <div class="empty-state">
+      <strong>Nenhum registro encontrado.</strong>
+
+      <span>
+        Cadastre novas informações para começar a usar este módulo.
+      </span>
+    </div>
+
+  </template>
+
+  <!-- FIREBASE -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <!-- JS -->
+  <script src="js/firebase-sync.js?v=20260525"></script>
+
+  <script src="js/import-utils.js?v=20260525"></script>
+
+  <script src="js/data.js?v=20260525"></script>
+
+  <script src="js/dashboard.js?v=20260525"></script>
+
+  <script src="js/funcionarios.js?v=20260525"></script>
+
+  <script src="js/scale-rules.js?v=20260525"></script>
+
+  <script src="js/escala.js?v=20260525"></script>
+
+  <script src="js/ferias.js?v=20260525"></script>
+
+  <script src="js/feriados.js?v=20260525"></script>
+
+  <script src="js/vale-transporte.js?v=20260525"></script>
+
+  <script src="js/app.js?v=20260525"></script>
+
+</body>
+</html>

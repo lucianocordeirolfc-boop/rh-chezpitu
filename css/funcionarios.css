@@ -1,0 +1,573 @@
+/* Cadastro de Funcionários — layout corporativo horizontal */
+
+.func-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Topo: título + resumo */
+.func-page-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.func-page-intro-head {
+  flex: 1 1 220px;
+}
+
+.func-module-title {
+  margin: 0;
+  color: var(--sea-900);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.func-module-subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.func-stats-row {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.func-stats-row .stat-chip {
+  min-width: 72px;
+  padding: 6px 12px;
+  border-radius: 10px;
+}
+
+.func-stats-row .stat-chip span {
+  font-size: 0.72rem;
+}
+
+.func-stats-row .stat-chip strong {
+  font-size: 1rem;
+}
+
+/* Toolbar acima da lista */
+.func-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fafdfe 0%, #f2f9fb 100%);
+}
+
+.func-list-toolbar-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  flex: 0 1 auto;
+  min-width: 140px;
+  padding-right: 8px;
+  border-right: 1px solid var(--line);
+}
+
+.func-list-toolbar-eyebrow {
+  flex: 0 0 100%;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.func-list-toolbar-company {
+  color: var(--sea-900);
+  font-size: 0.92rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.func-list-toolbar-count {
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.func-list-toolbar-controls {
+  display: flex;
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.func-list-toolbar-search {
+  flex: 1 1 180px;
+  min-width: 140px;
+  max-width: 280px;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.func-list-toolbar-search input {
+  width: 100%;
+  padding: 6px 9px;
+  font-size: 0.82rem;
+}
+
+.func-list-toolbar-filters {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.func-list-toolbar-filters label {
+  margin: 0;
+  font-size: 0.72rem;
+  min-width: 0;
+}
+
+.func-list-toolbar-filters select {
+  padding: 5px 7px;
+  font-size: 0.8rem;
+  min-width: 88px;
+}
+
+.func-list-toolbar-filters .btn-sm {
+  flex-shrink: 0;
+  align-self: flex-end;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.func-company-card {
+  padding: 14px 18px;
+}
+
+/* ─── Seção de logo da empresa ─── */
+
+.func-logo-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.func-logo-label {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.func-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.func-logo-preview {
+  display: flex;
+  width: 100px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--sand);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.func-logo-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.func-logo-placeholder {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.func-logo-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.func-logo-upload-btn {
+  cursor: pointer;
+}
+
+.func-company-form {
+  display: grid;
+  grid-template-columns: 1.2fr 180px 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.func-form-card {
+  padding: 16px 18px;
+}
+
+.func-form-horizontal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.func-form-row {
+  display: grid;
+  gap: 10px;
+  align-items: end;
+}
+
+.func-form-row.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.func-form-row.cols-vt {
+  grid-template-columns: 140px 120px 1fr;
+}
+
+.func-form-row label {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.func-form-row input,
+.func-form-row select,
+.func-form-row textarea {
+  padding: 7px 10px;
+  font-size: 0.85rem;
+}
+
+.func-form-row textarea {
+  min-height: 56px;
+  resize: vertical;
+}
+
+.func-form-row label.full {
+  grid-column: 1 / -1;
+}
+
+.func-origin-readonly {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 4px;
+}
+
+.func-form-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.func-table-card {
+  padding: 12px 14px 14px;
+}
+
+.func-table-card .table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: auto;
+  max-height: min(52vh, 480px);
+}
+
+.table-premium {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.table-premium thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 8px;
+  border-bottom: 2px solid var(--sea-200);
+  color: var(--sea-800);
+  background: #f4fafc;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.table-premium tbody tr {
+  border-bottom: 1px solid #edf4f7;
+  transition: background 0.12s ease;
+}
+
+.table-premium tbody tr:nth-child(even) {
+  background: rgba(234, 248, 251, 0.35);
+}
+
+.table-premium tbody tr:hover {
+  background: rgba(201, 237, 246, 0.35);
+}
+
+.table-premium td {
+  padding: 6px 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table-premium td:nth-child(3) {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-premium .pill {
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
+.table-premium .actions {
+  white-space: nowrap;
+}
+
+.table-premium .link-button {
+  font-size: 0.78rem;
+}
+
+/* Notebook: filtros em linha */
+@media (min-width: 1024px) {
+  .func-list-toolbar {
+    flex-wrap: nowrap;
+  }
+
+  .func-list-toolbar-controls {
+    flex-wrap: nowrap;
+  }
+
+  .func-list-toolbar-filters {
+    flex-wrap: nowrap;
+  }
+
+  .func-list-toolbar-meta {
+    flex-wrap: nowrap;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    max-width: 200px;
+  }
+
+  .func-list-toolbar-eyebrow {
+    flex: none;
+  }
+}
+
+@media (max-width: 1200px) {
+  .func-form-row.cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .func-company-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .func-company-form button[type="submit"] {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 900px) {
+  .func-list-toolbar-meta {
+    flex: 1 1 100%;
+    padding-right: 0;
+    padding-bottom: 6px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .func-list-toolbar-controls {
+    flex: 1 1 100%;
+  }
+
+  .func-list-toolbar-search {
+    max-width: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .func-form-row.cols-3,
+  .func-form-row.cols-vt {
+    grid-template-columns: 1fr;
+  }
+
+  .func-page-intro {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .func-stats-row {
+    justify-content: flex-start;
+  }
+}
+
+/* ── Department select + new-dept input ────────────────────── */
+
+.func-dept-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.func-dept-new-input {
+  margin-top: 2px;
+  padding: 6px 10px;
+  font-size: 0.83rem;
+  border: 1.5px dashed var(--sea-500);
+  border-radius: 7px;
+  background: var(--sea-100);
+  color: var(--sea-900);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.func-dept-new-input:focus {
+  border-color: var(--sea-700);
+  box-shadow: 0 0 0 3px rgba(34, 100, 209, 0.14);
+}
+
+/* ── Sunday off selector ───────────────────────────────────── */
+
+.sunday-field-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f4f8fe 0%, #eef4fb 100%);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sunday-field-label {
+  flex: 0 0 100%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--sea-700);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.sunday-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sunday-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sunday-pill input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.sunday-pill span {
+  display: inline-block;
+  padding: 5px 13px;
+  border: 1.5px solid var(--sea-200);
+  border-radius: 20px;
+  background: #fff;
+  color: var(--sea-700);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.13s, border-color 0.13s, color 0.13s, box-shadow 0.13s;
+}
+
+.sunday-pill input[type="checkbox"]:checked + span {
+  background: var(--sea-500);
+  border-color: var(--sea-500);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(34, 100, 209, 0.28);
+}
+
+.sunday-pill:hover span {
+  border-color: var(--sea-500);
+  background: var(--sea-100);
+}
+
+.double-sunday-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 5px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--sea-700);
+  transition: border-color 0.13s, background 0.13s;
+  margin: 0;
+  user-select: none;
+}
+
+.double-sunday-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--sea-500);
+  cursor: pointer;
+}
+
+.double-sunday-label:has(input:checked) {
+  border-color: #d97706;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.double-sunday-label small {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 600px) {
+  .sunday-selector {
+    gap: 5px;
+  }
+
+  .sunday-pill span {
+    padding: 4px 10px;
+    font-size: 0.74rem;
+  }
+
+  .double-sunday-label {
+    font-size: 0.74rem;
+  }
+}
