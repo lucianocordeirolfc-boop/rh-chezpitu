@@ -1,8 +1,10 @@
 # Configurar deploy automático — site Netlify **já existente**
 
-Use este guia se o sistema **já está no ar** no Netlify (deploy manual ou arrastar pasta) e você quer que **cada atualização** suba sozinha.
+**Site em produção:** [https://rh-chezpitu.netlify.app/](https://rh-chezpitu.netlify.app/)
 
-**Não** use *Add new site* — isso criaria um segundo site. Sempre trabalhe no **mesmo site** que você já usa.
+Use este guia se o sistema **já está no ar** no Netlify e você quer que **cada atualização** suba sozinha.
+
+**Não** use *Add new site* — isso criaria um segundo site. Sempre trabalhe no site **rh-chezpitu** no painel Netlify.
 
 ---
 
@@ -25,7 +27,7 @@ git init
 git add .
 git commit -m "Sistema RH Chez Pitu — deploy automático"
 git branch -M main
-git remote add origin https://github.com/SUA_EMPRESA/sistema-rh-chez-pitu.git
+git remote add origin https://github.com/lucianocordeirolfc-boop/rh-chezpitu.git
 git push -u origin main
 ```
 

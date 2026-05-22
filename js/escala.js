@@ -15,7 +15,7 @@
   ];
 
   const scaleState = {
-    yearMonth: AppData.monthKey(),
+    yearMonth: AppData.getEscalaSelectedYearMonth(),
     department: "todos",
     search: "",
     previewVisible: false,
@@ -678,6 +678,7 @@
     const month = Number(container.querySelector("#scaleMonth").value);
     scaleState.yearMonth = getYearMonth(year, month);
     scaleState.printMonthYear = formatMonthYear(scaleState.yearMonth);
+    AppData.setEscalaSelectedYearMonth(scaleState.yearMonth);
   }
 
   function renderCurrent(container) {
@@ -940,6 +941,7 @@
   function render(container, currentMonth = scaleState.yearMonth) {
     try {
       scaleState.yearMonth = currentMonth;
+      AppData.setEscalaSelectedYearMonth(scaleState.yearMonth, { save: false });
       if (window.ScaleRules?.getCoveragePrincipalStatus) {
         try {
           window.ScaleRules.getCoveragePrincipalStatus(AppData.state);

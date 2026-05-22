@@ -33,7 +33,8 @@
     const container = document.getElementById(moduleId);
 
     if (moduleId === "vale-transporte") {
-      window.ValeTransporteModule.render(container, AppData.getVtSelectedYearMonth());
+      const yearMonth = AppData.getVtSelectedYearMonth() || AppData.getEscalaSelectedYearMonth();
+      window.ValeTransporteModule.render(container, yearMonth);
       return;
     }
 
@@ -167,7 +168,16 @@
   }
 
   function applyRemoteState(remoteState, fromRemote = false) {
-    AppData.setRemoteState(remoteState, { preserveLocalHolidays: true });
+    let localSnapshot = null;
+    if (fromRemote) {
+      try {
+        const raw = localStorage.getItem("chezPituPeopleSystem.v1");
+        if (raw) localSnapshot = JSON.parse(raw);
+      } catch (error) {
+        console.warn("[App] Snapshot local indisponível no sync.", error);
+      }
+    }
+    AppData.setRemoteState(remoteState, { preserveLocalHolidays: true, localSnapshot });
     const select = document.getElementById("companySelect");
     if (select && remoteState.selectedCompany) {
       select.value = remoteState.selectedCompany;

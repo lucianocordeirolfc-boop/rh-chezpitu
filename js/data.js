@@ -108,6 +108,7 @@
 
     return {
       selectedCompany: COMPANIES[0],
+      escalaSelectedYearMonth: monthKey(),
       companies,
       calendarHolidays: [],
       coverageAlerts: [],
@@ -115,9 +116,44 @@
       scaleCodeConfig: {},
       valeTransporte: {
         selectedYearMonth: monthKey(),
-        discountValues: {}
+        discountValues: {},
+        deductionDays: {}
       }
     };
+  }
+
+  /** Dados locais prevalecem sobre remoto vazio/desatualizado (evita apagar descontos VT no sync). */
+  function mergeRecordMapsPreferLocal(remoteMap = {}, localMap = {}) {
+    return { ...remoteMap, ...localMap };
+  }
+
+  function mergeDiscountValuesByCompany(localVt = {}, remoteVt = {}) {
+    const merged = {};
+    COMPANIES.forEach((company) => {
+      merged[company] = mergeRecordMapsPreferLocal(
+        remoteVt.discountValues?.[company] || {},
+        localVt.discountValues?.[company] || {}
+      );
+    });
+    return merged;
+  }
+
+  function syncVtDeductionsToValeTransporte() {
+    const vt = ensureValeTransporteState();
+    if (!vt.deductionDays) vt.deductionDays = {};
+    COMPANIES.forEach((company) => {
+      vt.deductionDays[company] = { ...(getCompanyData(company).vtDeductions || {}) };
+    });
+  }
+
+  function syncVtDeductionsFromValeTransporte() {
+    const vt = ensureValeTransporteState();
+    if (!vt.deductionDays) return;
+    COMPANIES.forEach((company) => {
+      const data = getCompanyData(company);
+      if (!data.vtDeductions) data.vtDeductions = {};
+      data.vtDeductions = mergeRecordMapsPreferLocal(vt.deductionDays[company] || {}, data.vtDeductions);
+    });
   }
 
   function ensureValeTransporteState() {
@@ -126,6 +162,9 @@
     }
     if (!state.valeTransporte.discountValues || typeof state.valeTransporte.discountValues !== "object") {
       state.valeTransporte.discountValues = {};
+    }
+    if (!state.valeTransporte.deductionDays || typeof state.valeTransporte.deductionDays !== "object") {
+      state.valeTransporte.deductionDays = {};
     }
     if (!state.valeTransporte.selectedYearMonth) {
       state.valeTransporte.selectedYearMonth = monthKey();
@@ -143,6 +182,20 @@
     const vt = ensureValeTransporteState();
     if (vt.selectedYearMonth === normalized) return;
     vt.selectedYearMonth = normalized;
+    if (options.save !== false) saveState();
+  }
+
+  function getEscalaSelectedYearMonth() {
+    const stored = String(state.escalaSelectedYearMonth || "").trim();
+    if (/^\d{4}-\d{2}$/.test(stored)) return stored;
+    return monthKey();
+  }
+
+  function setEscalaSelectedYearMonth(yearMonth, options = {}) {
+    const normalized = String(yearMonth || "").trim();
+    if (!/^\d{4}-\d{2}$/.test(normalized)) return;
+    if (state.escalaSelectedYearMonth === normalized) return;
+    state.escalaSelectedYearMonth = normalized;
     if (options.save !== false) saveState();
   }
 
@@ -248,7 +301,9 @@
         normalizeCompanyHolidays(parsed.companies[company]);
         parsed.companies[company].vacations = parsed.companies[company].vacations || [];
         parsed.companies[company].absences = parsed.companies[company].absences || [];
+        parsed.companies[company].vtDeductions = parsed.companies[company].vtDeductions || {};
       });
+      parsed.escalaSelectedYearMonth = parsed.escalaSelectedYearMonth || monthKey();
       parsed.calendarHolidays = parsed.calendarHolidays || [];
       parsed.coverageAlerts = parsed.coverageAlerts || [];
       parsed.coveragePrincipalBindings = parsed.coveragePrincipalBindings || {};
@@ -259,6 +314,10 @@
         discountValues: {
           ...(defaults.valeTransporte?.discountValues || {}),
           ...(parsed.valeTransporte?.discountValues || {})
+        },
+        deductionDays: {
+          ...(defaults.valeTransporte?.deductionDays || {}),
+          ...(parsed.valeTransporte?.deductionDays || {})
         }
       };
       return { ...defaults, ...parsed };
@@ -269,8 +328,10 @@
   }
 
   let state = loadState();
+  syncVtDeductionsFromValeTransporte();
 
   function saveState() {
+    syncVtDeductionsToValeTransporte();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     // Sincroniza com Firebase se disponível
     if (window.FirebaseSync?.isReady()) {
@@ -336,11 +397,19 @@
     const defaults = createDefaultState();
     const preserveLocalHolidays = options.preserveLocalHolidays !== false;
     const previous = state;
+    const localSnapshot = options.localSnapshot || null;
+    const localCompanies = localSnapshot?.companies || previous.companies || {};
+    const localVt = localSnapshot?.valeTransporte || previous.valeTransporte || {};
 
     remoteState.companies = remoteState.companies || {};
     COMPANIES.forEach((company) => {
-      const localHolidays = preserveLocalHolidays ? previous?.companies?.[company]?.holidays || [] : [];
+      const localHolidays = preserveLocalHolidays ? localCompanies?.[company]?.holidays || [] : [];
       const remoteHolidays = remoteState.companies[company]?.holidays || [];
+      const remoteDeductions = remoteState.companies[company]?.vtDeductions || {};
+      const localDeductions = mergeRecordMapsPreferLocal(
+        localCompanies?.[company]?.vtDeductions || {},
+        localVt?.deductionDays?.[company] || {}
+      );
 
       remoteState.companies[company] = {
         ...defaults.companies[company],
@@ -355,24 +424,35 @@
       remoteState.companies[company].manualScale = remoteState.companies[company].manualScale || {};
       remoteState.companies[company].vacations = remoteState.companies[company].vacations || [];
       remoteState.companies[company].absences = remoteState.companies[company].absences || [];
+      remoteState.companies[company].vtDeductions = mergeRecordMapsPreferLocal(remoteDeductions, localDeductions);
       normalizeCompanyHolidays(remoteState.companies[company]);
     });
+    const remoteVt = remoteState.valeTransporte || {};
     state = {
       ...defaults,
       ...remoteState,
+      escalaSelectedYearMonth:
+        localSnapshot?.escalaSelectedYearMonth ||
+        previous.escalaSelectedYearMonth ||
+        remoteState.escalaSelectedYearMonth ||
+        defaults.escalaSelectedYearMonth,
       calendarHolidays: remoteState.calendarHolidays || [],
       coverageAlerts: remoteState.coverageAlerts || [],
       coveragePrincipalBindings: remoteState.coveragePrincipalBindings || {},
       scaleCodeConfig: remoteState.scaleCodeConfig || {},
       valeTransporte: {
         ...defaults.valeTransporte,
-        ...(remoteState.valeTransporte || {}),
-        discountValues: {
-          ...(defaults.valeTransporte?.discountValues || {}),
-          ...(remoteState.valeTransporte?.discountValues || {})
-        }
+        ...remoteVt,
+        selectedYearMonth:
+          localVt.selectedYearMonth ||
+          previous.valeTransporte?.selectedYearMonth ||
+          remoteVt.selectedYearMonth ||
+          defaults.valeTransporte.selectedYearMonth,
+        discountValues: mergeDiscountValuesByCompany(localVt, remoteVt),
+        deductionDays: {}
       }
     };
+    syncVtDeductionsToValeTransporte();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
@@ -864,37 +944,49 @@
   }
 
   function setVtDeduction(employeeId, yearMonth, days, options = {}) {
-    const data = getCompanyData(options.company);
+    const company = options.company || state.selectedCompany;
+    const data = getCompanyData(company);
     if (!data.vtDeductions) data.vtDeductions = {};
+    const vt = ensureValeTransporteState();
+    if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
     const key = `${employeeId}|${yearMonth}`;
     const raw = String(days ?? "").trim();
 
     if (raw === "") {
       delete data.vtDeductions[key];
+      delete vt.deductionDays[company][key];
     } else {
       const value = Math.max(0, parseInt(raw, 10) || 0);
       if (value === 0) {
         delete data.vtDeductions[key];
+        delete vt.deductionDays[company][key];
       } else {
         data.vtDeductions[key] = value;
+        vt.deductionDays[company][key] = value;
       }
     }
 
     if (options.save !== false) saveState();
   }
 
-  function getVtDeduction(employeeId, yearMonth, data = getCompanyData()) {
-    if (!data.vtDeductions) return 0;
+  function getVtDeduction(employeeId, yearMonth, data = getCompanyData(), company = state.selectedCompany) {
     const key = `${employeeId}|${yearMonth}`;
-    if (!Object.prototype.hasOwnProperty.call(data.vtDeductions, key)) return 0;
-    return Math.max(0, parseInt(data.vtDeductions[key], 10) || 0);
+    if (data.vtDeductions && Object.prototype.hasOwnProperty.call(data.vtDeductions, key)) {
+      return Math.max(0, parseInt(data.vtDeductions[key], 10) || 0);
+    }
+    const fromVt = ensureValeTransporteState().deductionDays?.[company]?.[key];
+    if (fromVt === undefined || fromVt === null || fromVt === "") return 0;
+    return Math.max(0, parseInt(fromVt, 10) || 0);
   }
 
-  function getVtDeductionDisplay(employeeId, yearMonth, data = getCompanyData()) {
-    if (!data.vtDeductions) return "";
+  function getVtDeductionDisplay(employeeId, yearMonth, data = getCompanyData(), company = state.selectedCompany) {
     const key = `${employeeId}|${yearMonth}`;
-    if (!Object.prototype.hasOwnProperty.call(data.vtDeductions, key)) return "";
-    return String(data.vtDeductions[key]);
+    if (data.vtDeductions && Object.prototype.hasOwnProperty.call(data.vtDeductions, key)) {
+      return String(data.vtDeductions[key]);
+    }
+    const fromVt = ensureValeTransporteState().deductionDays?.[company]?.[key];
+    if (fromVt === undefined || fromVt === null || fromVt === "") return "";
+    return String(fromVt);
   }
 
   function getManualScaleEntry(employeeId, date, data) {
@@ -1175,6 +1267,8 @@
     getVtDeductionDisplay,
     getVtSelectedYearMonth,
     setVtSelectedYearMonth,
+    getEscalaSelectedYearMonth,
+    setEscalaSelectedYearMonth,
     normalizeCurrencyInput,
     saveDiscountValue,
     getDiscountValue,

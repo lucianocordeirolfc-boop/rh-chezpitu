@@ -81,6 +81,7 @@ window.firebaseDB = firebase.database();
     const ferias = {};
     const feriados = {};
 
+    const vtDescontos = {};
     COMPANIES.forEach((company) => {
       const block = state.companies?.[company] || defaultCompanyData(company);
       empresas[company] = block.companyInfo || defaultCompanyData(company).companyInfo;
@@ -91,11 +92,13 @@ window.firebaseDB = firebase.database();
         absences: block.absences || []
       };
       feriados[company] = block.holidays || [];
+      vtDescontos[company] = block.vtDeductions || {};
     });
 
     return {
       configuracoes: {
         selectedCompany: state.selectedCompany || COMPANIES[0],
+        escalaYearMonth: state.escalaSelectedYearMonth || "",
         updatedAt: Date.now()
       },
       empresas,
@@ -103,6 +106,7 @@ window.firebaseDB = firebase.database();
       escalas,
       ferias,
       feriados,
+      vtDescontos,
       holidaysWorked: buildHolidaysWorkedIndex(state),
       feriadosCalendario: state.calendarHolidays || [],
       coverageAlerts: state.coverageAlerts || [],
@@ -159,12 +163,14 @@ window.firebaseDB = firebase.database();
         manualScale: data.escalas?.[company] || {},
         vacations,
         absences,
-        holidays: data.feriados?.[company] || []
+        holidays: data.feriados?.[company] || [],
+        vtDeductions: data.vtDescontos?.[company] || {}
       };
     });
 
     return {
       selectedCompany: data.configuracoes?.selectedCompany || COMPANIES[0],
+      escalaSelectedYearMonth: data.configuracoes?.escalaYearMonth || "",
       companies,
       valeTransporte: data.valeTransporte || {},
       calendarHolidays: data.feriadosCalendario || data.calendarHolidays || [],

@@ -305,6 +305,25 @@
     return { receipts, validation };
   }
 
+  function persistDeductionField(input) {
+    if (!input?.dataset?.employeeId || !input.dataset.yearMonth) return;
+    if (input.dataset.field === "discount") {
+      const parsed = AppData.saveDiscountValue(input.dataset.employeeId, input.dataset.yearMonth, input.value, {
+        save: true
+      });
+      input.value = parsed === null ? "" : AppData.formatDiscountDisplay(parsed);
+      return;
+    }
+    AppData.setVtDeduction(input.dataset.employeeId, input.dataset.yearMonth, input.value, { save: true });
+  }
+
+  function flushAllDeductionInputs(container) {
+    if (!container) return;
+    container.querySelectorAll(".vt-deduct-days-input, .vt-discount-money-input").forEach((input) => {
+      persistDeductionField(input);
+    });
+  }
+
   function bindDeductionInputs(container, yearMonth) {
     container.querySelectorAll(".vt-deduct-days-input, .vt-discount-money-input").forEach((input) => {
       const fieldKey = `${input.dataset.field}|${input.dataset.employeeId}|${input.dataset.yearMonth}`;
@@ -320,48 +339,35 @@
       input.addEventListener("focus", markEditing);
       input.addEventListener("blur", () => {
         clearEditing();
-        if (input.dataset.field === "discount") {
-          const parsed = AppData.saveDiscountValue(input.dataset.employeeId, input.dataset.yearMonth, input.value, {
-            save: true
-          });
-          input.value = parsed === null ? "" : AppData.formatDiscountDisplay(parsed);
-        } else {
-          AppData.setVtDeduction(input.dataset.employeeId, input.dataset.yearMonth, input.value, { save: true });
-        }
+        persistDeductionField(input);
         refreshVtCalculations(container, yearMonth);
       });
 
       input.addEventListener("input", () => {
         markEditing();
-        const employeeId = input.dataset.employeeId;
         const ym = input.dataset.yearMonth;
-
-        if (input.dataset.field === "discount") {
-          debounce(`discount-${fieldKey}`, () => {
-            AppData.saveDiscountValue(employeeId, ym, input.value, { save: false });
-            refreshVtCalculations(container, ym);
-          });
-        } else {
-          debounce(`days-${fieldKey}`, () => {
-            AppData.setVtDeduction(employeeId, ym, input.value, { save: false });
-            refreshVtCalculations(container, ym);
-          });
-        }
+        debounce(`persist-${fieldKey}`, () => {
+          persistDeductionField(input);
+          refreshVtCalculations(container, ym);
+        }, 200);
       });
 
       input.addEventListener("change", () => {
-        debounce(`persist-${fieldKey}`, () => {
-          if (input.dataset.field === "discount") {
-            const parsed = AppData.saveDiscountValue(input.dataset.employeeId, input.dataset.yearMonth, input.value, {
-              save: true
-            });
-            input.value = parsed === null ? "" : AppData.formatDiscountDisplay(parsed);
-          } else {
-            AppData.setVtDeduction(input.dataset.employeeId, input.dataset.yearMonth, input.value, { save: true });
-          }
-          refreshVtCalculations(container, yearMonth);
-        }, 50);
+        persistDeductionField(input);
+        refreshVtCalculations(container, yearMonth);
       });
+    });
+  }
+
+  if (!window.__vtPersistHooksBound) {
+    window.__vtPersistHooksBound = true;
+    window.addEventListener("beforeunload", () => {
+      flushAllDeductionInputs(document.getElementById("vale-transporte"));
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flushAllDeductionInputs(document.getElementById("vale-transporte"));
+      }
     });
   }
 
@@ -484,6 +490,15 @@
     bindEvents(container, resolvedMonth);
   }
 
+  function refreshDeductionList(container, yearMonth) {
+    const list = container.querySelector("[data-vt-deduct-list]");
+    if (!list) return;
+    const data = AppData.getCompanyData();
+    const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
+    list.innerHTML = deductionRows(employees, yearMonth);
+    bindDeductionInputs(container, yearMonth);
+  }
+
   function softRefreshFromSync(container) {
     if (!container || vtUiState.editingField) return;
     const yearMonth = getActiveYearMonth();
@@ -491,6 +506,7 @@
       render(container, yearMonth);
       return;
     }
+    refreshDeductionList(container, yearMonth);
     refreshVtCalculations(container, yearMonth);
     const monthInput = container.querySelector("#vtMonth");
     if (monthInput && monthInput.value !== yearMonth) {
