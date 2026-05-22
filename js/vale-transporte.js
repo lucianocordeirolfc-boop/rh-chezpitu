@@ -346,10 +346,10 @@
       input.addEventListener("input", () => {
         markEditing();
         const ym = input.dataset.yearMonth;
-        debounce(`persist-${fieldKey}`, () => {
-          persistDeductionField(input);
+        persistDeductionField(input);
+        debounce(`refresh-${fieldKey}`, () => {
           refreshVtCalculations(container, ym);
-        }, 200);
+        }, 120);
       });
 
       input.addEventListener("change", () => {
@@ -506,6 +506,8 @@
       render(container, yearMonth);
       return;
     }
+    AppData.restoreVtBackupIntoState(AppData.state);
+    AppData.syncVtDeductionsFromValeTransporte();
     refreshDeductionList(container, yearMonth);
     refreshVtCalculations(container, yearMonth);
     const monthInput = container.querySelector("#vtMonth");
@@ -514,9 +516,16 @@
     }
   }
 
+  function flushPersist() {
+    const container = document.getElementById("vale-transporte");
+    flushAllDeductionInputs(container);
+    AppData.saveState();
+  }
+
   window.ValeTransporteModule = {
     render,
     softRefreshFromSync,
-    getActiveYearMonth
+    getActiveYearMonth,
+    flushPersist
   };
 })();

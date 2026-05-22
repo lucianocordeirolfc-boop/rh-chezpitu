@@ -246,8 +246,15 @@ window.firebaseDB = firebase.database();
     return loadFromFirebase().then((remoteState) => {
       const localState = getLocalState?.();
 
+      if (remoteState && localState && window.AppData?.mergeRemoteIntoLocal) {
+        const merged = window.AppData.mergeRemoteIntoLocal(localState, remoteState);
+        applyRemote(merged, false); // já mesclado: não sobrescrever descontos VT
+        setStatus("online", "Dados mesclados (local + Firebase)");
+        return save(merged).then(() => true);
+      }
+
       if (remoteState) {
-        applyRemote(remoteState);
+        applyRemote(remoteState, true);
         setStatus("online", "Dados carregados do Firebase");
         return true;
       }

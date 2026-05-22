@@ -57,7 +57,12 @@
 
   function setupMenu() {
     document.querySelectorAll(".menu-item").forEach((button) => {
-      button.addEventListener("click", () => render(button.dataset.module));
+      button.addEventListener("click", () => {
+        if (activeModuleId() === "vale-transporte" && window.ValeTransporteModule?.flushPersist) {
+          window.ValeTransporteModule.flushPersist();
+        }
+        render(button.dataset.module);
+      });
     });
   }
 
@@ -168,16 +173,15 @@
   }
 
   function applyRemoteState(remoteState, fromRemote = false) {
-    let localSnapshot = null;
+    let payload = remoteState;
     if (fromRemote) {
-      try {
-        const raw = localStorage.getItem("chezPituPeopleSystem.v1");
-        if (raw) localSnapshot = JSON.parse(raw);
-      } catch (error) {
-        console.warn("[App] Snapshot local indisponível no sync.", error);
-      }
+      const localSnapshot = AppData.readLocalStateSnapshot() || JSON.parse(JSON.stringify(AppData.state));
+      payload = AppData.mergeRemoteIntoLocal(localSnapshot, remoteState);
     }
-    AppData.setRemoteState(remoteState, { preserveLocalHolidays: true, localSnapshot });
+    AppData.setRemoteState(payload, {
+      preserveLocalHolidays: true,
+      localSnapshot: AppData.readLocalStateSnapshot()
+    });
     const select = document.getElementById("companySelect");
     if (select && remoteState.selectedCompany) {
       select.value = remoteState.selectedCompany;
@@ -214,7 +218,7 @@
     if (window.FirebaseSync?.init()) {
       window.FirebaseSync.bootstrap(
         () => JSON.parse(JSON.stringify(AppData.state)),
-        (remoteState) => applyRemoteState(remoteState, true)
+        (remoteState, fromRemote = true) => applyRemoteState(remoteState, fromRemote)
       ).finally(boot);
     } else {
       boot();

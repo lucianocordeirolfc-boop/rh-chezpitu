@@ -1,5 +1,6 @@
 (function () {
   const STORAGE_KEY = "chezPituPeopleSystem.v1";
+  const VT_BACKUP_KEY = "chezPituVtBackup.v1";
 
   const COMPANIES = ["Chez Pitu", "Pengold"];
   const WEEK_DAYS = [
@@ -136,6 +137,144 @@
       );
     });
     return merged;
+  }
+
+  function mergeDeductionDaysByCompany(localVt = {}, remoteVt = {}) {
+    const merged = {};
+    COMPANIES.forEach((company) => {
+      merged[company] = mergeRecordMapsPreferLocal(
+        remoteVt.deductionDays?.[company] || {},
+        localVt.deductionDays?.[company] || {}
+      );
+    });
+    return merged;
+  }
+
+  function normalizeValeTransporteBlock(parsedVt, defaultsVt) {
+    return {
+      selectedYearMonth: parsedVt?.selectedYearMonth || defaultsVt?.selectedYearMonth || monthKey(),
+      discountValues: mergeDiscountValuesByCompany(defaultsVt, parsedVt),
+      deductionDays: mergeDeductionDaysByCompany(defaultsVt, parsedVt)
+    };
+  }
+
+  function saveVtBackup() {
+    try {
+      syncVtDeductionsToValeTransporte();
+      const vt = ensureValeTransporteState();
+      const companiesVt = {};
+      COMPANIES.forEach((company) => {
+        companiesVt[company] = { ...(getCompanyData(company).vtDeductions || {}) };
+      });
+      localStorage.setItem(
+        VT_BACKUP_KEY,
+        JSON.stringify({
+          selectedYearMonth: vt.selectedYearMonth,
+          discountValues: vt.discountValues,
+          deductionDays: vt.deductionDays,
+          companiesVt,
+          updatedAt: Date.now()
+        })
+      );
+    } catch (error) {
+      console.warn("[VT] Falha ao gravar backup local.", error);
+    }
+  }
+
+  function restoreVtBackupIntoState(targetState) {
+    if (!targetState) return targetState;
+    try {
+      const raw = localStorage.getItem(VT_BACKUP_KEY);
+      if (!raw) return targetState;
+
+      const backup = JSON.parse(raw);
+      if (!targetState.valeTransporte) targetState.valeTransporte = createDefaultState().valeTransporte;
+      if (!targetState.companies) targetState.companies = {};
+
+      const backupVt = {
+        selectedYearMonth: backup.selectedYearMonth,
+        discountValues: backup.discountValues || {},
+        deductionDays: backup.deductionDays || {}
+      };
+
+      targetState.valeTransporte.selectedYearMonth =
+        backupVt.selectedYearMonth || targetState.valeTransporte.selectedYearMonth;
+      targetState.valeTransporte.discountValues = mergeDiscountValuesByCompany(backupVt, targetState.valeTransporte);
+      targetState.valeTransporte.deductionDays = mergeDeductionDaysByCompany(backupVt, targetState.valeTransporte);
+
+      COMPANIES.forEach((company) => {
+        if (!targetState.companies[company]) {
+          targetState.companies[company] = createCompanyData(company);
+        }
+        if (!targetState.companies[company].vtDeductions) targetState.companies[company].vtDeductions = {};
+        const fromBackup = mergeRecordMapsPreferLocal(
+          backup.deductionDays?.[company],
+          backup.companiesVt?.[company]
+        );
+        targetState.companies[company].vtDeductions = mergeRecordMapsPreferLocal(
+          targetState.companies[company].vtDeductions,
+          fromBackup
+        );
+      });
+    } catch (error) {
+      console.warn("[VT] Falha ao restaurar backup local.", error);
+    }
+    return targetState;
+  }
+
+  function mergeRemoteIntoLocal(localState, remoteState) {
+    if (!localState) return remoteState;
+    if (!remoteState) return localState;
+
+    const local = JSON.parse(JSON.stringify(localState));
+    const remote = JSON.parse(JSON.stringify(remoteState));
+    const merged = {
+      ...remote,
+      ...local,
+      companies: {},
+      valeTransporte: {
+        selectedYearMonth:
+          local.valeTransporte?.selectedYearMonth ||
+          remote.valeTransporte?.selectedYearMonth ||
+          monthKey(),
+        discountValues: mergeDiscountValuesByCompany(local.valeTransporte, remote.valeTransporte),
+        deductionDays: mergeDeductionDaysByCompany(local.valeTransporte, remote.valeTransporte)
+      },
+      escalaSelectedYearMonth: local.escalaSelectedYearMonth || remote.escalaSelectedYearMonth
+    };
+
+    COMPANIES.forEach((company) => {
+      const localCo = local.companies?.[company] || {};
+      const remoteCo = remote.companies?.[company] || {};
+      const localDays = mergeRecordMapsPreferLocal(
+        localCo.vtDeductions || {},
+        local.valeTransporte?.deductionDays?.[company] || {}
+      );
+
+      merged.companies[company] = {
+        ...remoteCo,
+        vtDeductions: mergeRecordMapsPreferLocal(remoteCo.vtDeductions || {}, localDays),
+        employees: remoteCo.employees?.length ? remoteCo.employees : localCo.employees,
+        manualScale:
+          Object.keys(remoteCo.manualScale || {}).length > 0 ? remoteCo.manualScale : localCo.manualScale,
+        holidays: remoteCo.holidays?.length ? remoteCo.holidays : localCo.holidays,
+        vacations: remoteCo.vacations?.length ? remoteCo.vacations : localCo.vacations,
+        absences: remoteCo.absences?.length ? remoteCo.absences : localCo.absences,
+        companyInfo: { ...localCo.companyInfo, ...remoteCo.companyInfo }
+      };
+    });
+
+    return restoreVtBackupIntoState(merged);
+  }
+
+  function readLocalStateSnapshot() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      console.warn("[AppData] Snapshot local inválido.", error);
+      return null;
+    }
   }
 
   function syncVtDeductionsToValeTransporte() {
@@ -308,19 +447,8 @@
       parsed.coverageAlerts = parsed.coverageAlerts || [];
       parsed.coveragePrincipalBindings = parsed.coveragePrincipalBindings || {};
       parsed.scaleCodeConfig = parsed.scaleCodeConfig || {};
-      parsed.valeTransporte = {
-        ...defaults.valeTransporte,
-        ...(parsed.valeTransporte || {}),
-        discountValues: {
-          ...(defaults.valeTransporte?.discountValues || {}),
-          ...(parsed.valeTransporte?.discountValues || {})
-        },
-        deductionDays: {
-          ...(defaults.valeTransporte?.deductionDays || {}),
-          ...(parsed.valeTransporte?.deductionDays || {})
-        }
-      };
-      return { ...defaults, ...parsed };
+      parsed.valeTransporte = normalizeValeTransporteBlock(parsed.valeTransporte, defaults.valeTransporte);
+      return restoreVtBackupIntoState({ ...defaults, ...parsed });
     } catch (error) {
       console.warn("Não foi possível carregar os dados salvos.", error);
       return createDefaultState();
@@ -333,7 +461,7 @@
   function saveState() {
     syncVtDeductionsToValeTransporte();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    // Sincroniza com Firebase se disponível
+    saveVtBackup();
     if (window.FirebaseSync?.isReady()) {
       window.FirebaseSync.save(state);
     }
@@ -449,11 +577,14 @@
           remoteVt.selectedYearMonth ||
           defaults.valeTransporte.selectedYearMonth,
         discountValues: mergeDiscountValuesByCompany(localVt, remoteVt),
-        deductionDays: {}
+        deductionDays: mergeDeductionDaysByCompany(localVt, remoteVt)
       }
     };
+    syncVtDeductionsFromValeTransporte();
     syncVtDeductionsToValeTransporte();
+    state = restoreVtBackupIntoState(state);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    saveVtBackup();
   }
 
   function getCompanyData(company = state.selectedCompany) {
@@ -957,13 +1088,8 @@
       delete vt.deductionDays[company][key];
     } else {
       const value = Math.max(0, parseInt(raw, 10) || 0);
-      if (value === 0) {
-        delete data.vtDeductions[key];
-        delete vt.deductionDays[company][key];
-      } else {
-        data.vtDeductions[key] = value;
-        vt.deductionDays[company][key] = value;
-      }
+      data.vtDeductions[key] = value;
+      vt.deductionDays[company][key] = value;
     }
 
     if (options.save !== false) saveState();
@@ -1261,6 +1387,11 @@
     updateCompanyInfo,
     updateCompanyLogo,
     setRemoteState,
+    mergeRemoteIntoLocal,
+    readLocalStateSnapshot,
+    restoreVtBackupIntoState,
+    syncVtDeductionsFromValeTransporte,
+    syncVtDeductionsToValeTransporte,
     getManualScaleEntry,
     setVtDeduction,
     getVtDeduction,
