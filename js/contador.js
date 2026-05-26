@@ -378,16 +378,13 @@
     var selectedCompany = AppData.state.selectedCompany;
 
     var html =
-      '<div class="resumo-toolbar">' +
-        '<label class="resumo-company-label">Empresa ' +
-          '<select id="resumoCompanySelect" class="field-select">' + companyOptions + '</select>' +
-        '</label>' +
-        '<button class="btn btn-primary" id="btnPrintResumo">Imprimir / PDF</button>' +
+      '<div class="resumo-toolbar resumo-toolbar-compact">' +
+        '<select id="resumoCompanySelect" class="field-select">' + companyOptions + '</select>' +
+        '<button class="btn btn-primary btn-sm" id="btnPrintResumo">Imprimir / PDF</button>' +
       '</div>' +
       '<div id="resumoGridContainer">' +
         renderResumoGrid(selectedCompany, yearMonth) +
-      '</div>' +
-      '';
+      '</div>';
 
     return html;
   }

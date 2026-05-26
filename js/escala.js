@@ -873,6 +873,107 @@
       }, 0);
     }
 
+    function showAbsencePopup(employeeId, date, employeeName, company) {
+      var existing = document.getElementById("scaleAbsencePopup");
+      if (existing) existing.remove();
+
+      var TYPES = [
+        "Atestado médico",
+        "Licença maternidade",
+        "Licença paternidade",
+        "Licença INSS / Afastamento",
+        "Licença não remunerada",
+        "Falta justificada",
+        "Outro"
+      ];
+      var typesHTML = TYPES.map(function (t) {
+        return '<option value="' + esc(t) + '">' + esc(t) + '</option>';
+      }).join("");
+
+      var html =
+        '<div class="popup-overlay" id="scaleAbsencePopup">' +
+          '<div class="popup-card">' +
+            '<div class="popup-header">' +
+              '<h3>Registrar Ausência</h3>' +
+              '<button class="popup-close" id="absPopupClose" type="button">\u2715</button>' +
+            '</div>' +
+            '<form id="scaleAbsenceForm" class="popup-form">' +
+              '<label class="popup-field">Funcionário' +
+                '<input type="text" value="' + esc(employeeName) + '" readonly class="field-readonly">' +
+              '</label>' +
+              '<label class="popup-field">Tipo de ausência' +
+                '<select name="absType" required>' + typesHTML + '</select>' +
+              '</label>' +
+              '<div class="popup-grid">' +
+                '<label class="popup-field">Início' +
+                  '<input type="date" name="absStartDate" required value="' + date + '">' +
+                '</label>' +
+                '<label class="popup-field">Fim' +
+                  '<input type="date" name="absEndDate" required value="' + date + '">' +
+                '</label>' +
+                '<label class="popup-field">Dias' +
+                  '<input type="number" name="absDays" min="1" step="1" value="1">' +
+                '</label>' +
+                '<label class="popup-field">CID <small>(Opcional)</small>' +
+                  '<input name="absCid" placeholder="Ex.: Z00.0" autocomplete="off">' +
+                '</label>' +
+              '</div>' +
+              '<label class="popup-field">Observação' +
+                '<textarea name="absNote" rows="2"></textarea>' +
+              '</label>' +
+              '<div class="popup-actions">' +
+                '<button type="button" class="btn btn-cancel" id="absPopupCancel">Cancelar</button>' +
+                '<button type="submit" class="btn btn-primary">Salvar</button>' +
+              '</div>' +
+            '</form>' +
+          '</div>' +
+        '</div>';
+
+      document.body.insertAdjacentHTML("beforeend", html);
+      var popup = document.getElementById("scaleAbsencePopup");
+      var form = document.getElementById("scaleAbsenceForm");
+
+      var startInput = form.querySelector('[name="absStartDate"]');
+      var endInput = form.querySelector('[name="absEndDate"]');
+      var daysInput = form.querySelector('[name="absDays"]');
+
+      function syncDays() {
+        if (startInput.value && endInput.value && endInput.value >= startInput.value) {
+          var d1 = new Date(startInput.value + "T00:00:00");
+          var d2 = new Date(endInput.value + "T00:00:00");
+          daysInput.value = Math.round((d2 - d1) / 86400000) + 1;
+        }
+      }
+      startInput.addEventListener("change", syncDays);
+      endInput.addEventListener("change", syncDays);
+
+      function closePopup() { popup.remove(); }
+      document.getElementById("absPopupClose").addEventListener("click", closePopup);
+      document.getElementById("absPopupCancel").addEventListener("click", closePopup);
+      popup.addEventListener("click", function (e) { if (e.target === popup) closePopup(); });
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var fd = new FormData(form);
+        if (fd.get("absEndDate") < fd.get("absStartDate")) {
+          alert("A data final não pode ser anterior à data inicial.");
+          return;
+        }
+        AppData.addAbsence({
+          employeeId: employeeId,
+          type: fd.get("absType"),
+          startDate: fd.get("absStartDate"),
+          endDate: fd.get("absEndDate"),
+          cid: fd.get("absCid") || "",
+          note: fd.get("absNote") || ""
+        });
+        closePopup();
+        window.App?.toast?.("Ausência registrada.", "success");
+        renderCurrent(container);
+        window.App.renderCurrent();
+      });
+    }
+
     container.querySelectorAll(".scale-select").forEach((select) => {
       select.addEventListener("change", () => {
         const scaleCompany = select.dataset.scaleCompany || AppData.state.selectedCompany;
@@ -897,8 +998,23 @@
         }
       });
 
-      select.closest(".scale-cell").addEventListener("click", () => {
+      var cell = select.closest(".scale-cell");
+      cell.addEventListener("click", () => {
         select.focus();
+      });
+
+      cell.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        var code = select.value === "__AUTO__" ? "" : select.value;
+        if (!code || code === "" || code === "FOLGA" || code === "DOM") {
+          var empId = select.dataset.employee;
+          var date = select.dataset.date;
+          var scaleCompany = select.dataset.scaleCompany || AppData.state.selectedCompany;
+          var data = AppData.getCompanyData(scaleCompany);
+          var emp = data.employees.find(function (emp) { return emp.id === empId; });
+          var empName = emp ? emp.name : empId;
+          showAbsencePopup(empId, date, empName, scaleCompany);
+        }
       });
     });
 

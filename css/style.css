@@ -1006,6 +1006,11 @@ small.progress-hint.progress-tone-info {
   top: 0;
   z-index: 3;
   background: linear-gradient(180deg, var(--sand), var(--sea-100));
+  background-color: var(--sand);
+}
+
+.scale-table thead tr:nth-child(2) th {
+  top: 26px;
 }
 
 .employee-sticky {
@@ -1641,6 +1646,9 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   font-size: 0.62rem;
   line-height: 1;
   background: #fff7ed;
+  position: sticky;
+  top: 26px;
+  z-index: 3;
 }
 
 .scale-coverage-indicator-row .coverage-indicator-label {
@@ -1650,6 +1658,7 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   color: #9a3412;
   min-width: 130px;
   width: 130px;
+  z-index: 5;
 }
 
 .scale-coverage-indicator-row .coverage-indicator-cell {
@@ -2427,8 +2436,8 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .contador-period {
@@ -2603,13 +2612,23 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   border: 1px solid var(--line);
 }
 
+.field-readonly {
+  background: var(--sand) !important;
+  color: var(--sea-700);
+  cursor: default;
+}
+
 /* ── Resumo grid ── */
 
 .resumo-toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.resumo-toolbar-compact {
+  margin-bottom: 6px;
 }
 
 .resumo-company-label {
@@ -2701,7 +2720,7 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   gap: 16px;
   margin-bottom: 12px;
 }
