@@ -834,21 +834,23 @@
         </div>
       `;
 
-      const cellRect = cell.getBoundingClientRect();
-      picker.style.position = "fixed";
-      picker.style.top = `${cellRect.bottom + 4}px`;
-      picker.style.left = `${Math.min(cellRect.left, window.innerWidth - 280)}px`;
-      document.body.appendChild(picker);
+      const backdrop = document.createElement("div");
+      backdrop.className = "modal-backdrop";
+      const wrapper = document.createElement("div");
+      wrapper.className = "modal-center";
+      wrapper.appendChild(picker);
+      backdrop.appendChild(wrapper);
+      document.body.appendChild(backdrop);
 
       picker.querySelector("#coPickerCancel").addEventListener("click", () => {
-        picker.remove();
+        backdrop.remove();
         AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
         renderCurrent(container);
       });
 
       picker.querySelector("#coPickerConfirm").addEventListener("click", () => {
         const linkedId = picker.querySelector("#coHolidaySelect").value || null;
-        picker.remove();
+        backdrop.remove();
         const result = AppData.setManualScale(employeeId, date, "CO", linkedId, scaleCompany);
         if (result?.coWarning) window.App?.toast?.(result.coWarning, "warning", 5000);
         renderCurrent(container);
@@ -857,10 +859,9 @@
 
       setTimeout(() => {
         const outsideClick = (e) => {
-          if (!picker.contains(e.target)) {
-            picker.remove();
+          if (!wrapper.contains(e.target)) {
+            backdrop.remove();
             document.removeEventListener("mousedown", outsideClick);
-            // Reverte se não confirmou
             const entry = AppData.getManualScaleEntry(employeeId, date, data);
             if (typeof entry !== "object") {
               AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
