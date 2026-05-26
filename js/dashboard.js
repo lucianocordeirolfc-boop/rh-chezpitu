@@ -8,6 +8,8 @@
       const dueDate = AppData.addDays(holiday.date, 120);
       return holiday.workedEmployees
         .filter((item) => {
+          const emp = data.employees.find((e) => e.id === item.employeeId);
+          if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return false;
           const resolved = AppData.resolveWorkedHolidayStatus(item, holiday.date);
           return resolved.key === "pendente" || resolved.key === "agendado";
         })

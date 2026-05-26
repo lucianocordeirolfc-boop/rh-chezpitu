@@ -34,6 +34,7 @@
     const workedItem = line.workedItem || null;
     const holidayDate = line.holiday?.date;
     if (!workedItem || !holidayDate) {
+      if (line.daysLeft < 0) return { key: "vencido", label: "Vencido", daysLeft: line.daysLeft };
       return { key: "pendente", label: "Pendente", daysLeft: line.daysLeft };
     }
     return AppData.resolveWorkedHolidayStatus(workedItem, holidayDate);
@@ -201,15 +202,12 @@
     if (filterState.prazo === "todos") return true;
     const d = line.daysLeft;
     const key = statusKey(line);
-    if (key === "compensado") {
-      return filterState.prazo === "compensado";
-    }
     switch (filterState.prazo) {
-      case "vencido": return d < 0;
-      case "5dias": return d >= 0 && d <= 5;
-      case "10dias": return d > 5 && d <= 10;
-      case "20dias": return d > 10 && d <= 20;
-      case "noprazo": return d > 20;
+      case "vencido": return key === "vencido" || (key !== "compensado" && d < 0);
+      case "5dias": return key !== "compensado" && d >= 0 && d <= 5;
+      case "10dias": return key !== "compensado" && d > 5 && d <= 10;
+      case "20dias": return key !== "compensado" && d > 10 && d <= 20;
+      case "noprazo": return key !== "compensado" && d > 20;
       case "compensado": return key === "compensado";
       default: return true;
     }
@@ -370,9 +368,26 @@
       .join("")}</ul>`;
   }
 
-  function renderMetrics(container, stats, allLines, autoPendingCount) {
+  function computeStatsFromLines(allLines) {
+    const stats = { pending: 0, agendado: 0, compensado: 0, vencido: 0, deadlineAlerts: 0 };
+    allLines.forEach(function (line) {
+      if (!line.workedItem) return;
+      var key = statusKey(line);
+      if (key === "pendente") stats.pending += 1;
+      if (key === "agendado") stats.agendado += 1;
+      if (key === "compensado") stats.compensado += 1;
+      if (key === "vencido") stats.vencido += 1;
+      if ((key === "pendente" || key === "agendado") && line.daysLeft <= 20) {
+        stats.deadlineAlerts += 1;
+      }
+    });
+    return stats;
+  }
+
+  function renderMetrics(container, allLines, autoPendingCount) {
     const metrics = container.querySelector("[data-holiday-metrics]");
     if (!metrics) return;
+    const stats = computeStatsFromLines(allLines);
     metrics.innerHTML = `
       <article class="stat-chip"><span>Registros</span><strong>${allLines.length}</strong></article>
       <article class="stat-chip"><span>Pendentes</span><strong>${stats.pending}</strong></article>
@@ -396,12 +411,13 @@
       });
     }
 
-    const stats = AppData.getHolidayStats();
     const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(AppData.state.selectedCompany) || 0;
-    renderMetrics(container, stats, allLines, autoPendingCount);
+    renderMetrics(container, allLines, autoPendingCount);
 
     const alertsPanel = container.querySelector("[data-holiday-alerts]");
     if (alertsPanel) alertsPanel.innerHTML = renderAlerts(allLines);
+
+    bindTableActions(container);
   }
 
   function setCompensationDate(holidayId, employeeId, compensationDate) {
@@ -873,17 +889,17 @@
     const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
     const allLines = buildLines(data);
     const filteredLines = applyFilters(allLines);
-    const stats = AppData.getHolidayStats();
+    const lineStats = computeStatsFromLines(allLines);
     const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(AppData.state.selectedCompany) || 0;
 
     container.innerHTML = `
       <div class="dash-metrics" data-holiday-metrics>
         <article class="stat-chip"><span>Registros</span><strong>${allLines.length}</strong></article>
-        <article class="stat-chip"><span>Pendentes</span><strong>${stats.pending}</strong></article>
-        <article class="stat-chip chip-info"><span>Agendados</span><strong>${stats.agendado}</strong></article>
-        <article class="stat-chip"><span>Compensados</span><strong>${stats.compensado}</strong></article>
-        <article class="stat-chip chip-danger"><span>Vencidos</span><strong>${stats.vencido}</strong></article>
-        <article class="stat-chip"><span>Alertas prazo</span><strong>${stats.deadlineAlerts}</strong></article>
+        <article class="stat-chip"><span>Pendentes</span><strong>${lineStats.pending}</strong></article>
+        <article class="stat-chip chip-info"><span>Agendados</span><strong>${lineStats.agendado}</strong></article>
+        <article class="stat-chip"><span>Compensados</span><strong>${lineStats.compensado}</strong></article>
+        <article class="stat-chip chip-danger"><span>Vencidos</span><strong>${lineStats.vencido}</strong></article>
+        <article class="stat-chip"><span>Alertas prazo</span><strong>${lineStats.deadlineAlerts}</strong></article>
         <article class="stat-chip"><span>Auto escala pend.</span><strong>${autoPendingCount}</strong></article>
       </div>
 

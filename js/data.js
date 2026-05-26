@@ -1106,6 +1106,9 @@
 
     (data.holidays || []).forEach((holiday) => {
       (holiday.workedEmployees || []).forEach((item) => {
+        const emp = data.employees.find((e) => e.id === item.employeeId);
+        if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return;
+
         const resolved = resolveWorkedHolidayStatus(item, holiday.date, today);
         item.status = resolved.label;
         if (resolved.key === "pendente") stats.pending += 1;
