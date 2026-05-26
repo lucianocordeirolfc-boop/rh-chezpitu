@@ -369,24 +369,11 @@
     '</div>';
   }
 
-  function renderResumoTab(container, yearMonth) {
-    var companyOptions = AppData.COMPANIES.map(function (c) {
-      var sel = c === AppData.state.selectedCompany ? " selected" : "";
-      return '<option value="' + c + '"' + sel + '>' + c + '</option>';
-    }).join("");
-
+  function renderResumoTabContent(container, yearMonth) {
     var selectedCompany = AppData.state.selectedCompany;
-
-    var html =
-      '<div class="resumo-toolbar resumo-toolbar-compact">' +
-        '<select id="resumoCompanySelect" class="field-select">' + companyOptions + '</select>' +
-        '<button class="btn btn-primary btn-sm" id="btnPrintResumo">Imprimir / PDF</button>' +
-      '</div>' +
-      '<div id="resumoGridContainer">' +
-        renderResumoGrid(selectedCompany, yearMonth) +
-      '</div>';
-
-    return html;
+    return '<div id="resumoGridContainer">' +
+      renderResumoGrid(selectedCompany, yearMonth) +
+    '</div>';
   }
 
   function bindResumoEvents(container, yearMonth) {
@@ -443,6 +430,20 @@
     var company = AppData.state.selectedCompany;
     var activeTab = container._contadorActiveTab || "lancamentos";
 
+    var companyOptions = AppData.COMPANIES.map(function (c) {
+      var sel = c === AppData.state.selectedCompany ? " selected" : "";
+      return '<option value="' + c + '"' + sel + '>' + c + '</option>';
+    }).join("");
+
+    var toolbarRight = '';
+    if (activeTab === "lancamentos") {
+      toolbarRight = '<button class="btn btn-primary" id="btnNovoLancamento">+ Novo Lançamento</button>';
+    } else {
+      toolbarRight =
+        '<select id="resumoCompanySelect" class="field-select field-select-compact">' + companyOptions + '</select>' +
+        '<button class="btn btn-primary btn-sm" id="btnPrintResumo">Imprimir / PDF</button>';
+    }
+
     var html =
       '<div class="module-header">' +
         '<h2>Informações Contador</h2>' +
@@ -453,10 +454,10 @@
       '</div>' +
       '<div class="contador-toolbar">' +
         renderMonthSelector(yearMonth) +
-        (activeTab === "lancamentos" ? '<button class="btn btn-primary" id="btnNovoLancamento">+ Novo Lançamento</button>' : '') +
+        toolbarRight +
       '</div>' +
       '<div id="contadorTabContent">' +
-        (activeTab === "lancamentos" ? renderLancamentosTable(company, yearMonth) : renderResumoTab(container, yearMonth)) +
+        (activeTab === "lancamentos" ? renderLancamentosTable(company, yearMonth) : renderResumoTabContent(container, yearMonth)) +
       '</div>';
 
     container.innerHTML = html;

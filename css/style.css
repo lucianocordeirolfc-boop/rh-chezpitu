@@ -2627,8 +2627,8 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   margin-bottom: 8px;
 }
 
-.resumo-toolbar-compact {
-  margin-bottom: 6px;
+.field-select-compact {
+  max-width: 180px;
 }
 
 .resumo-company-label {
