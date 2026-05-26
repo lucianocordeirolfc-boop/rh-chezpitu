@@ -563,9 +563,14 @@
 
   /* ── Impressão Resumo Contador ── */
   body.printing-contador {
-    width: auto !important;
+    width: 297mm !important;
+    height: 210mm !important;
   }
 
+  body.printing-contador .sidebar,
+  body.printing-contador .topbar,
+  body.printing-contador .app-shell,
+  body.printing-contador .module,
   body.printing-contador .vt-print-area,
   body.printing-contador .vt-preview-card {
     display: none !important;
@@ -582,12 +587,10 @@
     top: 0;
     left: 0;
     width: 287mm !important;
-    height: 200mm !important;
     margin: 0 !important;
     padding: 5mm !important;
     background: #ffffff !important;
     color: var(--ink) !important;
-    page: contadorLandscape;
     overflow: visible !important;
   }
 
@@ -596,8 +599,12 @@
     padding-bottom: 2mm !important;
   }
 
-  body.printing-contador .resumo-print-header h2 {
-    font-size: 14pt !important;
+  body.printing-contador .resumo-print-title {
+    font-size: 10pt !important;
+  }
+
+  body.printing-contador .resumo-print-month {
+    font-size: 11pt !important;
   }
 
   body.printing-contador .resumo-print-table {
@@ -614,7 +621,12 @@
   }
 
   body.printing-contador .resumo-print-name {
-    width: 30% !important;
+    width: 25% !important;
     font-size: 7pt !important;
+  }
+
+  body.printing-contador .resumo-print-logo {
+    max-width: 25mm !important;
+    max-height: 15mm !important;
   }
 }

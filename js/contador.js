@@ -393,11 +393,18 @@
         printContainer.innerHTML = renderResumoPrintArea(company, yearMonth);
         printContainer.style.display = "block";
 
+        var pageStyle = document.createElement("style");
+        pageStyle.id = "contador-page-override";
+        pageStyle.textContent = "@page { size: A4 landscape; margin: 5mm; }";
+        document.head.appendChild(pageStyle);
+
         document.body.classList.add("printing-contador");
         setTimeout(function () {
           window.print();
           document.body.classList.remove("printing-contador");
           printContainer.style.display = "none";
+          var s = document.getElementById("contador-page-override");
+          if (s) s.remove();
         }, 200);
       });
     }
