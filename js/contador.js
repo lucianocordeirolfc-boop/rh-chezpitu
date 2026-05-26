@@ -224,12 +224,17 @@
 
       var targetCompany = companySelect.value;
       saveLancamento(targetCompany, yearMonth, record);
-      closePopup();
       App.toast("Lançamento salvo.", "success");
 
       if (targetCompany === AppData.state.selectedCompany) {
         renderContent(container, yearMonth);
       }
+
+      employeeSelect.value = "";
+      LANCAMENTO_FIELDS.forEach(function (f) {
+        var input = form.querySelector('[name="' + f.key + '"]');
+        if (input) input.value = "0";
+      });
     });
   }
 
