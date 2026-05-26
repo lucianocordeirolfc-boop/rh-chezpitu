@@ -116,24 +116,30 @@
         ];
       }
 
-      return holiday.workedEmployees.map((item) => {
-        const employee = getEmployee(item.employeeId, data);
-        AppData.syncWorkedEmployeeStatus(item, holiday.date);
-        const resolved = AppData.resolveWorkedHolidayStatus(item, holiday.date, today);
-        return {
-          holiday,
-          employee,
-          employeeId: item.employeeId,
-          employeeName: employee?.name || "Funcionário não encontrado",
-          department: employee?.department || "",
-          compensationDate: item.compensationDate || "",
-          scheduledCoDate: item.scheduledCoDate || item.compensationDate || "",
-          dueDate,
-          daysLeft: resolved.daysLeft,
-          workedItem: item,
-          company: AppData.state.selectedCompany
-        };
-      });
+      return holiday.workedEmployees
+        .filter((item) => {
+          const emp = getEmployee(item.employeeId, data);
+          if (!emp || !emp.admissionDate) return true;
+          return holiday.date >= emp.admissionDate;
+        })
+        .map((item) => {
+          const employee = getEmployee(item.employeeId, data);
+          AppData.syncWorkedEmployeeStatus(item, holiday.date);
+          const resolved = AppData.resolveWorkedHolidayStatus(item, holiday.date, today);
+          return {
+            holiday,
+            employee,
+            employeeId: item.employeeId,
+            employeeName: employee?.name || "Funcionário não encontrado",
+            department: employee?.department || "",
+            compensationDate: item.compensationDate || "",
+            scheduledCoDate: item.scheduledCoDate || item.compensationDate || "",
+            dueDate,
+            daysLeft: resolved.daysLeft,
+            workedItem: item,
+            company: AppData.state.selectedCompany
+          };
+        });
     });
   }
 

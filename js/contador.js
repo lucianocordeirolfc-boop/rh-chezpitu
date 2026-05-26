@@ -1,13 +1,13 @@
 (function () {
   const LANCAMENTO_FIELDS = [
-    { key: "falta",          label: "Falta (dias)" },
-    { key: "horaExtra",      label: "Hora Extra (horas)" },
-    { key: "gratificacao",   label: "Gratificação (R$)" },
-    { key: "comissoes",      label: "Comissões (R$)" },
-    { key: "consumoInterno", label: "Consumo Interno (R$)" },
-    { key: "domingoMulher",  label: "Domingo da Mulher (R$)" },
-    { key: "adNoturno",      label: "Ad. Noturno (horas)" },
-    { key: "vales",          label: "Vales (R$)" }
+    { key: "falta",          label: "Falta (dias)",           type: "number" },
+    { key: "horaExtra",      label: "Hora Extra",             type: "time" },
+    { key: "gratificacao",   label: "Gratificação (R$)",      type: "number" },
+    { key: "comissoes",      label: "Comissões (R$)",         type: "number" },
+    { key: "consumoInterno", label: "Consumo Interno (R$)",   type: "number" },
+    { key: "domingoMulher",  label: "Domingo da Mulher (R$)", type: "number" },
+    { key: "adNoturno",      label: "Ad. Noturno",            type: "time" },
+    { key: "vales",          label: "Vales (R$)",             type: "number" }
   ];
 
   function getActiveTab() {
@@ -79,6 +79,14 @@
     return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function formatCellValue(val, field) {
+    if (field.type === "time") {
+      if (!val || val === "0" || val === 0) return "—";
+      return String(val);
+    }
+    return formatMoney(val);
+  }
+
   function renderMonthSelector(selectedYM) {
     var parts = selectedYM.split("-");
     var year = parseInt(parts[0]);
@@ -123,7 +131,7 @@
       var name = App.formatDisplayName(getEmployeeName(company, l.employeeId));
       var cells = '<td class="cell-name">' + App.escapeHTML(name) + '</td>';
       LANCAMENTO_FIELDS.forEach(function (f) {
-        cells += '<td class="cell-number">' + formatMoney(l[f.key]) + '</td>';
+        cells += '<td class="cell-number">' + formatCellValue(l[f.key], f) + '</td>';
       });
       cells += '<td class="cell-actions">' +
         '<button class="btn-icon btn-edit-lancamento" data-emp="' + l.employeeId + '" title="Editar">✎</button>' +
@@ -152,6 +160,12 @@
 
     var fieldsHTML = LANCAMENTO_FIELDS.map(function (f) {
       var val = lancamento ? (lancamento[f.key] || "") : "";
+      if (f.type === "time") {
+        var timeVal = val || "00:00";
+        return '<label class="popup-field">' + f.label +
+          '<input type="time" name="' + f.key + '" value="' + timeVal + '">' +
+          '</label>';
+      }
       return '<label class="popup-field">' + f.label +
         '<input type="number" step="any" min="0" name="' + f.key + '" value="' + val + '" placeholder="0">' +
         '</label>';
@@ -219,7 +233,11 @@
       var record = { employeeId: empId };
       LANCAMENTO_FIELDS.forEach(function (f) {
         var input = form.querySelector('[name="' + f.key + '"]');
-        record[f.key] = input ? parseFloat(input.value) || 0 : 0;
+        if (f.type === "time") {
+          record[f.key] = input ? (input.value || "00:00") : "00:00";
+        } else {
+          record[f.key] = input ? parseFloat(input.value) || 0 : 0;
+        }
       });
 
       var targetCompany = companySelect.value;
@@ -233,7 +251,7 @@
       employeeSelect.value = "";
       LANCAMENTO_FIELDS.forEach(function (f) {
         var input = form.querySelector('[name="' + f.key + '"]');
-        if (input) input.value = "0";
+        if (input) input.value = f.type === "time" ? "00:00" : "0";
       });
     });
   }
@@ -276,8 +294,8 @@
       var lanc = lancMap[emp.id];
       var cells = '<td class="resumo-name-cell">' + App.escapeHTML(App.formatDisplayName(emp.name)) + '</td>';
       LANCAMENTO_FIELDS.forEach(function (f) {
-        var val = lanc ? lanc[f.key] : 0;
-        cells += '<td class="resumo-data-cell">' + formatMoney(val) + '</td>';
+        var val = lanc ? lanc[f.key] : (f.type === "time" ? "" : 0);
+        cells += '<td class="resumo-data-cell">' + formatCellValue(val, f) + '</td>';
       });
       return '<tr>' + cells + '</tr>';
     }).join("");
@@ -319,8 +337,8 @@
       var lanc = lancMap[emp.id];
       var cells = '<td class="resumo-print-name">' + App.escapeHTML(App.formatDisplayName(emp.name)) + '</td>';
       LANCAMENTO_FIELDS.forEach(function (f) {
-        var val = lanc ? lanc[f.key] : 0;
-        cells += '<td>' + formatMoney(val) + '</td>';
+        var val = lanc ? lanc[f.key] : (f.type === "time" ? "" : 0);
+        cells += '<td>' + formatCellValue(val, f) + '</td>';
       });
       return '<tr>' + cells + '</tr>';
     }).join("");
@@ -369,7 +387,7 @@
       '<div id="resumoGridContainer">' +
         renderResumoGrid(selectedCompany, yearMonth) +
       '</div>' +
-      '<div id="resumoPrintContainer" style="display:none"></div>';
+      '';
 
     return html;
   }
@@ -389,9 +407,14 @@
     if (printBtn) {
       printBtn.addEventListener("click", function () {
         var company = companySel ? companySel.value : AppData.state.selectedCompany;
-        var printContainer = document.getElementById("resumoPrintContainer");
+
+        var existing = document.getElementById("resumoPrintContainer");
+        if (existing) existing.remove();
+
+        var printContainer = document.createElement("div");
+        printContainer.id = "resumoPrintContainer";
         printContainer.innerHTML = renderResumoPrintArea(company, yearMonth);
-        printContainer.style.display = "block";
+        document.body.appendChild(printContainer);
 
         var pageStyle = document.createElement("style");
         pageStyle.id = "contador-page-override";
@@ -402,7 +425,7 @@
         setTimeout(function () {
           window.print();
           document.body.classList.remove("printing-contador");
-          printContainer.style.display = "none";
+          printContainer.remove();
           var s = document.getElementById("contador-page-override");
           if (s) s.remove();
         }, 200);
