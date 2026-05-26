@@ -875,6 +875,91 @@
       }, 0);
     }
 
+    var RANGE_CODES = new Set(["ATESTADO", "FÉRIAS", "LICENÇA", "FALTA", "SUSPENSÃO"]);
+
+    function showDateRangePicker(employeeId, date, code, scaleCompany) {
+      document.getElementById("dateRangePicker")?.remove();
+
+      var data = AppData.getCompanyData(scaleCompany || AppData.state.selectedCompany);
+      var emp = (data.employees || []).find(function (e) { return e.id === employeeId; });
+      var empName = emp ? emp.name : employeeId;
+
+      var labels = {
+        "ATESTADO": "Atestado",
+        "FÉRIAS": "Férias",
+        "LICENÇA": "Licença",
+        "FALTA": "Falta",
+        "SUSPENSÃO": "Suspensão"
+      };
+      var label = labels[code] || code;
+
+      var picker = document.createElement("div");
+      picker.id = "dateRangePicker";
+      picker.className = "co-holiday-picker";
+      picker.innerHTML =
+        '<p class="co-picker-title">' + esc(label) + '</p>' +
+        '<p class="co-picker-hint">Funcionário: <strong>' + esc(empName) + '</strong></p>' +
+        '<div style="display:flex;gap:12px;margin:12px 0">' +
+          '<label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">Data Início' +
+            '<input type="date" id="rangeStartDate" class="field-select" value="' + date + '">' +
+          '</label>' +
+          '<label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">Data Fim' +
+            '<input type="date" id="rangeEndDate" class="field-select" value="' + date + '">' +
+          '</label>' +
+        '</div>' +
+        '<div class="co-picker-actions">' +
+          '<button id="rangePickerCancel" class="secondary btn-sm" type="button">Cancelar</button>' +
+          '<button id="rangePickerConfirm" class="primary btn-sm" type="button">Confirmar</button>' +
+        '</div>';
+
+      var backdrop = document.createElement("div");
+      backdrop.className = "modal-backdrop";
+      var wrapper = document.createElement("div");
+      wrapper.className = "modal-center";
+      wrapper.appendChild(picker);
+      backdrop.appendChild(wrapper);
+      document.body.appendChild(backdrop);
+
+      picker.querySelector("#rangePickerCancel").addEventListener("click", function () {
+        backdrop.remove();
+        AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
+        renderCurrent(container);
+      });
+
+      picker.querySelector("#rangePickerConfirm").addEventListener("click", function () {
+        var startStr = picker.querySelector("#rangeStartDate").value;
+        var endStr = picker.querySelector("#rangeEndDate").value;
+        if (!startStr || !endStr) { alert("Preencha as duas datas."); return; }
+        if (endStr < startStr) { alert("Data fim não pode ser anterior à data início."); return; }
+
+        var cur = new Date(startStr + "T00:00:00");
+        var end = new Date(endStr + "T00:00:00");
+        var count = 0;
+        while (cur <= end) {
+          var dayStr = cur.toISOString().slice(0, 10);
+          AppData.setManualScale(employeeId, dayStr, code, null, scaleCompany);
+          cur.setDate(cur.getDate() + 1);
+          count++;
+        }
+        backdrop.remove();
+        renderCurrent(container);
+        window.App.renderCurrent();
+        if (window.App?.toast) window.App.toast(label + " registrado(a) para " + count + " dia(s).", "success", 3000);
+      });
+
+      setTimeout(function () {
+        var outsideClick = function (e) {
+          if (!wrapper.contains(e.target)) {
+            backdrop.remove();
+            document.removeEventListener("mousedown", outsideClick);
+            AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
+            renderCurrent(container);
+          }
+        };
+        document.addEventListener("mousedown", outsideClick);
+      }, 0);
+    }
+
     function showAbsencePopup(employeeId, date, employeeName, company) {
       var existing = document.getElementById("scaleAbsencePopup");
       if (existing) existing.remove();
@@ -984,6 +1069,13 @@
             select.closest(".scale-cell"),
             select.dataset.employee,
             select.dataset.date,
+            scaleCompany
+          );
+        } else if (RANGE_CODES.has(select.value)) {
+          showDateRangePicker(
+            select.dataset.employee,
+            select.dataset.date,
+            select.value,
             scaleCompany
           );
         } else {
