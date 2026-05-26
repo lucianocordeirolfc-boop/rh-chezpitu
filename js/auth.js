@@ -1,6 +1,6 @@
 (function () {
   const firebaseConfig = {
-    apiKey: "AIzaSyD2Bw5TO_Q4fpvjdFwDGnJkiMenutGOFbM",
+    apiKey: "AIzaSyD2Bw5TO-Q4fpvjdFwDGnJkiMenutGOFbM",
     authDomain: "chez-pitu-rh.firebaseapp.com",
     databaseURL: "https://chez-pitu-rh-default-rtdb.firebaseio.com",
     projectId: "chez-pitu-rh",
