@@ -238,15 +238,29 @@
     });
   }
 
+  function getCompanyInfo(company) {
+    var data = AppData.getCompanyData(company);
+    return data && data.companyInfo ? data.companyInfo : {};
+  }
+
   function renderResumoGrid(company, yearMonth) {
     var employees = getEmployeesForCompany(company);
     var lancamentos = getLancamentos(company, yearMonth);
+    var info = getCompanyInfo(company);
 
     var lancMap = {};
     lancamentos.forEach(function (l) { lancMap[l.employeeId] = l; });
 
+    var logoHTML = info.logoDataUrl
+      ? '<img src="' + info.logoDataUrl + '" alt="Logo" class="resumo-logo">'
+      : '';
+
     if (!employees.length) {
-      return '<div class="empty-state"><strong>Nenhum funcionário ativo em ' + App.escapeHTML(company) + '.</strong></div>';
+      return '<div class="resumo-grid-header">' +
+        '<div class="resumo-grid-title"><h3>' + App.escapeHTML(company) + '</h3></div>' +
+        logoHTML +
+      '</div>' +
+      '<div class="empty-state"><strong>Nenhum funcionário ativo em ' + App.escapeHTML(company) + '.</strong></div>';
     }
 
     var shortLabels = LANCAMENTO_FIELDS.map(function (f) {
@@ -268,7 +282,11 @@
       return '<tr>' + cells + '</tr>';
     }).join("");
 
-    return '<div class="table-scroll resumo-scroll">' +
+    return '<div class="resumo-grid-header">' +
+      '<div class="resumo-grid-title"><h3>' + App.escapeHTML(company) + '</h3></div>' +
+      logoHTML +
+    '</div>' +
+    '<div class="table-scroll resumo-scroll">' +
       '<table class="data-table resumo-table">' +
         '<thead><tr>' + headerCells + '</tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
@@ -286,6 +304,7 @@
   function renderResumoPrintArea(company, yearMonth) {
     var employees = getEmployeesForCompany(company);
     var lancamentos = getLancamentos(company, yearMonth);
+    var info = getCompanyInfo(company);
     var lancMap = {};
     lancamentos.forEach(function (l) { lancMap[l.employeeId] = l; });
 
@@ -306,14 +325,23 @@
       return '<tr>' + cells + '</tr>';
     }).join("");
 
+    var logoHTML = info.logoDataUrl
+      ? '<img src="' + info.logoDataUrl + '" alt="Logo" class="resumo-print-logo">'
+      : '';
+
+    var legalName = info.legalName || company;
+    var cnpj = info.cnpj || '';
+
     return '<div class="resumo-print-area">' +
       '<div class="resumo-print-header">' +
-        '<div>' +
-          '<span>Informações para o Contador</span>' +
-          '<h2>' + App.escapeHTML(company) + '</h2>' +
+        '<div class="resumo-print-left">' +
+          '<span class="resumo-print-title">Informações Fechamento Folha Salarial</span>' +
+          '<p class="resumo-print-month">Mês: ' + getMonthName(yearMonth) + '</p>' +
+          '<p class="resumo-print-company">' + App.escapeHTML(legalName) + '</p>' +
+          (cnpj ? '<p class="resumo-print-cnpj">CNPJ: ' + App.escapeHTML(cnpj) + '</p>' : '') +
         '</div>' +
-        '<div class="resumo-print-period">' +
-          '<strong>' + getMonthName(yearMonth) + '</strong>' +
+        '<div class="resumo-print-right">' +
+          logoHTML +
         '</div>' +
       '</div>' +
       '<table class="resumo-print-table">' +
