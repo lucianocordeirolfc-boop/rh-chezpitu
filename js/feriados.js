@@ -4,7 +4,10 @@
     employeeId: "todos",
     holidayId: "todos",
     department: "todos",
-    status: "todos"
+    status: "todos",
+    prazo: "todos",
+    compDateFrom: "",
+    compDateTo: ""
   };
 
   let searchDelegationReady = false;
@@ -140,7 +143,10 @@
       filterState.employeeId !== "todos" ||
       filterState.holidayId !== "todos" ||
       filterState.department !== "todos" ||
-      filterState.status !== "todos"
+      filterState.status !== "todos" ||
+      filterState.prazo !== "todos" ||
+      Boolean(filterState.compDateFrom) ||
+      Boolean(filterState.compDateTo)
     );
   }
 
@@ -185,6 +191,31 @@
     return false;
   }
 
+  function matchesPrazoFilter(line) {
+    if (filterState.prazo === "todos") return true;
+    const d = line.daysLeft;
+    const key = statusKey(line);
+    if (key === "compensado") {
+      return filterState.prazo === "compensado";
+    }
+    switch (filterState.prazo) {
+      case "vencido": return d < 0;
+      case "5dias": return d >= 0 && d <= 5;
+      case "10dias": return d > 5 && d <= 10;
+      case "20dias": return d > 10 && d <= 20;
+      case "noprazo": return d > 20;
+      case "compensado": return key === "compensado";
+      default: return true;
+    }
+  }
+
+  function matchesCompDateFilter(line) {
+    var cd = line.compensationDate || line.scheduledCoDate || "";
+    if (filterState.compDateFrom && (!cd || cd < filterState.compDateFrom)) return false;
+    if (filterState.compDateTo && (!cd || cd > filterState.compDateTo)) return false;
+    return true;
+  }
+
   function applyFilters(lines) {
     return lines.filter((line) => {
       if (!matchesSearch(line, filterState.search)) return false;
@@ -192,6 +223,8 @@
       if (filterState.holidayId !== "todos" && line.holiday.id !== filterState.holidayId) return false;
       if (filterState.department !== "todos" && line.department !== filterState.department) return false;
       if (!matchesStatusFilter(line)) return false;
+      if (!matchesPrazoFilter(line)) return false;
+      if (!matchesCompDateFilter(line)) return false;
       return true;
     });
   }
@@ -281,6 +314,15 @@
       { value: "alerta5", label: "Alerta 5 dias" }
     ];
 
+    const prazos = [
+      { value: "noprazo", label: "No prazo (>20 dias)" },
+      { value: "20dias", label: "Faltam 11–20 dias" },
+      { value: "10dias", label: "Faltam 6–10 dias" },
+      { value: "5dias", label: "Faltam ≤5 dias" },
+      { value: "vencido", label: "Vencido" },
+      { value: "compensado", label: "Compensado" }
+    ];
+
     return `
       <div class="filter-panel filter-panel-compact" data-holiday-filters>
         <label class="full">Buscar
@@ -290,6 +332,9 @@
         <label>Feriado<select id="holidayNameFilter">${options(holidays, filterState.holidayId, "Todos")}</select></label>
         <label>Setor<select id="holidayDepartmentFilter">${options(departments, filterState.department, "Todos")}</select></label>
         <label>Status<select id="holidayStatusFilter">${options(statuses, filterState.status, "Todos")}</select></label>
+        <label>Prazo / Progresso<select id="holidayPrazoFilter">${options(prazos, filterState.prazo, "Todos")}</select></label>
+        <label>Comp. prev. de<input id="holidayCompDateFrom" type="date" value="${esc(filterState.compDateFrom)}"></label>
+        <label>Comp. prev. até<input id="holidayCompDateTo" type="date" value="${esc(filterState.compDateTo)}"></label>
         <button id="clearHolidayFilters" class="secondary btn-sm" type="button">Limpar</button>
       </div>
     `;
@@ -428,22 +473,46 @@
       refreshTable(container);
     });
 
+    container.querySelector("#holidayPrazoFilter")?.addEventListener("change", (event) => {
+      filterState.prazo = event.target.value;
+      refreshTable(container);
+    });
+
+    container.querySelector("#holidayCompDateFrom")?.addEventListener("change", (event) => {
+      filterState.compDateFrom = event.target.value;
+      refreshTable(container);
+    });
+
+    container.querySelector("#holidayCompDateTo")?.addEventListener("change", (event) => {
+      filterState.compDateTo = event.target.value;
+      refreshTable(container);
+    });
+
     container.querySelector("#clearHolidayFilters")?.addEventListener("click", () => {
       filterState.search = "";
       filterState.employeeId = "todos";
       filterState.holidayId = "todos";
       filterState.department = "todos";
       filterState.status = "todos";
+      filterState.prazo = "todos";
+      filterState.compDateFrom = "";
+      filterState.compDateTo = "";
       const searchInput = container.querySelector("#holidaySearch");
       if (searchInput) searchInput.value = "";
       const employeeFilter = container.querySelector("#holidayEmployeeFilter");
       const nameFilter = container.querySelector("#holidayNameFilter");
       const departmentFilter = container.querySelector("#holidayDepartmentFilter");
       const statusFilter = container.querySelector("#holidayStatusFilter");
+      const prazoFilter = container.querySelector("#holidayPrazoFilter");
+      const compFrom = container.querySelector("#holidayCompDateFrom");
+      const compTo = container.querySelector("#holidayCompDateTo");
       if (employeeFilter) employeeFilter.value = "todos";
       if (nameFilter) nameFilter.value = "todos";
       if (departmentFilter) departmentFilter.value = "todos";
       if (statusFilter) statusFilter.value = "todos";
+      if (prazoFilter) prazoFilter.value = "todos";
+      if (compFrom) compFrom.value = "";
+      if (compTo) compTo.value = "";
       refreshView(container);
     });
   }
