@@ -2197,6 +2197,10 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   background: linear-gradient(135deg, var(--sea-900) 0%, var(--sea-800) 40%, var(--sea-700) 100%);
 }
 
+.login-screen[hidden] {
+  display: none;
+}
+
 .login-card {
   width: 100%;
   max-width: 400px;
