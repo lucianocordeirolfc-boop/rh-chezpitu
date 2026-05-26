@@ -97,7 +97,8 @@
       absences: [],
       holidays: [],
       manualScale: {},
-      vtDeductions: {}
+      vtDeductions: {},
+      contadorLancamentos: {}
     };
   }
 
@@ -260,7 +261,11 @@
         holidays: remoteCo.holidays?.length ? remoteCo.holidays : localCo.holidays,
         vacations: remoteCo.vacations?.length ? remoteCo.vacations : localCo.vacations,
         absences: remoteCo.absences?.length ? remoteCo.absences : localCo.absences,
-        companyInfo: { ...localCo.companyInfo, ...remoteCo.companyInfo }
+        companyInfo: { ...localCo.companyInfo, ...remoteCo.companyInfo },
+        contadorLancamentos: mergeLancamentosMaps(
+          localCo.contadorLancamentos || {},
+          remoteCo.contadorLancamentos || {}
+        )
       };
     });
 
@@ -514,6 +519,21 @@
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  function mergeLancamentosMaps(localMap, remoteMap) {
+    const merged = {};
+    const allKeys = new Set([...Object.keys(localMap), ...Object.keys(remoteMap)]);
+    allKeys.forEach((ym) => {
+      const localArr = Array.isArray(localMap[ym]) ? localMap[ym] : [];
+      const remoteArr = Array.isArray(remoteMap[ym]) ? remoteMap[ym] : [];
+      const byEmp = {};
+      remoteArr.forEach((r) => { if (r.employeeId) byEmp[r.employeeId] = r; });
+      localArr.forEach((l) => { if (l.employeeId) byEmp[l.employeeId] = l; });
+      const arr = Object.values(byEmp);
+      if (arr.length) merged[ym] = arr;
+    });
+    return merged;
+  }
+
   function normalizeCompanyHolidays(companyBlock) {
     if (!companyBlock) return;
     companyBlock.holidays = mergeHolidayLists([], companyBlock.holidays || []);
@@ -553,6 +573,10 @@
       remoteState.companies[company].vacations = remoteState.companies[company].vacations || [];
       remoteState.companies[company].absences = remoteState.companies[company].absences || [];
       remoteState.companies[company].vtDeductions = mergeRecordMapsPreferLocal(remoteDeductions, localDeductions);
+      remoteState.companies[company].contadorLancamentos = mergeLancamentosMaps(
+        localCompanies?.[company]?.contadorLancamentos || {},
+        remoteState.companies[company].contadorLancamentos || {}
+      );
       normalizeCompanyHolidays(remoteState.companies[company]);
     });
     const remoteVt = remoteState.valeTransporte || {};
