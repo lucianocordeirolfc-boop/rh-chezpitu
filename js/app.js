@@ -10,13 +10,13 @@
   };
 
   const renderers = {
-    dashboard: window.DashboardModule.render,
-    funcionarios: window.FuncionariosModule.render,
-    escala: window.EscalaModule.render,
-    ferias: window.FeriasModule.render,
-    "vale-transporte": window.ValeTransporteModule.render,
-    feriados: window.FeriadosModule.render,
-    contador: window.ContadorModule.render
+    dashboard: window.DashboardModule?.render,
+    funcionarios: window.FuncionariosModule?.render,
+    escala: window.EscalaModule?.render,
+    ferias: window.FeriasModule?.render,
+    "vale-transporte": window.ValeTransporteModule?.render,
+    feriados: window.FeriadosModule?.render,
+    contador: window.ContadorModule?.render
   };
 
   function activeModuleId() {
@@ -40,7 +40,9 @@
       return;
     }
 
-    renderers[moduleId](container);
+    if (typeof renderers[moduleId] === "function") {
+      renderers[moduleId](container);
+    }
   }
 
   function renderCurrent() {
