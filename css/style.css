@@ -2701,6 +2701,7 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 6px;
   gap: 16px;
   margin-bottom: 12px;
 }
@@ -2712,8 +2713,8 @@ td.code-dom { background: #fff7e6; color: #b45309; }
 }
 
 .resumo-logo {
-  max-height: 48px;
-  max-width: 120px;
+  max-height: 36px;
+  max-width: 90px;
   object-fit: contain;
 }
 
@@ -2775,8 +2776,8 @@ td.code-dom { background: #fff7e6; color: #b45309; }
 }
 
 .resumo-print-logo {
-  max-width: 32mm;
-  max-height: 20mm;
+  max-width: 24mm;
+  max-height: 14mm;
   object-fit: contain;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;

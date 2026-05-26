@@ -422,12 +422,21 @@
         document.head.appendChild(pageStyle);
 
         document.body.classList.add("printing-contador");
-        setTimeout(function () {
-          window.print();
+
+        function cleanupPrint() {
           document.body.classList.remove("printing-contador");
-          printContainer.remove();
+          var pc = document.getElementById("resumoPrintContainer");
+          if (pc) pc.remove();
           var s = document.getElementById("contador-page-override");
           if (s) s.remove();
+          window.removeEventListener("afterprint", cleanupPrint);
+        }
+
+        window.addEventListener("afterprint", cleanupPrint);
+
+        setTimeout(function () {
+          window.print();
+          cleanupPrint();
         }, 200);
       });
     }

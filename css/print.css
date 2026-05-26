@@ -465,8 +465,8 @@
     visibility: hidden !important;
   }
 
-  .vt-print-area,
-  .vt-print-area *,
+  body:not(.printing-contador):not(.printing-scale) .vt-print-area,
+  body:not(.printing-contador):not(.printing-scale) .vt-print-area *,
   body.printing-scale .scale-print-area,
   body.printing-scale .scale-print-area * {
     visibility: visible !important;
@@ -482,11 +482,11 @@
     display: none !important;
   }
 
-  .app-shell,
-  .module.active,
-  .vt-preview-card,
-  .vt-preview-scroll,
-  .vt-print-area {
+  body:not(.printing-contador):not(.printing-scale) .app-shell,
+  body:not(.printing-contador):not(.printing-scale) .module.active,
+  body:not(.printing-contador):not(.printing-scale) .vt-preview-card,
+  body:not(.printing-contador):not(.printing-scale) .vt-preview-scroll,
+  body:not(.printing-contador):not(.printing-scale) .vt-print-area {
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -567,18 +567,19 @@
     height: 210mm !important;
   }
 
-  body.printing-contador .sidebar,
-  body.printing-contador .topbar,
-  body.printing-contador .app-shell,
-  body.printing-contador .module,
-  body.printing-contador .vt-print-area,
-  body.printing-contador .vt-preview-card {
+  body.printing-contador > *:not(#resumoPrintContainer) {
     display: none !important;
   }
 
+  body.printing-contador #resumoPrintContainer,
+  body.printing-contador #resumoPrintContainer *,
   body.printing-contador .resumo-print-area,
   body.printing-contador .resumo-print-area * {
     visibility: visible !important;
+  }
+
+  body.printing-contador #resumoPrintContainer {
+    display: block !important;
   }
 
   body.printing-contador .resumo-print-area {
