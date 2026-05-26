@@ -183,6 +183,8 @@
       .map((employee) => ({ ...employee, _scaleCompany: AppData.state.selectedCompany }));
 
     getPrincipalEmployeesExtra().forEach((employee) => {
+      if (employee._scaleCompany !== AppData.state.selectedCompany) return;
+
       const matchesDepartment =
         scaleState.department === "todos" || employee.department === scaleState.department;
       const matchesSearch =
