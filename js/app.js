@@ -5,7 +5,8 @@
     escala: "Escala de Folga",
     ferias: "Ausências",
     "vale-transporte": "Recibo de Vale-transporte",
-    feriados: "Controle de Feriados"
+    feriados: "Controle de Feriados",
+    contador: "Informações Contador"
   };
 
   const renderers = {
@@ -14,7 +15,8 @@
     escala: window.EscalaModule.render,
     ferias: window.FeriasModule.render,
     "vale-transporte": window.ValeTransporteModule.render,
-    feriados: window.FeriadosModule.render
+    feriados: window.FeriadosModule.render,
+    contador: window.ContadorModule.render
   };
 
   function activeModuleId() {

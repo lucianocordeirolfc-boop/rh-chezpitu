@@ -2336,3 +2336,227 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   text-overflow: ellipsis;
   max-width: 200px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Módulo Informações Contador
+   ═══════════════════════════════════════════════════════════ */
+
+.contador-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 20px;
+}
+
+.contador-tab {
+  padding: 10px 24px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.contador-tab:hover {
+  color: var(--sea-700);
+}
+
+.contador-tab.active {
+  color: var(--sea-700);
+  border-bottom-color: var(--sea-700);
+}
+
+.contador-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.contador-period {
+  display: flex;
+  gap: 8px;
+}
+
+.contador-table th,
+.contador-table td {
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.contador-table .cell-name {
+  font-weight: 600;
+  min-width: 160px;
+}
+
+.contador-table .cell-number {
+  text-align: right;
+  min-width: 80px;
+}
+
+.contador-table .cell-actions {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.btn-icon:hover {
+  background: var(--sea-100);
+}
+
+.btn-edit-lancamento { color: var(--sea-700); }
+.btn-delete-lancamento { color: var(--danger); }
+
+/* Popup overlay */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  background: rgba(7, 26, 56, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.popup-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: 16px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.popup-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--sea-900);
+}
+
+.popup-close {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.popup-close:hover {
+  background: var(--sea-100);
+  color: var(--danger);
+}
+
+.popup-form {
+  padding: 20px 24px 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.popup-field {
+  display: grid;
+  gap: 5px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sea-900);
+}
+
+.popup-field select,
+.popup-field input {
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.popup-field select:focus,
+.popup-field input:focus {
+  outline: none;
+  border-color: var(--sea-500);
+  box-shadow: 0 0 0 3px rgba(34, 100, 209, 0.12);
+}
+
+.popup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.btn {
+  padding: 10px 22px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:hover { opacity: 0.88; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--sea-700), var(--sea-500));
+  color: #fff;
+}
+
+.btn-cancel {
+  background: var(--sand);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 600px) {
+  .popup-grid {
+    grid-template-columns: 1fr;
+  }
+  .contador-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

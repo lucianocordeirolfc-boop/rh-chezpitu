@@ -74,6 +74,7 @@ if (window.firebase && firebase.apps.length) {
     const feriados = {};
 
     const vtDescontos = {};
+    const contadorLancamentos = {};
     COMPANIES.forEach((company) => {
       const block = state.companies?.[company] || defaultCompanyData(company);
       empresas[company] = block.companyInfo || defaultCompanyData(company).companyInfo;
@@ -85,6 +86,7 @@ if (window.firebase && firebase.apps.length) {
       };
       feriados[company] = block.holidays || [];
       vtDescontos[company] = block.vtDeductions || {};
+      contadorLancamentos[company] = block.contadorLancamentos || {};
     });
 
     return {
@@ -104,7 +106,8 @@ if (window.firebase && firebase.apps.length) {
       coverageAlerts: state.coverageAlerts || [],
       coveragePrincipalBindings: state.coveragePrincipalBindings || {},
       scaleCodeConfig: state.scaleCodeConfig || {},
-      valeTransporte: state.valeTransporte || {}
+      valeTransporte: state.valeTransporte || {},
+      contadorLancamentos
     };
   }
 
@@ -156,7 +159,8 @@ if (window.firebase && firebase.apps.length) {
         vacations,
         absences,
         holidays: data.feriados?.[company] || [],
-        vtDeductions: data.vtDescontos?.[company] || {}
+        vtDeductions: data.vtDescontos?.[company] || {},
+        contadorLancamentos: data.contadorLancamentos?.[company] || {}
       };
     });
 
