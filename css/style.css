@@ -2603,6 +2603,98 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   border: 1px solid var(--line);
 }
 
+/* ── Resumo grid ── */
+
+.resumo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.resumo-company-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--sea-900);
+}
+
+.resumo-company-label select {
+  padding: 8px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.resumo-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 300px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.resumo-table {
+  min-width: 800px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.resumo-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, var(--sea-100), #e8eefb);
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--sea-900);
+  border-bottom: 2px solid var(--line);
+  white-space: nowrap;
+}
+
+.resumo-name-col {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 200px;
+  text-align: left !important;
+}
+
+.resumo-name-cell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  font-weight: 600;
+  color: var(--sea-900);
+  min-width: 200px;
+  padding: 10px 14px;
+  border-right: 2px solid var(--line);
+  box-shadow: 4px 0 8px rgba(7, 26, 56, 0.05);
+}
+
+.resumo-data-col {
+  text-align: center;
+  min-width: 100px;
+}
+
+.resumo-data-cell {
+  text-align: right;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  border-right: 1px solid rgba(208, 218, 242, 0.4);
+}
+
+.resumo-table tbody tr:nth-child(even) .resumo-name-cell {
+  background: #f7f9fd;
+}
+
 @media (max-width: 600px) {
   .popup-grid {
     grid-template-columns: 1fr;
@@ -2610,5 +2702,9 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   .contador-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+  .resumo-name-col,
+  .resumo-name-cell {
+    min-width: 140px;
   }
 }

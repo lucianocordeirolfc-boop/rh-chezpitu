@@ -233,30 +233,109 @@
     });
   }
 
+  function renderResumoGrid(company, yearMonth) {
+    var employees = getEmployeesForCompany(company);
+    var lancamentos = getLancamentos(company, yearMonth);
+
+    var lancMap = {};
+    lancamentos.forEach(function (l) { lancMap[l.employeeId] = l; });
+
+    if (!employees.length) {
+      return '<div class="empty-state"><strong>Nenhum funcionário ativo em ' + App.escapeHTML(company) + '.</strong></div>';
+    }
+
+    var shortLabels = LANCAMENTO_FIELDS.map(function (f) {
+      return f.label.split(" (")[0];
+    });
+
+    var headerCells = '<th class="resumo-name-col">Funcionário</th>';
+    shortLabels.forEach(function (label) {
+      headerCells += '<th class="resumo-data-col">' + label + '</th>';
+    });
+
+    var rows = employees.map(function (emp) {
+      var lanc = lancMap[emp.id];
+      var cells = '<td class="resumo-name-cell">' + App.escapeHTML(App.formatDisplayName(emp.name)) + '</td>';
+      LANCAMENTO_FIELDS.forEach(function (f) {
+        var val = lanc ? lanc[f.key] : 0;
+        cells += '<td class="resumo-data-cell">' + formatMoney(val) + '</td>';
+      });
+      return '<tr>' + cells + '</tr>';
+    }).join("");
+
+    return '<div class="table-scroll resumo-scroll">' +
+      '<table class="data-table resumo-table">' +
+        '<thead><tr>' + headerCells + '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' +
+    '</div>';
+  }
+
+  function renderResumoTab(container, yearMonth) {
+    var companyOptions = AppData.COMPANIES.map(function (c) {
+      var sel = c === AppData.state.selectedCompany ? " selected" : "";
+      return '<option value="' + c + '"' + sel + '>' + c + '</option>';
+    }).join("");
+
+    var selectedCompany = AppData.state.selectedCompany;
+
+    var html =
+      '<div class="resumo-toolbar">' +
+        '<label class="resumo-company-label">Empresa ' +
+          '<select id="resumoCompanySelect" class="field-select">' + companyOptions + '</select>' +
+        '</label>' +
+      '</div>' +
+      '<div id="resumoGridContainer">' +
+        renderResumoGrid(selectedCompany, yearMonth) +
+      '</div>';
+
+    return html;
+  }
+
+  function bindResumoEvents(container, yearMonth) {
+    var companySel = document.getElementById("resumoCompanySelect");
+    if (companySel) {
+      companySel.addEventListener("change", function () {
+        var gridContainer = document.getElementById("resumoGridContainer");
+        if (gridContainer) {
+          gridContainer.innerHTML = renderResumoGrid(companySel.value, yearMonth);
+        }
+      });
+    }
+  }
+
   function renderContent(container, yearMonth) {
     var company = AppData.state.selectedCompany;
+    var activeTab = container._contadorActiveTab || "lancamentos";
 
     var html =
       '<div class="module-header">' +
         '<h2>Informações Contador</h2>' +
       '</div>' +
       '<div class="contador-tabs">' +
-        '<button class="contador-tab active" data-tab="lancamentos">Lançamentos</button>' +
-        '<button class="contador-tab" data-tab="resumo">Resumo</button>' +
+        '<button class="contador-tab' + (activeTab === "lancamentos" ? " active" : "") + '" data-tab="lancamentos">Lançamentos</button>' +
+        '<button class="contador-tab' + (activeTab === "resumo" ? " active" : "") + '" data-tab="resumo">Resumo</button>' +
       '</div>' +
       '<div class="contador-toolbar">' +
         renderMonthSelector(yearMonth) +
-        '<button class="btn btn-primary" id="btnNovoLancamento">+ Novo Lançamento</button>' +
+        (activeTab === "lancamentos" ? '<button class="btn btn-primary" id="btnNovoLancamento">+ Novo Lançamento</button>' : '') +
       '</div>' +
       '<div id="contadorTabContent">' +
-        renderLancamentosTable(company, yearMonth) +
+        (activeTab === "lancamentos" ? renderLancamentosTable(company, yearMonth) : renderResumoTab(container, yearMonth)) +
       '</div>';
 
     container.innerHTML = html;
 
-    document.getElementById("btnNovoLancamento").addEventListener("click", function () {
-      openPopup(container, company, yearMonth, null);
-    });
+    if (activeTab === "resumo") {
+      bindResumoEvents(container, yearMonth);
+    }
+
+    var novoBtn = document.getElementById("btnNovoLancamento");
+    if (novoBtn) {
+      novoBtn.addEventListener("click", function () {
+        openPopup(container, company, yearMonth, null);
+      });
+    }
 
     container.addEventListener("click", function (e) {
       var editBtn = e.target.closest(".btn-edit-lancamento");
@@ -288,14 +367,8 @@
     var tabs = container.querySelectorAll(".contador-tab");
     tabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
-        tabs.forEach(function (t) { t.classList.remove("active"); });
-        tab.classList.add("active");
-        var tabContent = document.getElementById("contadorTabContent");
-        if (tab.dataset.tab === "lancamentos") {
-          tabContent.innerHTML = renderLancamentosTable(company, yearMonth);
-        } else if (tab.dataset.tab === "resumo") {
-          tabContent.innerHTML = '<div class="empty-state"><strong>Em breve.</strong><span>Resumo mensal para o contador.</span></div>';
-        }
+        container._contadorActiveTab = tab.dataset.tab;
+        renderContent(container, yearMonth);
       });
     });
   }
