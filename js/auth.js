@@ -18,8 +18,6 @@
 
   let currentUser = null;
   let onLoginCallback = null;
-  let loginInProgress = false;
-  let appVisible = false;
 
   function getUser() {
     return currentUser;
@@ -29,56 +27,44 @@
     return currentUser !== null;
   }
 
-  function showLogin() {
-    appVisible = false;
-    const loginScreen = document.getElementById("loginScreen");
-    const sidebar = document.querySelector(".sidebar");
-    const appShell = document.querySelector(".app-shell");
-    const toast = document.getElementById("toastContainer");
+  function hide(el) { if (el) el.style.display = "none"; }
+  function show(el, type) { if (el) el.style.display = type || ""; }
 
-    if (loginScreen) loginScreen.hidden = false;
-    if (sidebar) sidebar.hidden = true;
-    if (appShell) appShell.hidden = true;
-    if (toast) toast.hidden = true;
+  function showLogin() {
+    hide(document.querySelector(".sidebar"));
+    hide(document.querySelector(".app-shell"));
+    hide(document.getElementById("toastContainer"));
+    show(document.getElementById("loginScreen"), "flex");
   }
 
   function showApp() {
-    appVisible = true;
-    const loginScreen = document.getElementById("loginScreen");
-    const sidebar = document.querySelector(".sidebar");
-    const appShell = document.querySelector(".app-shell");
-    const toast = document.getElementById("toastContainer");
+    hide(document.getElementById("loginScreen"));
+    show(document.querySelector(".sidebar"));
+    show(document.querySelector(".app-shell"));
+    show(document.getElementById("toastContainer"));
 
-    if (loginScreen) loginScreen.hidden = true;
-    if (sidebar) sidebar.hidden = false;
-    if (appShell) appShell.hidden = false;
-    if (toast) toast.hidden = false;
-
-    const userLabel = document.getElementById("loggedUserLabel");
+    var userLabel = document.getElementById("loggedUserLabel");
     if (userLabel && currentUser) {
       userLabel.textContent = currentUser.email;
     }
   }
 
   function clearLoginForm() {
-    const form = document.getElementById("loginForm");
-    const errorEl = document.getElementById("loginError");
+    var form = document.getElementById("loginForm");
+    var errorEl = document.getElementById("loginError");
     if (form) form.reset();
-    if (errorEl) {
-      errorEl.hidden = true;
-      errorEl.textContent = "";
-    }
+    if (errorEl) { errorEl.style.display = "none"; errorEl.textContent = ""; }
   }
 
   function showLoginError(message) {
-    const errorEl = document.getElementById("loginError");
+    var errorEl = document.getElementById("loginError");
     if (!errorEl) return;
     errorEl.textContent = message;
-    errorEl.hidden = false;
+    errorEl.style.display = "block";
   }
 
-  function translateError(code, originalMessage) {
-    const messages = {
+  function translateError(code, msg) {
+    var m = {
       "auth/invalid-email": "E-mail inválido.",
       "auth/user-disabled": "Usuário desativado. Contate o administrador.",
       "auth/user-not-found": "Usuário não encontrado.",
@@ -86,38 +72,29 @@
       "auth/invalid-credential": "E-mail ou senha incorretos.",
       "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos.",
       "auth/network-request-failed": "Falha de rede. Verifique sua conexão.",
-      "auth/unauthorized-domain": "Domínio não autorizado. Adicione este domínio nas configurações do Firebase.",
-      "auth/operation-not-allowed": "Login por e-mail/senha não habilitado. Ative no Firebase Console."
+      "auth/unauthorized-domain": "Domínio não autorizado no Firebase.",
+      "auth/operation-not-allowed": "Login por e-mail/senha não habilitado no Firebase."
     };
-    return messages[code] || ("Erro: " + (code || originalMessage || "Tente novamente."));
+    return m[code] || ("Erro: " + (code || msg || "Tente novamente."));
   }
 
   function login(email, password) {
-    const btn = document.getElementById("loginButton");
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = "Entrando…";
-    }
-    loginInProgress = true;
+    var btn = document.getElementById("loginButton");
+    if (btn) { btn.disabled = true; btn.textContent = "Entrando…"; }
 
     return auth
       .signInWithEmailAndPassword(email, password)
-      .then((credential) => {
-        console.log("[Auth] signIn OK:", credential.user.email);
+      .then(function (credential) {
         clearLoginForm();
         return credential.user;
       })
-      .catch((error) => {
-        console.error("[Auth] signIn ERRO:", error.code, error.message);
+      .catch(function (error) {
+        console.error("[Auth] Login error:", error.code, error.message);
         showLoginError(translateError(error.code, error.message));
-        loginInProgress = false;
         throw error;
       })
-      .finally(() => {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = "Entrar";
-        }
+      .finally(function () {
+        if (btn) { btn.disabled = false; btn.textContent = "Entrar"; }
       });
   }
 
@@ -130,47 +107,35 @@
   }
 
   function bindUI() {
-    const loginForm = document.getElementById("loginForm");
+    var loginForm = document.getElementById("loginForm");
     if (loginForm) {
-      loginForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const email = document.getElementById("loginEmail").value.trim();
-        const password = document.getElementById("loginPassword").value;
-        if (!email || !password) return;
-        login(email, password).catch(() => {});
+      loginForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var email = document.getElementById("loginEmail").value.trim();
+        var pw = document.getElementById("loginPassword").value;
+        if (!email || !pw) return;
+        login(email, pw).catch(function () {});
       });
     }
 
-    const logoutBtn = document.getElementById("logoutButton");
+    var logoutBtn = document.getElementById("logoutButton");
     if (logoutBtn) {
-      logoutBtn.addEventListener("click", () => {
-        logout();
-      });
+      logoutBtn.addEventListener("click", function () { logout(); });
     }
   }
 
-  let authCheckCount = 0;
-
-  auth.onAuthStateChanged((user) => {
-    authCheckCount++;
-    console.log("[Auth] onAuthStateChanged #" + authCheckCount + ":", user ? user.email : "null");
-
+  auth.onAuthStateChanged(function (user) {
+    currentUser = user;
     if (user) {
-      currentUser = user;
-      loginInProgress = false;
+      console.log("[Auth] Usuário autenticado:", user.email);
       showApp();
       try {
-        if (typeof onLoginCallback === "function") {
-          onLoginCallback(user);
-        }
+        if (typeof onLoginCallback === "function") onLoginCallback(user);
       } catch (e) {
-        console.error("[Auth] Erro no callback de login:", e);
+        console.error("[Auth] Erro callback:", e);
       }
     } else {
-      if (currentUser && !loginInProgress) {
-        console.log("[Auth] Sessão encerrada");
-      }
-      currentUser = null;
+      console.log("[Auth] Sem usuário");
       showLogin();
     }
   });
@@ -181,11 +146,5 @@
     bindUI();
   }
 
-  window.AppAuth = {
-    getUser,
-    isLoggedIn,
-    login,
-    logout,
-    onLogin
-  };
+  window.AppAuth = { getUser: getUser, isLoggedIn: isLoggedIn, login: login, logout: logout, onLogin: onLogin };
 })();
