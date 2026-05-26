@@ -555,4 +555,28 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  /* ── Impressão Resumo Contador ── */
+  body.printing-contador .vt-print-area,
+  body.printing-contador .vt-preview-card {
+    display: none !important;
+  }
+
+  body.printing-contador .resumo-print-area,
+  body.printing-contador .resumo-print-area * {
+    visibility: visible !important;
+  }
+
+  body.printing-contador .resumo-print-area {
+    display: block !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 281mm !important;
+    margin: 0 !important;
+    padding: 8mm !important;
+    background: #ffffff !important;
+    color: var(--ink) !important;
+    page: scaleLandscape;
+  }
 }

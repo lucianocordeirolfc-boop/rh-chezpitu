@@ -271,6 +271,53 @@
     '</div>';
   }
 
+  function getMonthName(ym) {
+    var months = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+      "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    var parts = ym.split("-");
+    return months[parseInt(parts[1]) - 1] + " " + parts[0];
+  }
+
+  function renderResumoPrintArea(company, yearMonth) {
+    var employees = getEmployeesForCompany(company);
+    var lancamentos = getLancamentos(company, yearMonth);
+    var lancMap = {};
+    lancamentos.forEach(function (l) { lancMap[l.employeeId] = l; });
+
+    var shortLabels = LANCAMENTO_FIELDS.map(function (f) { return f.label.split(" (")[0]; });
+
+    var headerCells = '<th class="resumo-print-name">Funcionário</th>';
+    shortLabels.forEach(function (label) {
+      headerCells += '<th>' + label + '</th>';
+    });
+
+    var rows = employees.map(function (emp) {
+      var lanc = lancMap[emp.id];
+      var cells = '<td class="resumo-print-name">' + App.escapeHTML(App.formatDisplayName(emp.name)) + '</td>';
+      LANCAMENTO_FIELDS.forEach(function (f) {
+        var val = lanc ? lanc[f.key] : 0;
+        cells += '<td>' + formatMoney(val) + '</td>';
+      });
+      return '<tr>' + cells + '</tr>';
+    }).join("");
+
+    return '<div class="resumo-print-area">' +
+      '<div class="resumo-print-header">' +
+        '<div>' +
+          '<span>Informações para o Contador</span>' +
+          '<h2>' + App.escapeHTML(company) + '</h2>' +
+        '</div>' +
+        '<div class="resumo-print-period">' +
+          '<strong>' + getMonthName(yearMonth) + '</strong>' +
+        '</div>' +
+      '</div>' +
+      '<table class="resumo-print-table">' +
+        '<thead><tr>' + headerCells + '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' +
+    '</div>';
+  }
+
   function renderResumoTab(container, yearMonth) {
     var companyOptions = AppData.COMPANIES.map(function (c) {
       var sel = c === AppData.state.selectedCompany ? " selected" : "";
@@ -284,10 +331,12 @@
         '<label class="resumo-company-label">Empresa ' +
           '<select id="resumoCompanySelect" class="field-select">' + companyOptions + '</select>' +
         '</label>' +
+        '<button class="btn btn-primary" id="btnPrintResumo">Imprimir / PDF</button>' +
       '</div>' +
       '<div id="resumoGridContainer">' +
         renderResumoGrid(selectedCompany, yearMonth) +
-      '</div>';
+      '</div>' +
+      '<div id="resumoPrintContainer" style="display:none"></div>';
 
     return html;
   }
@@ -300,6 +349,23 @@
         if (gridContainer) {
           gridContainer.innerHTML = renderResumoGrid(companySel.value, yearMonth);
         }
+      });
+    }
+
+    var printBtn = document.getElementById("btnPrintResumo");
+    if (printBtn) {
+      printBtn.addEventListener("click", function () {
+        var company = companySel ? companySel.value : AppData.state.selectedCompany;
+        var printContainer = document.getElementById("resumoPrintContainer");
+        printContainer.innerHTML = renderResumoPrintArea(company, yearMonth);
+        printContainer.style.display = "block";
+
+        document.body.classList.add("printing-contador");
+        setTimeout(function () {
+          window.print();
+          document.body.classList.remove("printing-contador");
+          printContainer.style.display = "none";
+        }, 200);
       });
     }
   }

@@ -2695,6 +2695,80 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   background: #f7f9fd;
 }
 
+/* ── Print area - Resumo Contador ── */
+
+.resumo-print-area {
+  display: none;
+}
+
+.resumo-print-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6mm;
+  padding-bottom: 4mm;
+  border-bottom: 2px solid var(--sea-200);
+}
+
+.resumo-print-header span {
+  display: block;
+  color: var(--sea-700);
+  font-size: 9pt;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.resumo-print-header h2 {
+  margin: 1mm 0 0;
+  font-size: 16pt;
+  color: var(--sea-900);
+}
+
+.resumo-print-period strong {
+  color: var(--sea-700);
+  font-size: 12pt;
+}
+
+.resumo-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.resumo-print-table th,
+.resumo-print-table td {
+  padding: 2.5mm 2mm;
+  border: 1px solid #cfe3ea;
+  text-align: center;
+  font-size: 8pt;
+}
+
+.resumo-print-table th {
+  background: var(--sea-100);
+  color: var(--sea-900);
+  font-size: 7.5pt;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.resumo-print-name {
+  text-align: left !important;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 40mm;
+}
+
+.resumo-print-table tbody tr:nth-child(even) {
+  background: rgba(232, 238, 251, 0.4);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 @media (max-width: 600px) {
   .popup-grid {
     grid-template-columns: 1fr;
