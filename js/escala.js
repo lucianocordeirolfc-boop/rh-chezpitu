@@ -506,7 +506,7 @@
 
             return `
               <tr>
-                <th class="employee-sticky employee-name-only">
+                <th class="employee-sticky employee-name-only" title="${esc(employee.name)}">
                   <span class="emp-name-text">${displayName(employee.name)}</span>
                   ${companyTag}
                   ${employee.defaultShift ? `<small class="emp-shift-label">${esc(employee.defaultShift)}</small>` : ""}
