@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "sistemaRH": {
+      ".read": "auth !== null",
+      ".write": "auth !== null"
+    }
+  }
+}

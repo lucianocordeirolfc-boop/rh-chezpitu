@@ -16,8 +16,32 @@
 
 <body>
 
+  <!-- TELA DE LOGIN -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <span class="login-brand">CP</span>
+      <h1>Grupo Chez Pitu</h1>
+      <p class="login-subtitle">Sistema de Gestão de Pessoal</p>
+
+      <form id="loginForm" class="login-form" autocomplete="on">
+        <label>
+          E-mail
+          <input id="loginEmail" type="email" name="email" required autocomplete="username" placeholder="usuario@chezpitu.com">
+        </label>
+        <label>
+          Senha
+          <input id="loginPassword" type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+        </label>
+        <button id="loginButton" class="primary" type="submit">Entrar</button>
+        <p id="loginError" class="login-error" hidden></p>
+      </form>
+
+      <p class="login-footer">Acesso restrito a usuários autorizados.</p>
+    </div>
+  </div>
+
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" hidden>
 
     <div class="brand">
       <span class="brand-mark">CP</span>
@@ -74,7 +98,7 @@
   </aside>
 
   <!-- CONTEÚDO -->
-  <main class="app-shell">
+  <main class="app-shell" hidden>
 
     <!-- TOPO -->
     <header class="topbar">
@@ -94,6 +118,10 @@
         >
           Sincronizando...
         </span>
+
+        <span id="loggedUserLabel" class="logged-user-label"></span>
+
+        <button id="logoutButton" class="logout-btn" type="button" title="Sair do sistema">Sair</button>
 
         <label class="company-switcher">
 
@@ -144,28 +172,32 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
   <!-- JS -->
-  <script src="js/firebase-sync.js?v=0050eb0"></script>
+  <script src="js/auth.js?v=20260526"></script>
 
-  <script src="js/import-utils.js?v=0050eb0"></script>
+  <script src="js/firebase-sync.js?v=20260526"></script>
 
-  <script src="js/data.js?v=0050eb0"></script>
+  <script src="js/import-utils.js?v=20260526"></script>
 
-  <script src="js/dashboard.js?v=0050eb0"></script>
+  <script src="js/data.js?v=20260526"></script>
 
-  <script src="js/funcionarios.js?v=0050eb0"></script>
+  <script src="js/dashboard.js?v=20260526"></script>
 
-  <script src="js/scale-rules.js?v=0050eb0"></script>
+  <script src="js/funcionarios.js?v=20260526"></script>
 
-  <script src="js/escala.js?v=0050eb0"></script>
+  <script src="js/scale-rules.js?v=20260526"></script>
 
-  <script src="js/ferias.js?v=0050eb0"></script>
+  <script src="js/escala.js?v=20260526"></script>
 
-  <script src="js/feriados.js?v=0050eb0"></script>
+  <script src="js/ferias.js?v=20260526"></script>
 
-  <script src="js/vale-transporte.js?v=0050eb0"></script>
+  <script src="js/feriados.js?v=20260526"></script>
 
-  <script src="js/app.js?v=0050eb0"></script>
+  <script src="js/vale-transporte.js?v=20260526"></script>
+
+  <script src="js/app.js?v=20260526"></script>
 
 </body>
 </html>

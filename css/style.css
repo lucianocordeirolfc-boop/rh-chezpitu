@@ -807,6 +807,68 @@ th {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--sea-500), var(--sea-700));
+  transition: width 0.25s ease, background 0.25s ease;
+}
+
+/* Barra de prazo — feriados (alinhada aos alertas 20 / 10 / 5 dias) */
+.progress-bar.progress-tone-blue > span {
+  background: linear-gradient(90deg, #5b9fd4, #2f6fad);
+}
+
+.progress-bar.progress-tone-yellow > span {
+  background: linear-gradient(90deg, #f7dc6f, #d4ac0d);
+}
+
+.progress-bar.progress-tone-orange > span {
+  background: linear-gradient(90deg, #f5b041, #d68910);
+}
+
+.progress-bar.progress-tone-orange-strong > span {
+  background: linear-gradient(90deg, #eb7a2d, #ca4310);
+}
+
+.progress-bar.progress-tone-danger > span {
+  background: linear-gradient(90deg, #ec7063, #c0392b);
+}
+
+.progress-bar.progress-tone-success > span {
+  background: linear-gradient(90deg, #58d68d, #239b56);
+}
+
+.progress-bar.progress-tone-info > span {
+  background: linear-gradient(90deg, #85c1e9, #3498db);
+}
+
+small.progress-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+small.progress-hint.progress-tone-blue {
+  color: #2f6fad;
+}
+
+small.progress-hint.progress-tone-yellow {
+  color: #9a7b0a;
+}
+
+small.progress-hint.progress-tone-orange,
+small.progress-hint.progress-tone-orange-strong {
+  color: #b35c00;
+}
+
+small.progress-hint.progress-tone-danger {
+  color: #b91c1c;
+}
+
+small.progress-hint.progress-tone-success {
+  color: #1e7e45;
+}
+
+small.progress-hint.progress-tone-info {
+  color: #2471a3;
 }
 
 .compact-date {
@@ -2119,4 +2181,154 @@ td.code-dom { background: #fff7e6; color: #b45309; }
     color: #90d0a8;
     border-bottom-color: #1a4a30;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Tela de Login
+   ═══════════════════════════════════════════════════════════ */
+
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--sea-900) 0%, var(--sea-800) 40%, var(--sea-700) 100%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  margin: 20px;
+  padding: 48px 40px 36px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.login-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--sea-700), var(--sea-500));
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+.login-card h1 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+  color: var(--sea-900);
+}
+
+.login-subtitle {
+  margin: 0 0 32px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.login-form {
+  display: grid;
+  gap: 18px;
+  text-align: left;
+}
+
+.login-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sea-900);
+}
+
+.login-form input {
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: var(--sea-500);
+  box-shadow: 0 0 0 3px rgba(34, 100, 209, 0.15);
+}
+
+.login-form button.primary {
+  margin-top: 6px;
+  padding: 13px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--sea-700), var(--sea-500));
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.login-form button.primary:hover {
+  opacity: 0.92;
+}
+
+.login-form button.primary:active {
+  transform: scale(0.98);
+}
+
+.login-form button.primary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.login-error {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff2f2;
+  border: 1px solid #f5c4c4;
+  color: #a32b2b;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.login-footer {
+  margin: 28px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* Botão de Logout */
+.logout-btn {
+  padding: 6px 16px;
+  border: 1.5px solid var(--danger);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.logout-btn:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.logged-user-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }

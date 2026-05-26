@@ -1,18 +1,6 @@
-const firebaseConfig = {
-  apiKey: "AIzaSyD2Bw5TO_Q4fpvjdFwDGnJkiMenutGOFbM",
-  authDomain: "chez-pitu-rh.firebaseapp.com",
-  databaseURL: "https://chez-pitu-rh-default-rtdb.firebaseio.com",
-  projectId: "chez-pitu-rh",
-  storageBucket: "chez-pitu-rh.firebasestorage.app",
-  messagingSenderId: "41458783289",
-  appId: "1:41458783289:web:d2ac81b4e0b87fbc3ce9e8"
-};
-
-if (window.firebase && !firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
+if (window.firebase && firebase.apps.length) {
+  window.firebaseDB = firebase.database();
 }
-
-window.firebaseDB = firebase.database();
 
 (function () {
   const ROOT = "sistemaRH";
@@ -29,6 +17,10 @@ window.firebaseDB = firebase.database();
   function init() {
     if (!window.firebase || !window.firebaseDB) {
       console.warn("[FirebaseSync] Firebase não disponível.");
+      return false;
+    }
+    if (!window.AppAuth?.isLoggedIn()) {
+      console.warn("[FirebaseSync] Usuário não autenticado.");
       return false;
     }
     db = window.firebaseDB;
@@ -207,7 +199,7 @@ window.firebaseDB = firebase.database();
   }
 
   function save(state) {
-    if (!ready || !isOnline()) {
+    if (!ready || !isOnline() || !window.AppAuth?.isLoggedIn()) {
       return Promise.resolve();
     }
 

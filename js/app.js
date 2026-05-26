@@ -204,7 +204,12 @@
     );
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  let appBooted = false;
+
+  function bootApp() {
+    if (appBooted) return;
+    appBooted = true;
+
     setupCompanySelect();
     setupMenu();
     setupSidebarToggle();
@@ -222,6 +227,15 @@
       ).finally(boot);
     } else {
       boot();
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    if (window.AppAuth) {
+      window.AppAuth.onLogin(() => bootApp());
+      if (window.AppAuth.isLoggedIn()) bootApp();
+    } else {
+      bootApp();
     }
   });
 })();
