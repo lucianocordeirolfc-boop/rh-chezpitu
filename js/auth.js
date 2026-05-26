@@ -14,8 +14,12 @@
   }
 
   const auth = firebase.auth();
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
   let currentUser = null;
   let onLoginCallback = null;
+  let loginInProgress = false;
+  let appVisible = false;
 
   function getUser() {
     return currentUser;
@@ -26,6 +30,7 @@
   }
 
   function showLogin() {
+    appVisible = false;
     const loginScreen = document.getElementById("loginScreen");
     const sidebar = document.querySelector(".sidebar");
     const appShell = document.querySelector(".app-shell");
@@ -38,6 +43,7 @@
   }
 
   function showApp() {
+    appVisible = true;
     const loginScreen = document.getElementById("loginScreen");
     const sidebar = document.querySelector(".sidebar");
     const appShell = document.querySelector(".app-shell");
@@ -80,8 +86,8 @@
       "auth/invalid-credential": "E-mail ou senha incorretos.",
       "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos.",
       "auth/network-request-failed": "Falha de rede. Verifique sua conexão.",
-      "auth/unauthorized-domain": "Domínio não autorizado. Adicione este domínio nas configurações do Firebase Authentication.",
-      "auth/operation-not-allowed": "Login por e-mail/senha não está habilitado. Ative no Firebase Console > Authentication > Sign-in method."
+      "auth/unauthorized-domain": "Domínio não autorizado. Adicione este domínio nas configurações do Firebase.",
+      "auth/operation-not-allowed": "Login por e-mail/senha não habilitado. Ative no Firebase Console."
     };
     return messages[code] || ("Erro: " + (code || originalMessage || "Tente novamente."));
   }
@@ -92,16 +98,19 @@
       btn.disabled = true;
       btn.textContent = "Entrando…";
     }
+    loginInProgress = true;
 
     return auth
       .signInWithEmailAndPassword(email, password)
       .then((credential) => {
+        console.log("[Auth] signIn OK:", credential.user.email);
         clearLoginForm();
         return credential.user;
       })
       .catch((error) => {
-        console.error("[Auth] Login error:", error.code, error.message);
+        console.error("[Auth] signIn ERRO:", error.code, error.message);
         showLoginError(translateError(error.code, error.message));
+        loginInProgress = false;
         throw error;
       })
       .finally(() => {
@@ -140,11 +149,15 @@
     }
   }
 
+  let authCheckCount = 0;
+
   auth.onAuthStateChanged((user) => {
-    currentUser = user;
+    authCheckCount++;
+    console.log("[Auth] onAuthStateChanged #" + authCheckCount + ":", user ? user.email : "null");
 
     if (user) {
-      console.log("[Auth] Usuário autenticado:", user.email);
+      currentUser = user;
+      loginInProgress = false;
       showApp();
       try {
         if (typeof onLoginCallback === "function") {
@@ -154,7 +167,10 @@
         console.error("[Auth] Erro no callback de login:", e);
       }
     } else {
-      console.log("[Auth] Nenhum usuário autenticado");
+      if (currentUser && !loginInProgress) {
+        console.log("[Auth] Sessão encerrada");
+      }
+      currentUser = null;
       showLogin();
     }
   });
