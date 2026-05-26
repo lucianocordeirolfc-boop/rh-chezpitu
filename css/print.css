@@ -444,7 +444,12 @@
 
 @page scaleLandscape {
   size: A4 landscape;
-  margin: 8mm;
+  margin: 5mm;
+}
+
+@page contadorLandscape {
+  size: A4 landscape;
+  margin: 5mm;
 }
 
 @media print {
@@ -557,6 +562,10 @@
   }
 
   /* ── Impressão Resumo Contador ── */
+  body.printing-contador {
+    width: auto !important;
+  }
+
   body.printing-contador .vt-print-area,
   body.printing-contador .vt-preview-card {
     display: none !important;
@@ -572,11 +581,40 @@
     position: fixed !important;
     top: 0;
     left: 0;
-    width: 281mm !important;
+    width: 287mm !important;
+    height: 200mm !important;
     margin: 0 !important;
-    padding: 8mm !important;
+    padding: 5mm !important;
     background: #ffffff !important;
     color: var(--ink) !important;
-    page: scaleLandscape;
+    page: contadorLandscape;
+    overflow: visible !important;
+  }
+
+  body.printing-contador .resumo-print-header {
+    margin-bottom: 3mm !important;
+    padding-bottom: 2mm !important;
+  }
+
+  body.printing-contador .resumo-print-header h2 {
+    font-size: 14pt !important;
+  }
+
+  body.printing-contador .resumo-print-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 7pt !important;
+  }
+
+  body.printing-contador .resumo-print-table th,
+  body.printing-contador .resumo-print-table td {
+    padding: 1.5mm 1mm !important;
+    font-size: 7pt !important;
+    word-break: break-word;
+  }
+
+  body.printing-contador .resumo-print-name {
+    width: 30% !important;
+    font-size: 7pt !important;
   }
 }

@@ -2734,7 +2734,7 @@ td.code-dom { background: #fff7e6; color: #b45309; }
 .resumo-print-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .resumo-print-table th,
