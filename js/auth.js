@@ -71,7 +71,7 @@
     errorEl.hidden = false;
   }
 
-  function translateError(code) {
+  function translateError(code, originalMessage) {
     const messages = {
       "auth/invalid-email": "E-mail inválido.",
       "auth/user-disabled": "Usuário desativado. Contate o administrador.",
@@ -79,9 +79,11 @@
       "auth/wrong-password": "Senha incorreta.",
       "auth/invalid-credential": "E-mail ou senha incorretos.",
       "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos.",
-      "auth/network-request-failed": "Falha de rede. Verifique sua conexão."
+      "auth/network-request-failed": "Falha de rede. Verifique sua conexão.",
+      "auth/unauthorized-domain": "Domínio não autorizado. Adicione este domínio nas configurações do Firebase Authentication.",
+      "auth/operation-not-allowed": "Login por e-mail/senha não está habilitado. Ative no Firebase Console > Authentication > Sign-in method."
     };
-    return messages[code] || "Erro ao fazer login. Tente novamente.";
+    return messages[code] || ("Erro: " + (code || originalMessage || "Tente novamente."));
   }
 
   function login(email, password) {
@@ -98,7 +100,8 @@
         return credential.user;
       })
       .catch((error) => {
-        showLoginError(translateError(error.code));
+        console.error("[Auth] Login error:", error.code, error.message);
+        showLoginError(translateError(error.code, error.message));
         throw error;
       })
       .finally(() => {
