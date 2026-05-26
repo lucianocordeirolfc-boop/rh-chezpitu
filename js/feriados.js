@@ -60,6 +60,33 @@
     return "success";
   }
 
+  /** Tons da barra de prazo: azul >20d, amarelo 11–20, laranja 6–10, laranja intenso 1–5, vermelho vencido. */
+  function progressBarTone(line) {
+    const key = statusKey(line);
+    if (key === "compensado") return "progress-tone-success";
+    if (key === "agendado") return "progress-tone-info";
+
+    const daysLeft = line.daysLeft;
+    if (daysLeft < 0) return "progress-tone-danger";
+    if (daysLeft <= 5) return "progress-tone-orange-strong";
+    if (daysLeft <= 10) return "progress-tone-orange";
+    if (daysLeft <= 20) return "progress-tone-yellow";
+    return "progress-tone-blue";
+  }
+
+  function progressBarWidth(line) {
+    if (statusKey(line) === "compensado") return 100;
+    if (line.daysLeft < 0) return 100;
+    return Math.max(0, Math.min(100, Math.round(((120 - line.daysLeft) / 120) * 100)));
+  }
+
+  function progressBarHint(line) {
+    const key = statusKey(line);
+    if (key === "compensado") return "Compensado";
+    if (key === "agendado") return `Agendado · ${alertLabel(line.daysLeft)}`;
+    return alertLabel(line.daysLeft);
+  }
+
   function getEmployee(employeeId, data) {
     return data.employees.find((employee) => employee.id === employeeId);
   }
@@ -204,7 +231,8 @@
       .map((line) => {
         const status = statusLabel(line);
         const badgeClass = statusClass(line);
-        const progress = Math.max(0, Math.min(100, Math.round(((120 - line.daysLeft) / 120) * 100)));
+        const progress = progressBarWidth(line);
+        const progressTone = progressBarTone(line);
         const compensationDisplay = line.compensationDate ? formatDateBR(line.compensationDate) : "—";
         const originNote = line.workedItem?.origin
           ? `<small class="help-text">${esc(line.workedItem.origin)}</small>`
@@ -218,8 +246,10 @@
           <td>${formatDateBR(line.holiday.date)}</td>
           <td>
             <strong>${formatDateBR(line.dueDate)}</strong>
-            <div class="progress-bar" aria-label="Progresso do prazo"><span style="width: ${progress}%"></span></div>
-            <small>${statusKey(line) === "compensado" ? "Compensado" : `${line.daysLeft} dias restantes`}</small>
+            <div class="progress-bar ${progressTone}" aria-label="Progresso do prazo: ${esc(progressBarHint(line))}">
+              <span style="width: ${progress}%"></span>
+            </div>
+            <small class="progress-hint ${progressTone}">${esc(progressBarHint(line))}</small>
           </td>
           <td>${compensationDisplay}</td>
           <td><span class="pill ${badgeClass}">${status}</span></td>
@@ -464,10 +494,14 @@
   }
 
   function bindStaticEvents(container) {
+    bindWorkedHolidayNameField(container);
+
     container.querySelector("#holidayForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const form = event.currentTarget;
       const formData = new FormData(form);
+      const name = resolveWorkedHolidayName(formData);
+      if (!name) return;
       const date = formData.get("date");
       const compensationDate = formData.get("compensationDate");
 
@@ -485,11 +519,28 @@
         return item;
       });
 
-      AppData.addHoliday({
-        name: formData.get("name"),
-        date,
-        workedEmployees
-      });
+      const data = AppData.getCompanyData();
+      const existing = data.holidays.find(
+        (holiday) => holiday.date === date && AppData.normalizeSearchText(holiday.name) === AppData.normalizeSearchText(name)
+      );
+
+      if (existing) {
+        workedEmployees.forEach((item) => {
+          const prev = (existing.workedEmployees || []).find((row) => row.employeeId === item.employeeId);
+          if (prev) {
+            Object.assign(prev, item);
+          } else {
+            existing.workedEmployees.push(item);
+          }
+        });
+        AppData.saveState();
+      } else {
+        AppData.addHoliday({
+          name,
+          date,
+          workedEmployees
+        });
+      }
       window.App.renderCurrent();
     });
 
@@ -501,13 +552,17 @@
       const name = resolveCalendarHolidayName(formData);
       if (!name) return;
       const scope = formData.get("companyScope");
+      const date = String(formData.get("date") || "").trim();
+      const companies = scope === "ambas" ? ["ambas"] : [scope];
       ScaleRules.addCalendarHoliday({
         name,
-        date: formData.get("date"),
+        date,
         type: formData.get("type"),
-        companies: scope === "ambas" ? ["ambas"] : [scope]
+        companies
       });
-      AppData.runScaleIntegrations([String(formData.get("date")).slice(0, 7)]);
+      AppData.syncCompanyHolidaysFromCalendarEntry({ name, date, companies }, { save: false });
+      AppData.runScaleIntegrations([date.slice(0, 7)]);
+      AppData.saveState();
       window.App.renderCurrent();
     });
 
@@ -621,6 +676,87 @@
     return name;
   }
 
+  function collectHolidayOptionsForWorkedForm() {
+    const map = new Map();
+
+    (AppData.state.calendarHolidays || []).forEach((holiday) => {
+      const name = String(holiday.name || "").trim();
+      if (!name) return;
+      map.set(AppData.normalizeSearchText(name), { name, date: holiday.date });
+    });
+
+    (AppData.getCompanyData().holidays || []).forEach((holiday) => {
+      const name = String(holiday.name || "").trim();
+      if (!name) return;
+      const key = AppData.normalizeSearchText(name);
+      if (!map.has(key)) map.set(key, { name, date: holiday.date });
+    });
+
+    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, "pt-BR"));
+  }
+
+  function renderWorkedHolidayNameField(data) {
+    const options = collectHolidayOptionsForWorkedForm();
+    if (!options.length) {
+      return `<label>Nome do feriado<input name="name" required placeholder="Ex.: Natal"></label>`;
+    }
+
+    const selectOptions = [
+      `<option value="" disabled selected>Selecione o feriado</option>`,
+      ...options.map(
+        (item) =>
+          `<option value="${esc(item.name)}" data-holiday-date="${esc(item.date)}">${esc(item.name)} (${esc(item.date)})</option>`
+      ),
+      `<option value="__novo__">— Outro nome —</option>`
+    ].join("");
+
+    return `
+      <label>Nome do feriado
+        <select name="name" id="holidayWorkedNameSelect" required>
+          ${selectOptions}
+        </select>
+        <input type="text" name="nameCustom" id="holidayWorkedNameCustom" placeholder="Ex.: Natal" hidden>
+      </label>
+    `;
+  }
+
+  function bindWorkedHolidayNameField(container) {
+    const select = container.querySelector("#holidayWorkedNameSelect");
+    const custom = container.querySelector("#holidayWorkedNameCustom");
+    const dateInput = container.querySelector("#holidayWorkedDate");
+    if (!select) return;
+
+    const sync = () => {
+      const isOther = select.value === "__novo__";
+      if (custom) {
+        custom.hidden = !isOther;
+        custom.required = isOther;
+      }
+      select.required = !isOther;
+      if (!isOther) {
+        if (custom) custom.value = "";
+        const selected = select.selectedOptions[0];
+        const holidayDate = selected?.dataset?.holidayDate;
+        if (holidayDate && dateInput) dateInput.value = holidayDate;
+      }
+    };
+
+    select.addEventListener("change", sync);
+    sync();
+  }
+
+  function resolveWorkedHolidayName(formData) {
+    let name = String(formData.get("name") || "").trim();
+    if (name === "__novo__") {
+      name = String(formData.get("nameCustom") || "").trim();
+      if (!name) {
+        alert("Informe o nome do feriado.");
+        return null;
+      }
+    }
+    return name;
+  }
+
   function renderCalendarHolidays() {
     const holidays = AppData.state.calendarHolidays || [];
     if (!holidays.length) {
@@ -656,6 +792,7 @@
 
   function render(container) {
     ensureSearchDelegation();
+    AppData.syncAllCalendarHolidaysToCompanies();
 
     const data = AppData.getCompanyData();
     const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
@@ -714,8 +851,8 @@
             </div>
           </div>
           <form id="holidayForm" class="form-grid form-grid-compact">
-            <label>Nome do feriado<input name="name" required placeholder="Ex.: Natal"></label>
-            <label>Data do feriado<input type="date" name="date" required value="${AppData.todayISO()}"></label>
+            ${renderWorkedHolidayNameField(data)}
+            <label>Data do feriado<input id="holidayWorkedDate" type="date" name="date" required value="${AppData.todayISO()}"></label>
             <label class="full">Data de compensação<input type="date" name="compensationDate"></label>
             <fieldset class="full checkbox-group checkbox-group-compact">
               <legend>Funcionários que trabalharam</legend>
@@ -808,6 +945,8 @@
     softRefreshFromSync,
     alertLabel,
     alertClass,
+    progressBarTone,
+    progressBarHint,
     statusKey,
     statusLabel,
     statusClass

@@ -870,6 +870,65 @@
     saveState();
   }
 
+  function resolveCalendarTargetCompanies(companies) {
+    const list = Array.isArray(companies) ? companies : [];
+    if (!list.length || list.includes("ambas")) return [...COMPANIES];
+    return list.filter((company) => COMPANIES.includes(company));
+  }
+
+  function findCompanyHolidayByNameDate(data, name, date) {
+    const normalizedName = normalizeSearchText(name);
+    return (data.holidays || []).find(
+      (holiday) => holiday.date === date && normalizeSearchText(holiday.name) === normalizedName
+    );
+  }
+
+  function syncCompanyHolidaysFromCalendarEntry(entry, options = {}) {
+    const name = String(entry?.name || "").trim();
+    const date = String(entry?.date || "").trim();
+    if (!name || !date) return false;
+
+    const shouldSave = options.save !== false;
+    let changed = false;
+
+    resolveCalendarTargetCompanies(entry.companies).forEach((company) => {
+      const data = getCompanyData(company);
+      if (!data.holidays) data.holidays = [];
+      if (findCompanyHolidayByNameDate(data, name, date)) return;
+
+      data.holidays.push({
+        id: uid("feriado"),
+        name,
+        date,
+        workedEmployees: []
+      });
+      changed = true;
+    });
+
+    if (changed && shouldSave) saveState();
+    return changed;
+  }
+
+  function syncAllCalendarHolidaysToCompanies(options = {}) {
+    let changed = false;
+    (state.calendarHolidays || []).forEach((calendarHoliday) => {
+      if (
+        syncCompanyHolidaysFromCalendarEntry(
+          {
+            name: calendarHoliday.name,
+            date: calendarHoliday.date,
+            companies: calendarHoliday.companies || ["ambas"]
+          },
+          { save: false }
+        )
+      ) {
+        changed = true;
+      }
+    });
+    if (changed && options.save !== false) saveState();
+    return changed;
+  }
+
   function removeHoliday(id) {
     const data = getCompanyData();
     data.holidays = data.holidays.filter((holiday) => holiday.id !== id);
@@ -1410,6 +1469,8 @@
     addAbsence,
     removeAbsence,
     addHoliday,
+    syncCompanyHolidaysFromCalendarEntry,
+    syncAllCalendarHolidaysToCompanies,
     resolveWorkedHolidayStatus,
     syncWorkedEmployeeStatus,
     linkScaleCoToHoliday,
