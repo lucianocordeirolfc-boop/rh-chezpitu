@@ -144,11 +144,17 @@
     currentUser = user;
 
     if (user) {
+      console.log("[Auth] Usuário autenticado:", user.email);
       showApp();
-      if (typeof onLoginCallback === "function") {
-        onLoginCallback(user);
+      try {
+        if (typeof onLoginCallback === "function") {
+          onLoginCallback(user);
+        }
+      } catch (e) {
+        console.error("[Auth] Erro no callback de login:", e);
       }
     } else {
+      console.log("[Auth] Nenhum usuário autenticado");
       showLogin();
     }
   });

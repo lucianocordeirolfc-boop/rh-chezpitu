@@ -214,17 +214,24 @@
     setupMenu();
     setupSidebarToggle();
 
+    let booted = false;
     const boot = () => {
+      if (booted) return;
+      booted = true;
       refreshScaleIntegrations();
       render("dashboard");
       initSync();
     };
 
     if (window.FirebaseSync?.init()) {
+      const timeout = setTimeout(boot, 5000);
       window.FirebaseSync.bootstrap(
         () => JSON.parse(JSON.stringify(AppData.state)),
         (remoteState, fromRemote = true) => applyRemoteState(remoteState, fromRemote)
-      ).finally(boot);
+      ).finally(() => {
+        clearTimeout(timeout);
+        boot();
+      });
     } else {
       boot();
     }

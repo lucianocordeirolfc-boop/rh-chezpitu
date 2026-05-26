@@ -235,32 +235,38 @@ if (window.firebase && firebase.apps.length) {
       return Promise.resolve(false);
     }
 
-    return loadFromFirebase().then((remoteState) => {
-      const localState = getLocalState?.();
+    return loadFromFirebase()
+      .then((remoteState) => {
+        const localState = getLocalState?.();
 
-      if (remoteState && localState && window.AppData?.mergeRemoteIntoLocal) {
-        const merged = window.AppData.mergeRemoteIntoLocal(localState, remoteState);
-        applyRemote(merged, false); // já mesclado: não sobrescrever descontos VT
-        setStatus("online", "Dados mesclados (local + Firebase)");
-        return save(merged).then(() => true);
-      }
+        if (remoteState && localState && window.AppData?.mergeRemoteIntoLocal) {
+          const merged = window.AppData.mergeRemoteIntoLocal(localState, remoteState);
+          applyRemote(merged, false);
+          setStatus("online", "Dados mesclados (local + Firebase)");
+          return save(merged).then(() => true).catch(() => true);
+        }
 
-      if (remoteState) {
-        applyRemote(remoteState, true);
-        setStatus("online", "Dados carregados do Firebase");
-        return true;
-      }
-
-      if (localState && hasLocalData(localState)) {
-        return save(localState).then(() => {
-          setStatus("online", "Dados locais enviados ao Firebase");
+        if (remoteState) {
+          applyRemote(remoteState, true);
+          setStatus("online", "Dados carregados do Firebase");
           return true;
-        });
-      }
+        }
 
-      setStatus("online", "Aguardando primeiro cadastro");
-      return false;
-    });
+        if (localState && hasLocalData(localState)) {
+          return save(localState).then(() => {
+            setStatus("online", "Dados locais enviados ao Firebase");
+            return true;
+          }).catch(() => true);
+        }
+
+        setStatus("online", "Aguardando primeiro cadastro");
+        return false;
+      })
+      .catch((error) => {
+        console.error("[FirebaseSync] Bootstrap error:", error);
+        setStatus("error", error?.message || "Erro ao inicializar");
+        return false;
+      });
   }
 
   function hasLocalData(state) {
