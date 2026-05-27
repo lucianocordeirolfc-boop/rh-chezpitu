@@ -28,9 +28,13 @@
     const select = document.getElementById("companySelect");
     if (!switcher) return;
     // Na Escala de Folga a empresa é escolhida apenas no seletor da própria página.
-    switcher.hidden = moduleId === "escala";
-    if (select && moduleId !== "escala") {
-      select.value = AppData.state.selectedCompany;
+    const isEscala = moduleId === "escala";
+    // Dupla proteção: CSS + inline style + desabilita o select (evita conflito mesmo se aparecer).
+    switcher.hidden = isEscala;
+    switcher.style.display = isEscala ? "none" : "";
+    if (select) {
+      select.disabled = isEscala;
+      if (!isEscala) select.value = AppData.state.selectedCompany;
     }
   }
 
