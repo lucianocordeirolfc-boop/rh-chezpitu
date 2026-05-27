@@ -231,6 +231,9 @@
     return (alerts || []).filter((alert) => alert.principalCompany === company);
   }
 
+  let lastIntegrationMonth = "";
+  let lastIntegrationAt = 0;
+
   function runIntegrationsForView() {
     try {
       if (!window.ScaleRules?.recomputeScaleIntegrations) {
@@ -238,17 +241,24 @@
       }
 
       const month = scaleState.yearMonth;
-      const company = AppData.state.selectedCompany;
-      const before = JSON.stringify(
-        filterAlertsForSelectedCompany(window.ScaleRules.getCoverageAlertsForMonth(month))
-      );
-      const result = AppData.runScaleIntegrations([month]);
+      const now = Date.now();
+      const shouldRecompute =
+        month !== lastIntegrationMonth ||
+        now - lastIntegrationAt > 60_000;
+
+      const before = JSON.stringify(filterAlertsForSelectedCompany(window.ScaleRules.getCoverageAlertsForMonth(month)));
+      const result = shouldRecompute ? AppData.runScaleIntegrations([month]) : { created: 0 };
       const alerts = filterAlertsForSelectedCompany(
         window.ScaleRules.getCoverageAlertsForMonth(month) || []
       );
       const after = JSON.stringify(alerts);
 
-      if (result?.created > 0 || before !== after) {
+      if (shouldRecompute) {
+        lastIntegrationMonth = month;
+        lastIntegrationAt = now;
+      }
+
+      if (shouldRecompute && (result?.created > 0 || before !== after)) {
         AppData.saveState();
       }
 
