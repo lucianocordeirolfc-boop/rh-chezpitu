@@ -1083,7 +1083,7 @@
               <p class="eyebrow">Consulta</p>
               <h2>Lista de funcionários</h2>
             </div>
-            <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo cadastro</button>
+            <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo funcionário</button>
           </div>
           ${renderListToolbar(allEmployees, filteredEmployees.length, companyCount, allEmployees.length)}
           <div class="table-wrap">

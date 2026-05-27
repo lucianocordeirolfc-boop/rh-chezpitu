@@ -5,6 +5,7 @@ if (window.firebase && firebase.apps.length) {
 (function () {
   const ROOT = "sistemaRH";
   const COMPANIES = ["Chez Pitu", "Pengold"];
+  const DEFAULT_SELECTED_COMPANY = "Pengold";
 
   function companiesInState(state) {
     const keys = Object.keys(state?.companies || {});
@@ -103,7 +104,8 @@ if (window.firebase && firebase.apps.length) {
 
     return {
       configuracoes: {
-        selectedCompany: state.selectedCompany || COMPANIES[0],
+        selectedCompany:
+          state.selectedCompany || (COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0]),
         escalaYearMonth: state.escalaSelectedYearMonth || "",
         updatedAt: Date.now()
       },
@@ -183,7 +185,9 @@ if (window.firebase && firebase.apps.length) {
     });
 
     return {
-      selectedCompany: data.configuracoes?.selectedCompany || COMPANIES[0],
+      selectedCompany:
+        data.configuracoes?.selectedCompany ||
+        (COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0]),
       escalaSelectedYearMonth: data.configuracoes?.escalaYearMonth || "",
       companies,
       valeTransporte: data.valeTransporte || {},

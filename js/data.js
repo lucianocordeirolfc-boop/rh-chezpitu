@@ -3,6 +3,7 @@
   const VT_BACKUP_KEY = "chezPituVtBackup.v1";
 
   const COMPANIES = ["Chez Pitu", "Pengold"];
+  const DEFAULT_SELECTED_COMPANY = "Pengold";
   const WEEK_DAYS = [
     "Segunda-feira",
     "Terça-feira",
@@ -255,7 +256,7 @@
     });
 
     return {
-      selectedCompany: COMPANIES[0],
+      selectedCompany: COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0],
       escalaSelectedYearMonth: monthKey(),
       companies,
       calendarHolidays: [],
