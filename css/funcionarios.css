@@ -571,3 +571,46 @@
     font-size: 0.74rem;
   }
 }
+
+/* ── Pop-up cadastro de funcionário ─────────────────────────── */
+
+.func-table-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.func-table-card-header .btn-sm {
+  flex-shrink: 0;
+}
+
+.popup-card-employee {
+  max-width: 920px;
+  width: calc(100% - 32px);
+}
+
+.func-popup-form {
+  padding: 16px 22px 22px;
+  gap: 12px;
+}
+
+.func-popup-form .func-form-row.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.func-popup-form .sunday-field-wrapper {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .popup-card-employee {
+    max-width: calc(100% - 24px);
+  }
+
+  .func-popup-form .func-form-row.cols-3,
+  .func-popup-form .func-form-row.cols-vt {
+    grid-template-columns: 1fr;
+  }
+}

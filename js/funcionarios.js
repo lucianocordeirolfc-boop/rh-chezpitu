@@ -287,6 +287,317 @@
     });
   }
 
+  function closeEmployeePopup() {
+    document.getElementById("employeePopup")?.remove();
+  }
+
+  function renderEmployeeFormHTML(allEmployees) {
+    return `
+      <input type="hidden" name="id">
+      <div class="func-form-row cols-3">
+        <label>Nome completo<input name="name" required autocomplete="name"></label>
+        <label>CPF<input name="cpf" required placeholder="000.000.000-00" autocomplete="off"></label>
+        <label>CTPS<input name="ctps" required autocomplete="off"></label>
+      </div>
+      <div class="func-form-row cols-3">
+        <label>Cargo<input name="role" required></label>
+        <label class="func-dept-label">Setor
+          <select id="departmentSelect" name="department" required>
+            ${departmentSelectOptions(allEmployees, "")}
+          </select>
+          <input id="newDepartmentInput" class="func-dept-new-input" placeholder="Nome do novo setor" style="display:none" autocomplete="off">
+        </label>
+        <label>Status<select name="status">${statusOptions("Ativo")}</select></label>
+      </div>
+      <div class="func-form-row cols-3">
+        <label>Admissão<input type="date" name="admissionDate" required value="${AppData.todayISO()}"></label>
+        <label>Folga fixa
+          <select name="fixedDay" id="fixedDaySelect">${dayOptions("")}</select>
+          <small id="fixedDayScheduleHint" class="help-text compact-help" style="display:none"></small>
+        </label>
+        <label class="func-shift-label">Horário
+          <select id="shiftSelect" name="defaultShift">
+            ${shiftSelectOptions(getShiftPresets(), "")}
+          </select>
+          <input id="newShiftInput" class="func-dept-new-input" placeholder="Ex.: 14h às 22:20h" style="display:none" autocomplete="off">
+        </label>
+      </div>
+      <div class="func-form-row">
+        ${sundaySelectorHTML("", "false")}
+      </div>
+      <div class="func-form-row cols-vt">
+        <label>Valor diário VT<input name="vtDaily" inputmode="decimal" placeholder="17,30" autocomplete="off"></label>
+        <label>Origem<span id="employeeOriginDisplay" class="func-origin-readonly">Manual</span></label>
+        <label>Empresa<select name="employeeCompany">${companyFormOptions(AppData.state.selectedCompany)}</select></label>
+      </div>
+      <div class="func-form-row">
+        <label class="full">Observações<textarea name="notes" rows="2"></textarea></label>
+      </div>
+      <div class="popup-actions func-form-actions">
+        <button type="button" class="btn btn-cancel" id="employeePopupCancel">Cancelar</button>
+        <button class="primary btn-sm" type="submit">Salvar funcionário</button>
+      </div>
+    `;
+  }
+
+  function resetEmployeeForm(form) {
+    form.reset();
+    const originEl = form.querySelector("#employeeOriginDisplay");
+    if (originEl) originEl.textContent = "Manual";
+    const companyField = form.elements.employeeCompany;
+    if (companyField) companyField.value = AppData.state.selectedCompany;
+    if (form.elements.admissionDate) form.elements.admissionDate.value = AppData.todayISO();
+
+    const shiftSelect = form.querySelector("#shiftSelect");
+    const newShiftInput = form.querySelector("#newShiftInput");
+    if (shiftSelect) shiftSelect.value = "";
+    if (newShiftInput) { newShiftInput.style.display = "none"; newShiftInput.value = ""; }
+
+    const deptSelect = form.querySelector("#departmentSelect");
+    const newDeptInput = form.querySelector("#newDepartmentInput");
+    if (deptSelect) deptSelect.value = "";
+    if (newDeptInput) { newDeptInput.style.display = "none"; newDeptInput.value = ""; }
+
+    form.querySelectorAll(".sunday-off-check").forEach((cb) => { cb.checked = false; });
+    const doubleCheck = form.querySelector(".double-sunday-check");
+    if (doubleCheck) doubleCheck.checked = false;
+    const hiddenWeeks = form.querySelector("#sundayOffWeeksHidden");
+    const hiddenDouble = form.querySelector("#doubleSundayOffHidden");
+    if (hiddenWeeks) hiddenWeeks.value = "";
+    if (hiddenDouble) hiddenDouble.value = "false";
+
+    const fixedDayHint = form.querySelector("#fixedDayScheduleHint");
+    if (fixedDayHint) { fixedDayHint.style.display = "none"; fixedDayHint.textContent = ""; }
+  }
+
+  function fillEmployeeForm(form, employee, company) {
+    const companyField = form.elements.employeeCompany;
+    if (companyField) companyField.value = company;
+
+    Object.entries(employee).forEach(([key, value]) => {
+      if (["department", "sundayOffWeeks", "doubleSundayOff", "fixedDayHistory"].includes(key)) return;
+      const field = form.elements[key];
+      if (!field) return;
+      field.value = key === "vtDaily" ? AppData.formatVtInput(value) : value ?? "";
+    });
+
+    const fixedDayHint = form.querySelector("#fixedDayScheduleHint");
+    const fixedDaySelect = form.querySelector("#fixedDaySelect");
+    const pendingInfo = AppData.getFixedDayChangeInfo(employee);
+    if (fixedDayHint) {
+      if (pendingInfo) {
+        fixedDayHint.style.display = "";
+        fixedDayHint.textContent =
+          `Até ${pendingInfo.effectiveFromLabel}: ${pendingInfo.currentDay || "sem folga"}. ` +
+          `A partir dessa data: ${pendingInfo.nextDay || "sem folga"}.`;
+      } else {
+        fixedDayHint.style.display = "none";
+        fixedDayHint.textContent = "";
+      }
+    }
+    if (fixedDaySelect) {
+      fixedDaySelect.onchange = () => {
+        if (!form.elements.id?.value) {
+          if (fixedDayHint) fixedDayHint.style.display = "none";
+          return;
+        }
+        const current = AppData.resolveFixedDayForDate(employee, AppData.todayISO());
+        const selected = fixedDaySelect.value || "";
+        if (selected && selected !== current) {
+          const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
+          fixedDayHint.style.display = "";
+          fixedDayHint.textContent =
+            `Alteração agendada: mantém ${current || "sem folga"} até o mês atual. ` +
+            `Nova folga (${selected}) vale a partir de ${fromLabel}.`;
+        } else if (fixedDayHint) {
+          fixedDayHint.style.display = pendingInfo ? "" : "none";
+          fixedDayHint.textContent = pendingInfo
+            ? `Até ${pendingInfo.effectiveFromLabel}: ${pendingInfo.currentDay || "sem folga"}. ` +
+              `A partir dessa data: ${pendingInfo.nextDay || "sem folga"}.`
+            : "";
+        }
+      };
+    }
+
+    const shiftSelect = form.querySelector("#shiftSelect");
+    const newShiftInput = form.querySelector("#newShiftInput");
+    if (shiftSelect) {
+      const shift = employee.defaultShift || "";
+      const presets = getShiftPresets();
+      if (presets.includes(shift)) {
+        shiftSelect.value = shift;
+        if (newShiftInput) { newShiftInput.style.display = "none"; newShiftInput.value = ""; }
+      } else if (shift) {
+        shiftSelect.value = "__new_shift__";
+        if (newShiftInput) { newShiftInput.style.display = ""; newShiftInput.value = shift; }
+      } else {
+        shiftSelect.value = "";
+        if (newShiftInput) { newShiftInput.style.display = "none"; newShiftInput.value = ""; }
+      }
+    }
+
+    const deptSelect = form.querySelector("#departmentSelect");
+    const newDeptInput = form.querySelector("#newDepartmentInput");
+    if (deptSelect) {
+      const dept = employee.department || "";
+      const optionExists = [...deptSelect.options].some(
+        (o) => o.value === dept && o.value !== "" && o.value !== "__new__"
+      );
+      if (optionExists) {
+        deptSelect.value = dept;
+        if (newDeptInput) { newDeptInput.style.display = "none"; newDeptInput.value = ""; }
+      } else if (dept) {
+        deptSelect.value = "__new__";
+        if (newDeptInput) { newDeptInput.style.display = ""; newDeptInput.value = dept; }
+      } else {
+        deptSelect.value = "";
+        if (newDeptInput) { newDeptInput.style.display = "none"; newDeptInput.value = ""; }
+      }
+    }
+
+    const sundayWeeks = String(employee.sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean);
+    form.querySelectorAll(".sunday-off-check").forEach((cb) => {
+      cb.checked = sundayWeeks.includes(cb.value);
+    });
+    const doubleCheck = form.querySelector(".double-sunday-check");
+    if (doubleCheck) {
+      doubleCheck.checked = employee.doubleSundayOff === "true" || employee.doubleSundayOff === true;
+    }
+    const hiddenWeeks = form.querySelector("#sundayOffWeeksHidden");
+    const hiddenDouble = form.querySelector("#doubleSundayOffHidden");
+    if (hiddenWeeks) hiddenWeeks.value = sundayWeeks.join(",");
+    if (hiddenDouble) hiddenDouble.value = doubleCheck?.checked ? "true" : "false";
+
+    const originEl = form.querySelector("#employeeOriginDisplay");
+    if (originEl) originEl.textContent = employee.source === "imported" ? "Importado" : "Manual";
+  }
+
+  function bindEmployeeForm(form, pageContainer) {
+    const shiftSelect = form.querySelector("#shiftSelect");
+    const newShiftInput = form.querySelector("#newShiftInput");
+    shiftSelect?.addEventListener("change", () => {
+      if (shiftSelect.value === "__new_shift__") {
+        newShiftInput.style.display = "";
+        newShiftInput.focus();
+      } else {
+        newShiftInput.style.display = "none";
+        newShiftInput.value = "";
+      }
+    });
+
+    const deptSelect = form.querySelector("#departmentSelect");
+    const newDeptInput = form.querySelector("#newDepartmentInput");
+    deptSelect?.addEventListener("change", () => {
+      if (deptSelect.value === "__new__") {
+        newDeptInput.style.display = "";
+        newDeptInput.focus();
+      } else {
+        newDeptInput.style.display = "none";
+        newDeptInput.value = "";
+      }
+    });
+
+    setupSundayCheckboxes(form);
+
+    const vtField = form.elements.vtDaily;
+    if (vtField) {
+      vtField.addEventListener("blur", () => {
+        if (!vtField.value.trim()) return;
+        vtField.value = AppData.formatVtInput(AppData.parseVtDaily(vtField.value));
+      });
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      if (!payload.fixedDay) payload.fixedDay = "";
+
+      if (payload.defaultShift === "__new_shift__") {
+        const newShift = (newShiftInput?.value || "").trim();
+        if (!newShift) {
+          alert("Informe o horário.");
+          newShiftInput?.focus();
+          return;
+        }
+        addShiftPreset(newShift);
+        payload.defaultShift = newShift;
+      }
+
+      if (payload.department === "__new__") {
+        const newDept = (newDeptInput?.value || "").trim();
+        if (!newDept) {
+          alert("Informe o nome do novo setor.");
+          newDeptInput?.focus();
+          return;
+        }
+        payload.department = newDept;
+      }
+
+      const targetCompany = payload.employeeCompany || AppData.state.selectedCompany;
+      delete payload.employeeCompany;
+      const existing = AppData.getCompanyData(targetCompany).employees.find((item) => item.id === payload.id);
+      const previousFixedDay = existing?.fixedDay || "";
+      payload.source = existing?.source === "imported" ? "imported" : "manual";
+      payload.vtDaily = AppData.parseVtDaily(payload.vtDaily);
+      try {
+        AppData.upsertEmployee(payload, targetCompany);
+        if (existing && String(previousFixedDay).trim() !== String(payload.fixedDay || "").trim()) {
+          const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
+          window.App?.toast?.(
+            `Folga fixa atualizada. A nova regra vale a partir de ${fromLabel} (mês seguinte).`,
+            "info",
+            6000
+          );
+        }
+        closeEmployeePopup();
+        window.App.renderCurrent();
+      } catch (error) {
+        alert(error.message || "Não foi possível salvar o funcionário.");
+      }
+    });
+  }
+
+  function openEmployeePopup(pageContainer, options = {}) {
+    closeEmployeePopup();
+    const allEmployees = getAllEmployeesFlat();
+    const isEdit = Boolean(options.employee);
+    const overlay = document.createElement("div");
+    overlay.id = "employeePopup";
+    overlay.className = "popup-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = `
+      <div class="popup-card popup-card-employee">
+        <div class="popup-header">
+          <h3 id="employeePopupTitle">${isEdit ? "Editar funcionário" : "Novo cadastro"}</h3>
+          <button class="popup-close" id="employeePopupClose" type="button" aria-label="Fechar">✕</button>
+        </div>
+        <form id="employeeForm" class="popup-form func-popup-form func-form-horizontal">
+          ${renderEmployeeFormHTML(allEmployees)}
+        </form>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector("#employeeForm");
+    bindEmployeeForm(form, pageContainer);
+
+    if (isEdit) {
+      fillEmployeeForm(form, options.employee, options.company || AppData.state.selectedCompany);
+    } else {
+      resetEmployeeForm(form);
+    }
+
+    overlay.querySelector("#employeePopupClose").addEventListener("click", closeEmployeePopup);
+    overlay.querySelector("#employeePopupCancel").addEventListener("click", closeEmployeePopup);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeEmployeePopup();
+    });
+
+    form.querySelector("[name='name']")?.focus();
+  }
+
   function employeeRows(employees) {
     if (!employees.length) {
       return `<tr><td colspan="13">Nenhum funcionário encontrado.</td></tr>`;
@@ -443,225 +754,43 @@
       window.App.renderCurrent();
     });
 
-    const form = container.querySelector("#employeeForm");
-
-    // Shift select → show/hide new-shift input
-    const shiftSelect = form.querySelector("#shiftSelect");
-    const newShiftInput = form.querySelector("#newShiftInput");
-    shiftSelect?.addEventListener("change", () => {
-      if (shiftSelect.value === "__new_shift__") {
-        newShiftInput.style.display = "";
-        newShiftInput.focus();
-      } else {
-        newShiftInput.style.display = "none";
-        newShiftInput.value = "";
-      }
+    container.querySelector("#btnNewEmployee")?.addEventListener("click", () => {
+      openEmployeePopup(container);
     });
 
-    // Department select → show/hide new-dept input
-    const deptSelect = form.querySelector("#departmentSelect");
-    const newDeptInput = form.querySelector("#newDepartmentInput");
-    deptSelect?.addEventListener("change", () => {
-      if (deptSelect.value === "__new__") {
-        newDeptInput.style.display = "";
-        newDeptInput.focus();
-      } else {
-        newDeptInput.style.display = "none";
-        newDeptInput.value = "";
-      }
-    });
-
-    // Sunday checkbox interaction
-    setupSundayCheckboxes(form);
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const formData = new FormData(form);
-      const payload = Object.fromEntries(formData.entries());
-      if (!payload.fixedDay) payload.fixedDay = "";
-
-      // Resolve shift: __new_shift__ means use text input value
-      if (payload.defaultShift === "__new_shift__") {
-        const newShift = (newShiftInput?.value || "").trim();
-        if (!newShift) {
-          alert("Informe o horário.");
-          newShiftInput?.focus();
+    if (!container.dataset.employeeActionsBound) {
+      container.dataset.employeeActionsBound = "1";
+      container.addEventListener("click", (event) => {
+        const editBtn = event.target.closest("[data-edit]");
+        if (editBtn) {
+          event.preventDefault();
+          const company = editBtn.dataset.company || AppData.state.selectedCompany;
+          if (company !== AppData.state.selectedCompany) {
+            AppData.setSelectedCompany(company);
+            const globalSelect = document.getElementById("companySelect");
+            if (globalSelect) globalSelect.value = company;
+          }
+          const employee = AppData.getCompanyData(company).employees.find((item) => item.id === editBtn.dataset.edit);
+          if (employee) openEmployeePopup(container, { employee, company });
           return;
         }
-        addShiftPreset(newShift);
-        payload.defaultShift = newShift;
-      }
 
-      // Resolve department: __new__ means use text input value
-      if (payload.department === "__new__") {
-        const newDept = (newDeptInput?.value || "").trim();
-        if (!newDept) {
-          alert("Informe o nome do novo setor.");
-          newDeptInput?.focus();
-          return;
+        const removeBtn = event.target.closest("[data-remove]");
+        if (removeBtn) {
+          event.preventDefault();
+          if (!confirm("Excluir este funcionário e seus vínculos de escala, férias e feriados?")) return;
+          const company = removeBtn.dataset.company || AppData.state.selectedCompany;
+          AppData.removeEmployee(removeBtn.dataset.remove, company);
+          closeEmployeePopup();
+          window.App.renderCurrent();
         }
-        payload.department = newDept;
-      }
-
-      const targetCompany = payload.employeeCompany || AppData.state.selectedCompany;
-      delete payload.employeeCompany;
-      const existing = AppData.getCompanyData(targetCompany).employees.find((item) => item.id === payload.id);
-      const previousFixedDay = existing?.fixedDay || "";
-      payload.source = existing?.source === "imported" ? "imported" : "manual";
-      payload.vtDaily = AppData.parseVtDaily(payload.vtDaily);
-      try {
-        AppData.upsertEmployee(payload, targetCompany);
-        if (existing && String(previousFixedDay).trim() !== String(payload.fixedDay || "").trim()) {
-          const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
-          window.App?.toast?.(
-            `Folga fixa atualizada. A nova regra vale a partir de ${fromLabel} (mês seguinte).`,
-            "info",
-            6000
-          );
-        }
-        window.App.renderCurrent();
-      } catch (error) {
-        alert(error.message || "Não foi possível salvar o funcionário.");
-      }
-    });
-
-    container.querySelectorAll("[data-edit]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const company = button.dataset.company || AppData.state.selectedCompany;
-        if (company !== AppData.state.selectedCompany) {
-          AppData.setSelectedCompany(company);
-          document.getElementById("companySelect").value = company;
-        }
-        const employee = AppData.getCompanyData(company).employees.find((item) => item.id === button.dataset.edit);
-        if (!employee) return;
-        const companyField = form.elements.employeeCompany;
-        if (companyField) companyField.value = company;
-
-        Object.entries(employee).forEach(([key, value]) => {
-          // Skip fields we handle manually below
-          if (["department", "sundayOffWeeks", "doubleSundayOff", "fixedDayHistory"].includes(key)) return;
-          const field = form.elements[key];
-          if (!field) return;
-          field.value = key === "vtDaily" ? AppData.formatVtInput(value) : value ?? "";
-        });
-
-        const fixedDayHint = document.getElementById("fixedDayScheduleHint");
-        const fixedDaySelect = document.getElementById("fixedDaySelect");
-        const pendingInfo = AppData.getFixedDayChangeInfo(employee);
-        if (fixedDayHint) {
-          if (pendingInfo) {
-            fixedDayHint.style.display = "";
-            fixedDayHint.textContent =
-              `Até ${pendingInfo.effectiveFromLabel}: ${pendingInfo.currentDay || "sem folga"}. ` +
-              `A partir dessa data: ${pendingInfo.nextDay || "sem folga"}.`;
-          } else {
-            fixedDayHint.style.display = "none";
-            fixedDayHint.textContent = "";
-          }
-        }
-        if (fixedDaySelect && !fixedDaySelect.dataset.hintBound) {
-          fixedDaySelect.dataset.hintBound = "1";
-          fixedDaySelect.addEventListener("change", () => {
-            if (!form.elements.id?.value) {
-              if (fixedDayHint) fixedDayHint.style.display = "none";
-              return;
-            }
-            const current = AppData.resolveFixedDayForDate(employee, AppData.todayISO());
-            const selected = fixedDaySelect.value || "";
-            if (selected && selected !== current) {
-              const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
-              fixedDayHint.style.display = "";
-              fixedDayHint.textContent =
-                `Alteração agendada: mantém ${current || "sem folga"} até o mês atual. ` +
-                `Nova folga (${selected}) vale a partir de ${fromLabel}.`;
-            } else if (fixedDayHint) {
-              fixedDayHint.style.display = pendingInfo ? "" : "none";
-              fixedDayHint.textContent = pendingInfo
-                ? `Até ${pendingInfo.effectiveFromLabel}: ${pendingInfo.currentDay || "sem folga"}. ` +
-                  `A partir dessa data: ${pendingInfo.nextDay || "sem folga"}.`
-                : "";
-            }
-          });
-        }
-
-        // Populate shift select
-        if (shiftSelect) {
-          const shift = employee.defaultShift || "";
-          const presets = getShiftPresets();
-          if (presets.includes(shift)) {
-            shiftSelect.value = shift;
-            if (newShiftInput) { newShiftInput.style.display = "none"; newShiftInput.value = ""; }
-          } else if (shift) {
-            shiftSelect.value = "__new_shift__";
-            if (newShiftInput) { newShiftInput.style.display = ""; newShiftInput.value = shift; }
-          } else {
-            shiftSelect.value = "";
-            if (newShiftInput) { newShiftInput.style.display = "none"; newShiftInput.value = ""; }
-          }
-        }
-
-        // Populate department select
-        if (deptSelect) {
-          const dept = employee.department || "";
-          const optionExists = [...deptSelect.options].some(
-            (o) => o.value === dept && o.value !== "" && o.value !== "__new__"
-          );
-          if (optionExists) {
-            deptSelect.value = dept;
-            if (newDeptInput) { newDeptInput.style.display = "none"; newDeptInput.value = ""; }
-          } else if (dept) {
-            // Dept not in list — treat as new entry
-            deptSelect.value = "__new__";
-            if (newDeptInput) { newDeptInput.style.display = ""; newDeptInput.value = dept; }
-          } else {
-            deptSelect.value = "";
-            if (newDeptInput) { newDeptInput.style.display = "none"; newDeptInput.value = ""; }
-          }
-        }
-
-        // Populate sunday checkboxes
-        const sundayWeeks = String(employee.sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean);
-        form.querySelectorAll(".sunday-off-check").forEach((cb) => {
-          cb.checked = sundayWeeks.includes(cb.value);
-        });
-        const doubleCheck = form.querySelector(".double-sunday-check");
-        if (doubleCheck) {
-          doubleCheck.checked = employee.doubleSundayOff === "true" || employee.doubleSundayOff === true;
-        }
-        const hiddenWeeks = form.querySelector("#sundayOffWeeksHidden");
-        const hiddenDouble = form.querySelector("#doubleSundayOffHidden");
-        if (hiddenWeeks) hiddenWeeks.value = sundayWeeks.join(",");
-        if (hiddenDouble) hiddenDouble.value = doubleCheck?.checked ? "true" : "false";
-
-        const originEl = container.querySelector("#employeeOriginDisplay");
-        if (originEl) {
-          originEl.textContent = employee.source === "imported" ? "Importado" : "Manual";
-        }
-        form.scrollIntoView({ behavior: "smooth", block: "start" });
       });
-    });
-
-    container.querySelectorAll("[data-remove]").forEach((button) => {
-      button.addEventListener("click", () => {
-        if (!confirm("Excluir este funcionário e seus vínculos de escala, férias e feriados?")) return;
-        const company = button.dataset.company || AppData.state.selectedCompany;
-        AppData.removeEmployee(button.dataset.remove, company);
-        window.App.renderCurrent();
-      });
-    });
+    }
 
     ImportUtils.bindImportModal(container, "employeeImportModal", {
       buttonId: "importLovable",
       run: () => runEmployeeImport(container)
     });
-
-    const vtField = form.elements.vtDaily;
-    if (vtField) {
-      vtField.addEventListener("blur", () => {
-        if (!vtField.value.trim()) return;
-        vtField.value = AppData.formatVtInput(AppData.parseVtDaily(vtField.value));
-      });
-    }
 
     container.querySelector("#downloadEmployeeTemplate")?.addEventListener("click", () => {
       ImportUtils.downloadCSV(
@@ -684,32 +813,6 @@
     });
 
     bindListFilters(container);
-
-    form.addEventListener("reset", () => {
-      window.setTimeout(() => {
-        const originEl = container.querySelector("#employeeOriginDisplay");
-        if (originEl) originEl.textContent = "Manual";
-        const companyField = form.elements.employeeCompany;
-        if (companyField) companyField.value = AppData.state.selectedCompany;
-
-        // Reset shift select
-        if (shiftSelect) shiftSelect.value = "";
-        if (newShiftInput) { newShiftInput.style.display = "none"; newShiftInput.value = ""; }
-
-        // Reset department select
-        if (deptSelect) deptSelect.value = "";
-        if (newDeptInput) { newDeptInput.style.display = "none"; newDeptInput.value = ""; }
-
-        // Reset sunday checkboxes
-        form.querySelectorAll(".sunday-off-check").forEach((cb) => { cb.checked = false; });
-        const doubleCheck = form.querySelector(".double-sunday-check");
-        if (doubleCheck) doubleCheck.checked = false;
-        const hiddenWeeks = form.querySelector("#sundayOffWeeksHidden");
-        const hiddenDouble = form.querySelector("#doubleSundayOffHidden");
-        if (hiddenWeeks) hiddenWeeks.value = "";
-        if (hiddenDouble) hiddenDouble.value = "false";
-      }, 0);
-    });
   }
 
   function render(container) {
@@ -729,7 +832,7 @@
         <header class="func-page-intro">
           <div class="func-page-intro-head">
             <h2 class="func-module-title">Cadastro de Funcionários</h2>
-            <p class="func-module-subtitle">Empresa, cadastro e consulta de colaboradores</p>
+            <p class="func-module-subtitle">Empresa pagadora e consulta de colaboradores</p>
           </div>
           <div class="func-stats-row stat-row">${renderEmployeeStats()}</div>
         </header>
@@ -766,67 +869,13 @@
           </div>
         </article>
 
-        <article class="card func-form-card">
-          <div class="card-header card-header-compact">
-            <div>
-              <p class="eyebrow">Cadastro</p>
-              <h2>Funcionário</h2>
-            </div>
-          </div>
-          <form id="employeeForm" class="func-form-horizontal">
-            <input type="hidden" name="id">
-            <div class="func-form-row cols-3">
-              <label>Nome completo<input name="name" required></label>
-              <label>CPF<input name="cpf" required placeholder="000.000.000-00"></label>
-              <label>CTPS<input name="ctps" required></label>
-            </div>
-            <div class="func-form-row cols-3">
-              <label>Cargo<input name="role" required></label>
-              <label class="func-dept-label">Setor
-                <select id="departmentSelect" name="department" required>
-                  ${departmentSelectOptions(allEmployees, "")}
-                </select>
-                <input id="newDepartmentInput" class="func-dept-new-input" placeholder="Nome do novo setor" style="display:none" autocomplete="off">
-              </label>
-              <label>Status<select name="status">${statusOptions("Ativo")}</select></label>
-            </div>
-            <div class="func-form-row cols-3">
-              <label>Admissão<input type="date" name="admissionDate" required value="${AppData.todayISO()}"></label>
-              <label>Folga fixa
-                <select name="fixedDay" id="fixedDaySelect">${dayOptions("")}</select>
-                <small id="fixedDayScheduleHint" class="help-text compact-help" style="display:none"></small>
-              </label>
-              <label class="func-shift-label">Horário
-                <select id="shiftSelect" name="defaultShift">
-                  ${shiftSelectOptions(getShiftPresets(), "")}
-                </select>
-                <input id="newShiftInput" class="func-dept-new-input" placeholder="Ex.: 14h às 22:20h" style="display:none" autocomplete="off">
-              </label>
-            </div>
-            <div class="func-form-row">
-              ${sundaySelectorHTML("", "false")}
-            </div>
-            <div class="func-form-row cols-vt">
-              <label>Valor diário VT<input name="vtDaily" inputmode="decimal" placeholder="17,30" autocomplete="off"></label>
-              <label>Origem<span id="employeeOriginDisplay" class="func-origin-readonly">Manual</span></label>
-              <label>Empresa<select name="employeeCompany">${companyFormOptions(AppData.state.selectedCompany)}</select></label>
-            </div>
-            <div class="func-form-row">
-              <label class="full">Observações<textarea name="notes" rows="2"></textarea></label>
-            </div>
-            <div class="func-form-actions">
-              <button class="primary btn-sm" type="submit">Salvar funcionário</button>
-              <button class="secondary btn-sm" type="reset">Limpar</button>
-            </div>
-          </form>
-        </article>
-
         <article class="card func-table-card">
-          <div class="card-header card-header-compact">
+          <div class="card-header card-header-compact func-table-card-header">
             <div>
               <p class="eyebrow">Consulta</p>
               <h2>Lista de funcionários</h2>
             </div>
+            <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo cadastro</button>
           </div>
           ${renderListToolbar(allEmployees, filteredEmployees.length, companyCount, allEmployees.length)}
           <div class="table-wrap">
