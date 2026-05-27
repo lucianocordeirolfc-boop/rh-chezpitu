@@ -50,6 +50,93 @@
     return date.toISOString().slice(0, 10);
   }
 
+  /** Primeiro dia do mês seguinte à data informada (regra para folga fixa). */
+  function getNextMonthFirstDay(fromIso = todayISO()) {
+    const date = new Date(`${fromIso}T00:00:00`);
+    date.setMonth(date.getMonth() + 1, 1);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function formatDateBR(isoDate) {
+    if (!isoDate) return "—";
+    const [year, month, day] = String(isoDate).split("-");
+    return `${day}/${month}/${year}`;
+  }
+
+  function normalizeFixedDayHistory(employee) {
+    if (!employee || !Array.isArray(employee.fixedDayHistory)) return [];
+    return employee.fixedDayHistory
+      .map((entry) => ({
+        fixedDay: String(entry.fixedDay || "").trim(),
+        from: String(entry.from || "").trim(),
+        to: String(entry.to || "").trim()
+      }))
+      .filter((entry) => entry.fixedDay);
+  }
+
+  function resolveFixedDayForDate(employee, date) {
+    if (!employee) return "";
+    const history = normalizeFixedDayHistory(employee);
+    if (history.length) {
+      for (const entry of history) {
+        const from = entry.from || "0000-01-01";
+        const to = entry.to || "9999-12-31";
+        if (date >= from && date <= to) return entry.fixedDay;
+      }
+    }
+    return String(employee.fixedDay || "").trim();
+  }
+
+  function scheduleFixedDayChange(existing, newFixedDay) {
+    const oldDay = String(existing?.fixedDay || "").trim();
+    const nextDay = String(newFixedDay || "").trim();
+
+    if (!existing) {
+      return { fixedDay: nextDay, fixedDayHistory: [] };
+    }
+
+    if (oldDay === nextDay) {
+      return {
+        fixedDay: nextDay,
+        fixedDayHistory: normalizeFixedDayHistory(existing)
+      };
+    }
+
+    const effectiveFrom = getNextMonthFirstDay();
+    const lastDayBefore = addDays(effectiveFrom, -1);
+    let history = normalizeFixedDayHistory(existing);
+
+    if (!history.length && oldDay) {
+      history.push({ fixedDay: oldDay, from: "", to: lastDayBefore });
+    } else {
+      history = history.map((entry) => {
+        if (!entry.to && (!entry.from || entry.from < effectiveFrom)) {
+          return { ...entry, to: lastDayBefore };
+        }
+        return entry;
+      });
+    }
+
+    history.push({ fixedDay: nextDay, from: effectiveFrom, to: "" });
+
+    return { fixedDay: nextDay, fixedDayHistory: history };
+  }
+
+  function getFixedDayChangeInfo(employee) {
+    if (!employee) return null;
+    const effectiveFrom = getNextMonthFirstDay();
+    const today = todayISO();
+    const currentDay = resolveFixedDayForDate(employee, today);
+    const nextDay = String(employee.fixedDay || "").trim();
+    if (currentDay === nextDay) return null;
+    return {
+      currentDay,
+      nextDay,
+      effectiveFrom,
+      effectiveFromLabel: formatDateBR(effectiveFrom)
+    };
+  }
+
   function diffDays(fromISO, toISO) {
     const from = new Date(`${fromISO}T00:00:00`);
     const to = new Date(`${toISO}T00:00:00`);
@@ -827,8 +914,15 @@
       sundayOffWeeks: String(employee.sundayOffWeeks ?? existing?.sundayOffWeeks ?? "").trim(),
       doubleSundayOff: String(employee.doubleSundayOff ?? existing?.doubleSundayOff ?? "false"),
       notes: employee.notes ?? existing?.notes ?? "",
-      source
+      source,
+      fixedDayHistory: normalizeFixedDayHistory(existing)
     };
+
+    if (existing && hasFixedDay) {
+      const scheduled = scheduleFixedDayChange(existing, normalized.fixedDay);
+      normalized.fixedDay = scheduled.fixedDay;
+      normalized.fixedDayHistory = scheduled.fixedDayHistory;
+    }
 
     const index = data.employees.findIndex((item) => item.id === normalized.id);
     if (index >= 0) {
@@ -1339,7 +1433,8 @@
       }
     }
 
-    if (employee.fixedDay && employee.fixedDay === weekdayName(date)) return "FOLGA";
+    const fixedDayForDate = resolveFixedDayForDate(employee, date);
+    if (fixedDayForDate && fixedDayForDate === weekdayName(date)) return "FOLGA";
     return "";
   }
 
@@ -1551,6 +1646,10 @@
     VT_WORKED_CODES,
     runScaleIntegrations,
     addDays,
+    getNextMonthFirstDay,
+    resolveFixedDayForDate,
+    getFixedDayChangeInfo,
+    formatDateBR,
     diffDays,
     getCompanyData,
     ensureCompanyDataShape,

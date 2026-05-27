@@ -506,10 +506,19 @@
       const targetCompany = payload.employeeCompany || AppData.state.selectedCompany;
       delete payload.employeeCompany;
       const existing = AppData.getCompanyData(targetCompany).employees.find((item) => item.id === payload.id);
+      const previousFixedDay = existing?.fixedDay || "";
       payload.source = existing?.source === "imported" ? "imported" : "manual";
       payload.vtDaily = AppData.parseVtDaily(payload.vtDaily);
       try {
         AppData.upsertEmployee(payload, targetCompany);
+        if (existing && String(previousFixedDay).trim() !== String(payload.fixedDay || "").trim()) {
+          const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
+          window.App?.toast?.(
+            `Folga fixa atualizada. A nova regra vale a partir de ${fromLabel} (mês seguinte).`,
+            "info",
+            6000
+          );
+        }
         window.App.renderCurrent();
       } catch (error) {
         alert(error.message || "Não foi possível salvar o funcionário.");
@@ -530,11 +539,50 @@
 
         Object.entries(employee).forEach(([key, value]) => {
           // Skip fields we handle manually below
-          if (["department", "sundayOffWeeks", "doubleSundayOff"].includes(key)) return;
+          if (["department", "sundayOffWeeks", "doubleSundayOff", "fixedDayHistory"].includes(key)) return;
           const field = form.elements[key];
           if (!field) return;
           field.value = key === "vtDaily" ? AppData.formatVtInput(value) : value ?? "";
         });
+
+        const fixedDayHint = document.getElementById("fixedDayScheduleHint");
+        const fixedDaySelect = document.getElementById("fixedDaySelect");
+        const pendingInfo = AppData.getFixedDayChangeInfo(employee);
+        if (fixedDayHint) {
+          if (pendingInfo) {
+            fixedDayHint.style.display = "";
+            fixedDayHint.textContent =
+              `Até ${pendingInfo.effectiveFromLabel}: ${pendingInfo.currentDay || "sem folga"}. ` +
+              `A partir dessa data: ${pendingInfo.nextDay || "sem folga"}.`;
+          } else {
+            fixedDayHint.style.display = "none";
+            fixedDayHint.textContent = "";
+          }
+        }
+        if (fixedDaySelect && !fixedDaySelect.dataset.hintBound) {
+          fixedDaySelect.dataset.hintBound = "1";
+          fixedDaySelect.addEventListener("change", () => {
+            if (!form.elements.id?.value) {
+              if (fixedDayHint) fixedDayHint.style.display = "none";
+              return;
+            }
+            const current = AppData.resolveFixedDayForDate(employee, AppData.todayISO());
+            const selected = fixedDaySelect.value || "";
+            if (selected && selected !== current) {
+              const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
+              fixedDayHint.style.display = "";
+              fixedDayHint.textContent =
+                `Alteração agendada: mantém ${current || "sem folga"} até o mês atual. ` +
+                `Nova folga (${selected}) vale a partir de ${fromLabel}.`;
+            } else if (fixedDayHint) {
+              fixedDayHint.style.display = pendingInfo ? "" : "none";
+              fixedDayHint.textContent = pendingInfo
+                ? `Até ${pendingInfo.effectiveFromLabel}: ${pendingInfo.currentDay || "sem folga"}. ` +
+                  `A partir dessa data: ${pendingInfo.nextDay || "sem folga"}.`
+                : "";
+            }
+          });
+        }
 
         // Populate shift select
         if (shiftSelect) {
@@ -744,7 +792,10 @@
             </div>
             <div class="func-form-row cols-3">
               <label>Admissão<input type="date" name="admissionDate" required value="${AppData.todayISO()}"></label>
-              <label>Folga fixa<select name="fixedDay">${dayOptions("")}</select></label>
+              <label>Folga fixa
+                <select name="fixedDay" id="fixedDaySelect">${dayOptions("")}</select>
+                <small id="fixedDayScheduleHint" class="help-text compact-help" style="display:none"></small>
+              </label>
               <label class="func-shift-label">Horário
                 <select id="shiftSelect" name="defaultShift">
                   ${shiftSelectOptions(getShiftPresets(), "")}
