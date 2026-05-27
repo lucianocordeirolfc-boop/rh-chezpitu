@@ -959,6 +959,30 @@
     saveState();
   }
 
+  function removeWorkedEmployeeFromHoliday(holidayId, employeeId, options = {}) {
+    const company = options.company || state.selectedCompany;
+    const data = getCompanyData(company);
+    const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+    if (!holiday) return false;
+
+    const before = (holiday.workedEmployees || []).length;
+    holiday.workedEmployees = (holiday.workedEmployees || []).filter((item) => item.employeeId !== employeeId);
+    const changed = before !== holiday.workedEmployees.length;
+    if (!changed) return false;
+
+    Object.keys(data.manualScale || {}).forEach((key) => {
+      if (!key.startsWith(`${employeeId}|`)) return;
+      const entry = data.manualScale[key];
+      if (entry && typeof entry === "object" && entry.linkedHolidayId === holidayId) {
+        // Mantém o CO, mas remove o vínculo específico.
+        data.manualScale[key] = "CO";
+      }
+    });
+
+    if (options.save !== false) saveState();
+    return true;
+  }
+
   function updateHoliday(id, patch = {}, options = {}) {
     const data = getCompanyData(options.company || state.selectedCompany);
     const list = data.holidays || [];
@@ -1517,6 +1541,7 @@
     removeEmployee,
     removeHoliday,
     updateHoliday,
+    removeWorkedEmployeeFromHoliday,
     removeVacation,
     saveState,
     setManualScale,

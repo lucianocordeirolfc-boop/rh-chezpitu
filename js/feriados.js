@@ -264,6 +264,7 @@
       return `<tr><td colspan="8">Nenhum registro na tabela.</td></tr>`;
     }
 
+    const seenHoliday = new Set();
     return lines
       .map((line) => {
         const status = statusLabel(line);
@@ -274,6 +275,8 @@
         const originNote = line.workedItem?.origin
           ? `<small class="help-text">${esc(line.workedItem.origin)}</small>`
           : "";
+        const isFirstHolidayRow = !seenHoliday.has(line.holiday.id);
+        if (isFirstHolidayRow) seenHoliday.add(line.holiday.id);
 
         return `
         <tr>
@@ -292,8 +295,9 @@
           <td><span class="pill ${badgeClass}">${status}</span></td>
           <td class="actions holiday-actions">
             ${line.employeeId ? `<input class="compact-date" type="date" data-compensation-date="${line.holiday.id}|${line.employeeId}" value="${esc(line.compensationDate)}" title="Data de compensação">` : ""}
-            <button class="link-button" data-edit-holiday="${line.holiday.id}" type="button">Editar</button>
-            <button class="link-button danger" data-remove-holiday="${line.holiday.id}">Excluir</button>
+            ${line.employeeId ? `<button class="link-button danger" data-unlink-holiday="${line.holiday.id}|${line.employeeId}" type="button">Remover vínculo</button>` : ""}
+            ${isFirstHolidayRow ? `<button class="link-button" data-edit-holiday="${line.holiday.id}" type="button">Editar feriado</button>` : ""}
+            ${isFirstHolidayRow ? `<button class="link-button danger" data-remove-holiday="${line.holiday.id}" type="button">Excluir feriado</button>` : ""}
           </td>
         </tr>
       `;
@@ -443,6 +447,16 @@
   }
 
   function bindTableActions(container) {
+    function confirmDeleteHoliday(holidayId) {
+      const data = AppData.getCompanyData();
+      const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+      const total = holiday?.workedEmployees?.length || 0;
+      const msg = total
+        ? `Excluir o feriado "${holiday.name}" (${formatDateBR(holiday.date)})?\n\nIsso removerá ${total} vínculo(s) de funcionários e não pode ser desfeito.`
+        : `Excluir o feriado "${holiday?.name || ""}"?\n\nIsso não pode ser desfeito.`;
+      return window.confirm(msg);
+    }
+
     function showEditHolidayModal(holidayId) {
       document.getElementById("holidayEditPicker")?.remove();
 
@@ -509,7 +523,9 @@
 
     container.querySelectorAll("[data-remove-holiday]").forEach((button) => {
       button.addEventListener("click", () => {
-        AppData.removeHoliday(button.dataset.removeHoliday);
+        const holidayId = button.dataset.removeHoliday;
+        if (!confirmDeleteHoliday(holidayId)) return;
+        AppData.removeHoliday(holidayId);
         window.App.renderCurrent();
       });
     });
@@ -517,6 +533,17 @@
     container.querySelectorAll("[data-edit-holiday]").forEach((button) => {
       button.addEventListener("click", () => {
         showEditHolidayModal(button.dataset.editHoliday);
+      });
+    });
+
+    container.querySelectorAll("[data-unlink-holiday]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const [holidayId, employeeId] = String(button.dataset.unlinkHoliday || "").split("|");
+        if (!holidayId || !employeeId) return;
+        if (!window.confirm("Remover o vínculo deste funcionário com este feriado?")) return;
+        AppData.removeWorkedEmployeeFromHoliday(holidayId, employeeId);
+        refreshTable(container);
+        window.App.renderCurrent();
       });
     });
 
