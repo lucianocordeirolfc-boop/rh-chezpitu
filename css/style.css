@@ -914,6 +914,81 @@ tbody tr:hover {
   transition: width 0.25s ease, background 0.25s ease;
 }
 
+/* Feriados — toolbar, filtros rápidos e popup de cadastro */
+.feriados-page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.feriados-quick-nav {
+  flex: 1;
+  min-width: 0;
+}
+
+button.stat-chip.feriados-nav-chip {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+button.stat-chip.feriados-nav-chip:hover {
+  border-color: var(--sea-400);
+  box-shadow: 0 2px 8px rgba(15, 76, 92, 0.08);
+}
+
+button.stat-chip.feriados-nav-chip.is-active {
+  border-color: var(--sea-600);
+  background: var(--sea-50);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sea-400) 35%, transparent);
+}
+
+.feriados-register-popup {
+  width: min(720px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.feriados-popup-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.feriados-popup-tab {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.feriados-popup-tab.is-active {
+  color: var(--sea-700);
+  background: var(--sea-50);
+}
+
+.feriados-popup-calendar-list {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.feriados-popup-form .full {
+  grid-column: 1 / -1;
+}
+
 /* Barra de prazo — feriados (alinhada aos alertas 20 / 10 / 5 dias) */
 .progress-bar.progress-tone-blue > span {
   background: linear-gradient(90deg, #5b9fd4, #2f6fad);

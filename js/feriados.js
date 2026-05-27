@@ -1,5 +1,6 @@
 (function () {
   const filterState = {
+    quickView: "registros",
     search: "",
     employeeId: "todos",
     holidayId: "todos",
@@ -9,6 +10,8 @@
     compDateFrom: "",
     compDateTo: ""
   };
+
+  let holidayPopupTab = "trabalhado";
 
   let searchDelegationReady = false;
 
@@ -147,6 +150,7 @@
 
   function hasActiveFilters() {
     return (
+      filterState.quickView !== "registros" ||
       Boolean(String(filterState.search || "").trim()) ||
       filterState.employeeId !== "todos" ||
       filterState.holidayId !== "todos" ||
@@ -156,6 +160,33 @@
       Boolean(filterState.compDateFrom) ||
       Boolean(filterState.compDateTo)
     );
+  }
+
+  function matchesQuickView(line) {
+    if (filterState.quickView === "registros") return true;
+    if (!line.workedItem) return false;
+    const key = statusKey(line);
+    if (filterState.quickView === "pendentes") return key === "pendente";
+    if (filterState.quickView === "agendados") return key === "agendado";
+    if (filterState.quickView === "compensados") return key === "compensado";
+    if (filterState.quickView === "vencidos") return key === "vencido";
+    if (filterState.quickView === "alertas") {
+      return (key === "pendente" || key === "agendado") && line.daysLeft <= 20;
+    }
+    return true;
+  }
+
+  function setQuickView(view) {
+    filterState.quickView = view;
+    const statusMap = {
+      pendentes: "pendente",
+      agendados: "agendado",
+      compensados: "compensado",
+      vencidos: "vencido",
+      alertas: "alerta20",
+      registros: "todos"
+    };
+    filterState.status = statusMap[view] || "todos";
   }
 
   function matchesSearch(line, search) {
@@ -223,6 +254,7 @@
 
   function applyFilters(lines) {
     return lines.filter((line) => {
+      if (!matchesQuickView(line)) return false;
       if (!matchesSearch(line, filterState.search)) return false;
       if (filterState.employeeId !== "todos" && line.employeeId !== filterState.employeeId) return false;
       if (filterState.holidayId !== "todos" && line.holiday.id !== filterState.holidayId) return false;
@@ -257,7 +289,7 @@
   function rows(lines, context = {}) {
     if (!lines.length) {
       if (context.totalHolidays === 0) {
-        return `<tr><td colspan="8">Nenhum feriado cadastrado. Use o formulário acima ou importe dados.</td></tr>`;
+        return `<tr><td colspan="8">Nenhum feriado cadastrado. Use <strong>Cadastrar feriado</strong> ou importe dados.</td></tr>`;
       }
       if (context.hasActiveFilter) {
         return `<tr><td colspan="8">Nenhum resultado para os filtros informados.</td></tr>`;
@@ -390,19 +422,40 @@
     return stats;
   }
 
-  function renderMetrics(container, allLines, autoPendingCount) {
-    const metrics = container.querySelector("[data-holiday-metrics]");
-    if (!metrics) return;
-    const stats = computeStatsFromLines(allLines);
-    metrics.innerHTML = `
-      <article class="stat-chip"><span>Registros</span><strong>${allLines.length}</strong></article>
-      <article class="stat-chip"><span>Pendentes</span><strong>${stats.pending}</strong></article>
-      <article class="stat-chip chip-info"><span>Agendados</span><strong>${stats.agendado}</strong></article>
-      <article class="stat-chip"><span>Compensados</span><strong>${stats.compensado}</strong></article>
-      <article class="stat-chip chip-danger"><span>Vencidos</span><strong>${stats.vencido}</strong></article>
-      <article class="stat-chip"><span>Alertas prazo</span><strong>${stats.deadlineAlerts}</strong></article>
-      <article class="stat-chip"><span>Auto escala pend.</span><strong>${autoPendingCount}</strong></article>
-    `;
+  function renderQuickNav(allLines, lineStats, autoPendingCount) {
+    const q = filterState.quickView;
+    const items = [
+      { id: "registros", label: "Registros", count: allLines.length, chipClass: "" },
+      { id: "pendentes", label: "Pendentes", count: lineStats.pending, chipClass: "" },
+      { id: "agendados", label: "Agendados", count: lineStats.agendado, chipClass: "chip-info" },
+      { id: "compensados", label: "Compensados", count: lineStats.compensado, chipClass: "" },
+      { id: "vencidos", label: "Vencidos", count: lineStats.vencido, chipClass: "chip-danger" },
+      { id: "alertas", label: "Alertas prazo", count: lineStats.deadlineAlerts, chipClass: "" }
+    ];
+    return items
+      .map(
+        (item) => `
+      <button
+        type="button"
+        class="stat-chip feriados-nav-chip ${item.chipClass} ${q === item.id ? "is-active" : ""}"
+        data-feriados-view="${item.id}"
+      >
+        <span>${item.label}</span>
+        <strong>${item.count}</strong>
+      </button>
+    `
+      )
+      .concat(
+        `<article class="stat-chip" title="Pendências automáticas na escala"><span>Auto escala</span><strong>${autoPendingCount}</strong></article>`
+      )
+      .join("");
+  }
+
+  function updateQuickNavActive(container) {
+    const q = filterState.quickView;
+    container.querySelectorAll("[data-feriados-view]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.feriadosView === q);
+    });
   }
 
   function refreshTable(container) {
@@ -418,12 +471,7 @@
       });
     }
 
-    const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(company) || 0;
-    renderMetrics(container, allLines, autoPendingCount);
-
-    const alertsPanel = container.querySelector("[data-holiday-alerts]");
-    if (alertsPanel) alertsPanel.innerHTML = renderAlerts(allLines);
-
+    updateQuickNavActive(container);
     bindTableActions(container);
   }
 
@@ -610,12 +658,22 @@
       refreshTable(container);
     });
 
+    container.querySelector("[data-holiday-quick-nav]")?.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-feriados-view]");
+      if (!btn) return;
+      setQuickView(btn.dataset.feriadosView);
+      const statusFilter = container.querySelector("#holidayStatusFilter");
+      if (statusFilter) statusFilter.value = filterState.status;
+      updateQuickNavActive(container);
+      refreshTable(container);
+    });
+
     container.querySelector("#clearHolidayFilters")?.addEventListener("click", () => {
+      setQuickView("registros");
       filterState.search = "";
       filterState.employeeId = "todos";
       filterState.holidayId = "todos";
       filterState.department = "todos";
-      filterState.status = "todos";
       filterState.prazo = "todos";
       filterState.compDateFrom = "";
       filterState.compDateTo = "";
@@ -684,85 +742,249 @@
       });
   }
 
-  function bindStaticEvents(container) {
-    bindWorkedHolidayNameField(container);
+  function submitWorkedHolidayForm(form) {
+    const formData = new FormData(form);
+    const name = resolveWorkedHolidayName(formData);
+    if (!name) return false;
 
-    container.querySelector("#holidayForm")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const formData = new FormData(form);
-      const name = resolveWorkedHolidayName(formData);
-      if (!name) return;
-      const date = formData.get("date");
-      const compensationDate = formData.get("compensationDate");
+    const date = formData.get("date");
+    const compensationDate = formData.get("compensationDate");
+    const selectedEmployees = formData.getAll("workedEmployees");
+    if (!selectedEmployees.length) {
+      alert("Selecione ao menos um funcionário que trabalhou no feriado.");
+      return false;
+    }
 
-      if (compensationDate && AppData.diffDays(date, compensationDate) > 120) {
-        window.App?.toast?.("Compensação agendada fora do prazo de 120 dias.", "warning", 5000);
-      }
+    if (compensationDate && AppData.diffDays(date, compensationDate) > 120) {
+      window.App?.toast?.("Compensação agendada fora do prazo de 120 dias.", "warning", 5000);
+    }
 
-      const workedEmployees = formData.getAll("workedEmployees").map((employeeId) => {
-        const item = { employeeId, compensationDate: compensationDate || "" };
-        if (compensationDate) {
-          AppData.syncWorkedEmployeeStatus(item, date);
-        } else {
-          item.status = "Pendente";
-        }
-        return item;
-      });
-
-      const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
-      const existing = data.holidays.find(
-        (holiday) => holiday.date === date && AppData.normalizeSearchText(holiday.name) === AppData.normalizeSearchText(name)
-      );
-
-      if (existing) {
-        workedEmployees.forEach((item) => {
-          const prev = (existing.workedEmployees || []).find((row) => row.employeeId === item.employeeId);
-          if (prev) {
-            Object.assign(prev, item);
-          } else {
-            existing.workedEmployees.push(item);
-          }
-        });
-        AppData.saveState();
+    const workedEmployees = selectedEmployees.map((employeeId) => {
+      const item = { employeeId, compensationDate: compensationDate || "" };
+      if (compensationDate) {
+        AppData.syncWorkedEmployeeStatus(item, date);
       } else {
-        AppData.addHoliday({
-          name,
-          date,
-          workedEmployees
-        });
+        item.status = "Pendente";
       }
-      window.App.renderCurrent();
+      return item;
     });
 
-    bindCalendarHolidayNameField(container);
+    const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
+    const existing = data.holidays.find(
+      (holiday) =>
+        holiday.date === date && AppData.normalizeSearchText(holiday.name) === AppData.normalizeSearchText(name)
+    );
 
-    container.querySelector("#calendarHolidayForm")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const formData = new FormData(event.currentTarget);
-      const name = resolveCalendarHolidayName(formData);
-      if (!name) return;
-      const scope = formData.get("companyScope");
-      const date = String(formData.get("date") || "").trim();
-      const companies = scope === "ambas" ? ["ambas"] : [scope];
-      ScaleRules.addCalendarHoliday({
-        name,
-        date,
-        type: formData.get("type"),
-        companies
+    if (existing) {
+      workedEmployees.forEach((item) => {
+        const prev = (existing.workedEmployees || []).find((row) => row.employeeId === item.employeeId);
+        if (prev) {
+          Object.assign(prev, item);
+        } else {
+          existing.workedEmployees.push(item);
+        }
       });
-      AppData.syncCompanyHolidaysFromCalendarEntry({ name, date, companies }, { save: false });
-      AppData.runScaleIntegrations([date.slice(0, 7)]);
       AppData.saveState();
-      window.App.renderCurrent();
-    });
+    } else {
+      AppData.addHoliday({ name, date, workedEmployees });
+    }
+    return true;
+  }
 
-    container.querySelectorAll("[data-remove-calendar-holiday]").forEach((button) => {
+  function submitCalendarHolidayForm(form) {
+    const formData = new FormData(form);
+    const name = resolveCalendarHolidayName(formData);
+    if (!name) return false;
+    const scope = formData.get("companyScope");
+    const date = String(formData.get("date") || "").trim();
+    const companies = scope === "ambas" ? ["ambas"] : [scope];
+    ScaleRules.addCalendarHoliday({
+      name,
+      date,
+      type: formData.get("type"),
+      companies
+    });
+    AppData.syncCompanyHolidaysFromCalendarEntry({ name, date, companies }, { save: false });
+    AppData.runScaleIntegrations([date.slice(0, 7)]);
+    AppData.saveState();
+    return true;
+  }
+
+  function refreshPopupCalendarList(overlay) {
+    const list = overlay.querySelector("[data-calendar-holiday-list]");
+    if (list) list.innerHTML = renderCalendarHolidays();
+    bindCalendarHolidayRemoveButtons(overlay);
+  }
+
+  function bindCalendarHolidayRemoveButtons(root) {
+    root.querySelectorAll("[data-remove-calendar-holiday]").forEach((button) => {
+      if (button.dataset.boundRemoveCalendar) return;
+      button.dataset.boundRemoveCalendar = "1";
       button.addEventListener("click", () => {
         ScaleRules.removeCalendarHoliday(button.dataset.removeCalendarHoliday);
         AppData.runScaleIntegrations([AppData.monthKey()]);
+        refreshPopupCalendarList(root);
         window.App.renderCurrent();
       });
+    });
+  }
+
+  function closeHolidayRegisterPopup() {
+    document.getElementById("holidayRegisterPopup")?.remove();
+  }
+
+  function renderHolidayPopupTabs() {
+    const tabs = [
+      { id: "trabalhado", label: "Feriado trabalhado" },
+      { id: "calendario", label: "Calendário" }
+    ];
+    return `
+      <div class="feriados-popup-tabs" role="tablist">
+        ${tabs
+          .map(
+            (tab) => `
+          <button
+            type="button"
+            class="feriados-popup-tab ${holidayPopupTab === tab.id ? "is-active" : ""}"
+            data-holiday-popup-tab="${tab.id}"
+          >${tab.label}</button>
+        `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function renderHolidayRegisterPopupBody(data, employees, calendarCompanyOptions) {
+    return `
+      ${renderHolidayPopupTabs()}
+      <div class="feriados-popup-panels">
+        <section data-holiday-popup-panel="trabalhado" ${holidayPopupTab !== "trabalhado" ? "hidden" : ""}>
+          <form id="holidayForm" class="popup-form feriados-popup-form">
+            <div class="popup-grid">
+              ${renderWorkedHolidayNameField(data)}
+              <label class="popup-field">Data do feriado<input id="holidayWorkedDate" type="date" name="date" required value="${AppData.todayISO()}"></label>
+              <label class="popup-field full">Data de compensação<input type="date" name="compensationDate"></label>
+            </div>
+            <fieldset class="checkbox-group checkbox-group-compact full">
+              <legend>Funcionários que trabalharam (${esc(AppData.getPrimaryPageCompany("feriados"))})</legend>
+              ${employeeCheckboxes(employees)}
+            </fieldset>
+            <p class="help-text compact-help">Prazo de 120 dias corridos. CO na escala vincula ao feriado pendente mais antigo.</p>
+            <div class="popup-actions">
+              <button class="secondary" type="button" data-close-holiday-popup>Cancelar</button>
+              <button class="primary" type="submit">Salvar feriado</button>
+            </div>
+          </form>
+        </section>
+        <section data-holiday-popup-panel="calendario" ${holidayPopupTab !== "calendario" ? "hidden" : ""}>
+          <form id="calendarHolidayForm" class="popup-form feriados-popup-form">
+            <div class="popup-grid">
+              ${renderCalendarHolidayNameField()}
+              <label class="popup-field">Data<input type="date" name="date" required value="${AppData.todayISO()}"></label>
+              <label class="popup-field">Tipo
+                <select name="type">
+                  <option value="nacional">Nacional</option>
+                  <option value="estadual">Estadual</option>
+                  <option value="municipal">Municipal</option>
+                  <option value="interno">Interno</option>
+                </select>
+              </label>
+              <label class="popup-field">Empresa aplicável
+                <select name="companyScope">${calendarCompanyOptions}</select>
+              </label>
+            </div>
+            <div class="popup-actions">
+              <button class="secondary" type="button" data-close-holiday-popup>Cancelar</button>
+              <button class="primary" type="submit">Cadastrar no calendário</button>
+            </div>
+          </form>
+          <div class="feriados-popup-calendar-list" data-calendar-holiday-list>${renderCalendarHolidays()}</div>
+        </section>
+      </div>
+    `;
+  }
+
+  function bindHolidayPopupEvents(overlay, container) {
+    const close = () => closeHolidayRegisterPopup();
+    overlay.querySelectorAll("[data-close-holiday-popup]").forEach((btn) => btn.addEventListener("click", close));
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close();
+    });
+
+    const onKey = (event) => {
+      if (event.key === "Escape") {
+        document.removeEventListener("keydown", onKey);
+        close();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+
+    overlay.querySelectorAll("[data-holiday-popup-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        holidayPopupTab = btn.dataset.holidayPopupTab;
+        overlay.querySelectorAll("[data-holiday-popup-tab]").forEach((tabBtn) => {
+          tabBtn.classList.toggle("is-active", tabBtn === btn);
+        });
+        overlay.querySelector('[data-holiday-popup-panel="calendario"]')?.toggleAttribute("hidden", holidayPopupTab !== "calendario");
+        overlay.querySelector('[data-holiday-popup-panel="trabalhado"]')?.toggleAttribute("hidden", holidayPopupTab !== "trabalhado");
+      });
+    });
+
+    bindWorkedHolidayNameField(overlay);
+    bindCalendarHolidayNameField(overlay);
+    bindCalendarHolidayRemoveButtons(overlay);
+
+    overlay.querySelector("#holidayForm")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!submitWorkedHolidayForm(event.currentTarget)) return;
+      closeHolidayRegisterPopup();
+      window.App.renderCurrent();
+    });
+
+    overlay.querySelector("#calendarHolidayForm")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!submitCalendarHolidayForm(event.currentTarget)) return;
+      event.currentTarget.reset();
+      refreshPopupCalendarList(overlay);
+      bindWorkedHolidayNameField(overlay);
+      window.App.renderCurrent();
+    });
+  }
+
+  function openHolidayRegisterPopup(container, tab) {
+    if (tab) holidayPopupTab = tab;
+    closeHolidayRegisterPopup();
+    const company = AppData.getPrimaryPageCompany("feriados");
+    const data = AppData.getCompanyData(company);
+    const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
+    const companyList = window.CompanyUI?.listCompanies?.() || AppData.COMPANIES;
+    const calendarCompanyOptions = [
+      `<option value="ambas">Todas as empresas</option>`,
+      ...companyList.map((item) => `<option value="${esc(item)}">${esc(item)}</option>`)
+    ].join("");
+
+    const overlay = document.createElement("div");
+    overlay.id = "holidayRegisterPopup";
+    overlay.className = "popup-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = `
+      <div class="popup-card feriados-register-popup">
+        <div class="popup-header">
+          <h3>Cadastrar feriado</h3>
+          <button class="popup-close" type="button" data-close-holiday-popup aria-label="Fechar">✕</button>
+        </div>
+        ${renderHolidayRegisterPopupBody(data, employees, calendarCompanyOptions)}
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    bindHolidayPopupEvents(overlay, container);
+  }
+
+  function bindStaticEvents(container) {
+    container.querySelector("#openHolidayRegister")?.addEventListener("click", () => {
+      openHolidayRegisterPopup(container);
     });
 
     ImportUtils.bindImportModal(container, "holidayImportModal", {
@@ -987,92 +1209,19 @@
 
     const company = AppData.getPrimaryPageCompany("feriados");
     const data = AppData.getCompanyData(company);
-    const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
     const allLines = buildLines(data, company);
     const filteredLines = applyFilters(allLines);
     const lineStats = computeStatsFromLines(allLines);
     const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(company) || 0;
 
-    const companyList = window.CompanyUI?.listCompanies?.() || AppData.COMPANIES;
-    const calendarCompanyOptions = [
-      `<option value="ambas">Todas as empresas</option>`,
-      ...companyList.map((company) => `<option value="${esc(company)}">${esc(company)}</option>`)
-    ].join("");
-
     container.innerHTML = `
       ${window.CompanyUI?.renderToolbar?.("feriados") || ""}
-      <div class="dash-metrics" data-holiday-metrics>
-        <article class="stat-chip"><span>Registros</span><strong>${allLines.length}</strong></article>
-        <article class="stat-chip"><span>Pendentes</span><strong>${lineStats.pending}</strong></article>
-        <article class="stat-chip chip-info"><span>Agendados</span><strong>${lineStats.agendado}</strong></article>
-        <article class="stat-chip"><span>Compensados</span><strong>${lineStats.compensado}</strong></article>
-        <article class="stat-chip chip-danger"><span>Vencidos</span><strong>${lineStats.vencido}</strong></article>
-        <article class="stat-chip"><span>Alertas prazo</span><strong>${lineStats.deadlineAlerts}</strong></article>
-        <article class="stat-chip"><span>Auto escala pend.</span><strong>${autoPendingCount}</strong></article>
-      </div>
-
-      <article class="card card-compact">
-        <div class="card-header card-header-compact">
-          <div>
-            <p class="eyebrow">Calendário</p>
-            <h2>Feriados do mês / calendário</h2>
-          </div>
+      <div class="feriados-page-toolbar">
+        <div class="dash-metrics feriados-quick-nav" data-holiday-quick-nav>
+          ${renderQuickNav(allLines, lineStats, autoPendingCount)}
         </div>
-        <form id="calendarHolidayForm" class="form-grid form-grid-compact">
-          ${renderCalendarHolidayNameField()}
-          <label>Data<input type="date" name="date" required value="${AppData.todayISO()}"></label>
-          <label>Tipo
-            <select name="type">
-              <option value="nacional">Nacional</option>
-              <option value="estadual">Estadual</option>
-              <option value="municipal">Municipal</option>
-              <option value="interno">Interno</option>
-            </select>
-          </label>
-          <label>Empresa aplicável
-            <select name="companyScope">${calendarCompanyOptions}</select>
-          </label>
-          <button class="primary btn-sm" type="submit">Cadastrar feriado</button>
-        </form>
-        ${renderCalendarHolidays()}
-      </article>
-
-      <div class="grid two-columns compact-module">
-        <article class="card card-compact">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">Feriado trabalhado</p>
-              <h2>Lançar feriado</h2>
-            </div>
-          </div>
-          <form id="holidayForm" class="form-grid form-grid-compact">
-            ${renderWorkedHolidayNameField(data)}
-            <label>Data do feriado<input id="holidayWorkedDate" type="date" name="date" required value="${AppData.todayISO()}"></label>
-            <label class="full">Data de compensação<input type="date" name="compensationDate"></label>
-            <fieldset class="full checkbox-group checkbox-group-compact">
-              <legend>Funcionários que trabalharam</legend>
-              ${employeeCheckboxes(employees)}
-            </fieldset>
-            <button class="primary btn-sm" type="submit">Salvar feriado</button>
-          </form>
-        </article>
-
-        <article class="card card-compact info-card-compact">
-          <p class="eyebrow">Prazo</p>
-          <h2>120 dias corridos</h2>
-          <p class="help-text compact-help">CO na escala vincula automaticamente ao feriado pendente mais antigo. Status: Pendente, Agendado, Compensado ou Vencido.</p>
-        </article>
+        <button type="button" class="primary" id="openHolidayRegister">+ Cadastrar feriado</button>
       </div>
-
-      <article class="card card-compact">
-        <div class="card-header">
-          <div>
-            <p class="eyebrow">Alertas</p>
-            <h2>Alertas de vencimento</h2>
-          </div>
-        </div>
-        <div data-holiday-alerts>${renderAlerts(allLines)}</div>
-      </article>
 
       <article class="card card-compact">
         <div class="card-header card-header-compact">
