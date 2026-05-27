@@ -805,7 +805,7 @@
       const label = String(holiday.name || "").trim();
       if (label) names.add(label);
     });
-    AppData.COMPANIES.forEach((company) => {
+    (window.CompanyUI?.listCompanies?.() || AppData.COMPANIES).forEach((company) => {
       (AppData.getCompanyData(company).holidays || []).forEach((holiday) => {
         const label = String(holiday.name || "").trim();
         if (label) names.add(label);
@@ -990,7 +990,14 @@
     const lineStats = computeStatsFromLines(allLines);
     const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(AppData.state.selectedCompany) || 0;
 
+    const companyList = window.CompanyUI?.listCompanies?.() || AppData.COMPANIES;
+    const calendarCompanyOptions = [
+      `<option value="ambas">Todas as empresas</option>`,
+      ...companyList.map((company) => `<option value="${esc(company)}">${esc(company)}</option>`)
+    ].join("");
+
     container.innerHTML = `
+      ${window.CompanyUI?.renderCompanyBar?.() || ""}
       <div class="dash-metrics" data-holiday-metrics>
         <article class="stat-chip"><span>Registros</span><strong>${allLines.length}</strong></article>
         <article class="stat-chip"><span>Pendentes</span><strong>${lineStats.pending}</strong></article>
@@ -1020,11 +1027,7 @@
             </select>
           </label>
           <label>Empresa aplicável
-            <select name="companyScope">
-              <option value="ambas">Chez Pitu e Pengold</option>
-              <option value="Chez Pitu">Chez Pitu</option>
-              <option value="Pengold">Pengold</option>
-            </select>
+            <select name="companyScope">${calendarCompanyOptions}</select>
           </label>
           <button class="primary btn-sm" type="submit">Cadastrar feriado</button>
         </form>
@@ -1119,6 +1122,7 @@
 
     bindStaticEvents(container);
     bindFilterEvents(container);
+    window.CompanyUI?.bindCompanyBar?.(container, () => render(container));
     bindTableActions(container);
   }
 

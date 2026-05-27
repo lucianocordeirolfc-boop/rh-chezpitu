@@ -451,6 +451,7 @@
 
     container.innerHTML = `
       <div class="ausencias-module">
+        ${window.CompanyUI?.renderCompanyBar?.() || ""}
         <div class="ausencias-tabs-bar">
           <div class="ausencias-tabs">
             <button class="ausencias-tab-btn ${activeTab === "ferias" ? "active" : ""}" data-tab="ferias">
@@ -478,6 +479,7 @@
     `;
 
     bindEvents(container);
+    window.CompanyUI?.bindCompanyBar?.(container, () => render(container));
   }
 
   window.FeriasModule = { render };

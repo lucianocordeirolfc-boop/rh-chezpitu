@@ -23,21 +23,6 @@
     return document.querySelector(".menu-item.active")?.dataset.module || "dashboard";
   }
 
-  function updateCompanySwitcherVisibility(moduleId) {
-    const pill = document.getElementById("activeCompanyPill");
-    if (!pill) return;
-    // Escala e Cadastro têm seleção/gestão de empresa na própria página.
-    const hidePill = moduleId === "escala" || moduleId === "funcionarios";
-    pill.hidden = hidePill;
-    pill.style.display = hidePill ? "none" : "";
-    updateActiveCompanyPill();
-  }
-
-  function updateActiveCompanyPill() {
-    const nameEl = document.getElementById("activeCompanyName");
-    if (nameEl) nameEl.textContent = AppData.state.selectedCompany || "";
-  }
-
   function render(moduleId = activeModuleId()) {
     document.querySelectorAll(".module").forEach((section) => {
       section.classList.toggle("active", section.id === moduleId);
@@ -47,7 +32,6 @@
     });
 
     document.body.dataset.activeModule = moduleId;
-    updateCompanySwitcherVisibility(moduleId);
     document.getElementById("pageTitle").textContent = moduleTitles[moduleId];
     const container = document.getElementById(moduleId);
 
@@ -67,18 +51,7 @@
   }
 
   function setupCompanySelect() {
-    updateActiveCompanyPill();
-    const legacySelect = document.getElementById("companySelect");
-    if (legacySelect) {
-      legacySelect.innerHTML = AppData.getCompanies().map(
-        (company) => `<option value="${company}">${company}</option>`
-      ).join("");
-      legacySelect.value = AppData.state.selectedCompany;
-      legacySelect.addEventListener("change", () => {
-        AppData.setSelectedCompany(legacySelect.value);
-        renderCurrent();
-      });
-    }
+    /* Seleção de empresa fica em cada módulo (Cadastro, Escala, etc.). */
   }
 
   function setupMenu() {
@@ -220,7 +193,6 @@
     if (remoteState.selectedCompany) {
       AppData.setSelectedCompany(remoteState.selectedCompany, { save: false });
     }
-    updateActiveCompanyPill();
 
     refreshActiveModuleUI();
   }

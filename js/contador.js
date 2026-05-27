@@ -430,7 +430,8 @@
     var company = AppData.state.selectedCompany;
     var activeTab = container._contadorActiveTab || "lancamentos";
 
-    var companyOptions = AppData.COMPANIES.map(function (c) {
+    var companies = window.CompanyUI && CompanyUI.listCompanies ? CompanyUI.listCompanies() : AppData.COMPANIES;
+    var companyOptions = companies.map(function (c) {
       var sel = c === AppData.state.selectedCompany ? " selected" : "";
       return '<option value="' + c + '"' + sel + '>' + c + '</option>';
     }).join("");
@@ -445,6 +446,7 @@
     }
 
     var html =
+      (window.CompanyUI && CompanyUI.renderCompanyBar ? CompanyUI.renderCompanyBar() : "") +
       '<div class="module-header">' +
         '<h2>Informações Contador</h2>' +
       '</div>' +
@@ -461,6 +463,12 @@
       '</div>';
 
     container.innerHTML = html;
+
+    if (window.CompanyUI && CompanyUI.bindCompanyBar) {
+      CompanyUI.bindCompanyBar(container, function () {
+        renderContent(container, yearMonth);
+      });
+    }
 
     if (activeTab === "resumo") {
       bindResumoEvents(container, yearMonth);

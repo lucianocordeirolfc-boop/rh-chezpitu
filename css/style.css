@@ -277,34 +277,77 @@ body[data-sidebar="collapsed"] .app-shell {
 }
 
 /* Na Escala, a empresa é escolhida no seletor interno da página. */
-body[data-active-module="escala"] .active-company-pill,
-body[data-active-module="funcionarios"] .active-company-pill {
-  display: none !important;
-}
-
-.active-company-pill {
-  display: inline-flex;
-  flex-direction: column;
+/* Barra de empresa nos módulos (padrão Cadastro) */
+.module-company-bar {
+  display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 2px;
-  padding: 6px 12px;
-  border-radius: 10px;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
   border: 1px solid var(--line);
-  background: var(--sand);
-  min-width: 120px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fafdfe 0%, #f2f9fb 100%);
 }
 
-.active-company-pill-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.module-company-bar-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.module-company-bar-eyebrow {
   color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.active-company-pill strong {
-  font-size: 0.88rem;
+.module-company-bar-name {
   color: var(--sea-900);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.module-company-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+button.stat-chip.module-company-chip {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+  text-align: center;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+button.stat-chip.module-company-chip:hover {
+  border-color: var(--sea-400);
+  box-shadow: 0 2px 8px rgba(15, 76, 92, 0.08);
+}
+
+button.stat-chip.module-company-chip.is-active {
+  border-color: var(--sea-600);
+  background: var(--sea-50);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sea-400) 35%, transparent);
+}
+
+.module-company-select-label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--sea-900);
+}
+
+.module-company-select {
+  min-width: 140px;
 }
 
 .sync-status {

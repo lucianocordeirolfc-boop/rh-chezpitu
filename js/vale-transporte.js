@@ -417,6 +417,7 @@
     }
 
     container.innerHTML = `
+      ${window.CompanyUI?.renderCompanyBar?.() || ""}
       <article class="card card-compact">
         <div class="card-header card-header-compact vt-header">
           <div>
@@ -488,6 +489,7 @@
     container._vtReceipts = receipts;
     container._vtYearMonth = resolvedMonth;
     bindEvents(container, resolvedMonth);
+    window.CompanyUI?.bindCompanyBar?.(container, () => render(container, resolvedMonth));
   }
 
   function refreshDeductionList(container, yearMonth) {

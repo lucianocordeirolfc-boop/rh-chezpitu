@@ -43,7 +43,7 @@
   }
 
   function setViewCompany(company) {
-    if (!AppData.COMPANIES.includes(company)) return;
+    if (!AppData.state.companies[company]) return;
     scaleLog("setViewCompany", company);
     scaleState.viewCompany = company;
     AppData.setSelectedCompany(company, { save: false });
@@ -417,11 +417,7 @@
 
     return `
       <div class="scale-toolbar scale-toolbar-compact">
-        <label>Empresa
-          <select id="scaleCompany">
-            ${AppData.COMPANIES.map((company) => `<option value="${company}" ${company === getViewCompany() ? "selected" : ""}>${company}</option>`).join("")}
-          </select>
-        </label>
+        ${window.CompanyUI?.renderCompanySelect?.("scaleCompany", getViewCompany()) || ""}
         <label>Mês
           <select id="scaleMonth">${monthOptions(month)}</select>
         </label>

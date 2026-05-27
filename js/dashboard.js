@@ -57,6 +57,7 @@
     ).slice(0, 6);
 
     container.innerHTML = `
+      ${window.CompanyUI?.renderCompanyBar?.() || ""}
       <div class="dash-metrics">
         <article class="stat-chip chip-default"><span>Ativos</span><strong>${companyCount?.active || 0}</strong></article>
         <article class="stat-chip chip-info"><span>Folgas hoje</span><strong>${todayOff.length}</strong></article>
@@ -103,6 +104,8 @@
         </article>
       </div>
     `;
+
+    window.CompanyUI?.bindCompanyBar?.(container, () => render(container));
   }
 
   window.DashboardModule = { render };

@@ -164,13 +164,14 @@
 
   function renderEmployeeStats() {
     const counts = AppData.getEmployeeCounts();
+    const active = AppData.state.selectedCompany;
     return counts.byCompany
       .map(
         (item) => `
-        <article class="stat-chip">
+        <button type="button" class="stat-chip module-company-chip ${item.company === active ? "is-active" : ""}" data-select-company="${esc(item.company)}">
           <span>${esc(item.company)}</span>
           <strong>${item.total}</strong>
-        </article>
+        </button>
       `
       )
       .concat(`<article class="stat-chip highlight"><span>Total</span><strong>${counts.total}</strong></article>`)
@@ -1014,6 +1015,7 @@
     });
 
     bindListFilters(container);
+    window.CompanyUI?.bindCompanyBar?.(container, () => window.App.renderCurrent());
   }
 
   function render(container) {
