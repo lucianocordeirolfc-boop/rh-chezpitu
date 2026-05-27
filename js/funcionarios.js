@@ -102,13 +102,37 @@
     return String(value || "").replace(/\D/g, "");
   }
 
+  function listCompanies() {
+    if (typeof AppData.getCompanies === "function") {
+      const list = AppData.getCompanies();
+      if (list.length) return list;
+    }
+    const keys = Object.keys(AppData.state?.companies || {});
+    if (keys.length) {
+      return keys.sort((a, b) => a.localeCompare(b, "pt-BR"));
+    }
+    return AppData.COMPANIES;
+  }
+
   function getAllEmployeesFlat() {
-    return AppData.COMPANIES.flatMap((company) =>
-      AppData.getCompanyData(company).employees.map((employee) => ({
-        ...employee,
-        company
-      }))
-    );
+    const seen = new Set();
+    const flat = [];
+    listCompanies().forEach((company) => {
+      (AppData.getCompanyData(company)?.employees || []).forEach((employee) => {
+        if (!employee?.id || seen.has(employee.id)) return;
+        seen.add(employee.id);
+        flat.push({ ...employee, company });
+      });
+    });
+    if (flat.length) return flat;
+    Object.keys(AppData.state?.companies || {}).forEach((company) => {
+      (AppData.state.companies[company]?.employees || []).forEach((employee) => {
+        if (!employee?.id || seen.has(employee.id)) return;
+        seen.add(employee.id);
+        flat.push({ ...employee, company });
+      });
+    });
+    return flat;
   }
 
   function uniqueSorted(values) {
@@ -157,7 +181,7 @@
     const departments = uniqueSorted(employees.map((item) => item.department));
     const roles = uniqueSorted(employees.map((item) => item.role));
     const companyOptions = [`<option value="todos">Todas</option>`].concat(
-      AppData.COMPANIES.map(
+      listCompanies().map(
         (company) =>
           `<option value="${esc(company)}" ${listFilters.company === company ? "selected" : ""}>${esc(company)}</option>`
       )
@@ -199,7 +223,7 @@
     return `
       <div class="func-list-toolbar">
         <div class="func-list-toolbar-meta">
-          <span class="func-list-toolbar-eyebrow">Empresa selecionada</span>
+          <span class="func-list-toolbar-eyebrow">Empresa ativa no sistema</span>
           <strong class="func-list-toolbar-company">${esc(AppData.state.selectedCompany)}</strong>
           <small id="employeeListCount" class="func-list-toolbar-count">${filteredCount} exibidos · ${companyCount} na empresa · ${totalCount} no grupo</small>
         </div>
@@ -211,9 +235,192 @@
   }
 
   function companyFormOptions(selected) {
-    return AppData.COMPANIES.map(
+    return listCompanies().map(
       (company) => `<option value="${esc(company)}" ${company === selected ? "selected" : ""}>${esc(company)}</option>`
     ).join("");
+  }
+
+  function closeCompanyPopup() {
+    document.getElementById("companyPopup")?.remove();
+  }
+
+  function renderCompanyFormHTML(isEdit, companyKey) {
+    const nameField = isEdit
+      ? `<label>Nome no sistema<input value="${esc(companyKey)}" readonly disabled></label>`
+      : `<label>Nome no sistema<input name="companyKey" required placeholder="Ex.: Chez Pitu" autocomplete="off"></label>`;
+    return `
+      ${nameField}
+      <div class="func-form-row cols-3">
+        <label>Razão social<input name="legalName" required></label>
+        <label>CNPJ<input name="cnpj" required placeholder="00.000.000/0000-00" autocomplete="off"></label>
+        <label>Responsável<input name="responsibleName" placeholder="Nome completo do responsável"></label>
+      </div>
+      <div class="func-logo-section func-popup-logo-section">
+        <p class="func-logo-label">Logo (escala e recibos)</p>
+        <div class="func-logo-row">
+          <div class="func-logo-preview" id="companyPopupLogoPreview">
+            <span class="func-logo-placeholder">Sem logo</span>
+          </div>
+          <div class="func-logo-controls">
+            <label class="btn secondary btn-sm func-logo-upload-btn">
+              Selecionar imagem
+              <input type="file" id="companyPopupLogoInput" accept="image/*" style="display:none">
+            </label>
+            <button id="companyPopupRemoveLogo" class="secondary btn-sm" type="button" style="display:none">Remover logo</button>
+          </div>
+        </div>
+      </div>
+      <div class="popup-actions func-form-actions">
+        <button type="button" class="btn btn-cancel" id="companyPopupCancel">Cancelar</button>
+        <button class="primary btn-sm" type="submit">Salvar empresa</button>
+      </div>
+    `;
+  }
+
+  function fillCompanyPopupForm(form, companyKey) {
+    const info = AppData.getCompanyData(companyKey)?.companyInfo || {};
+    form.elements.legalName.value = info.legalName || companyKey;
+    form.elements.cnpj.value = info.cnpj || "";
+    if (form.elements.responsibleName) form.elements.responsibleName.value = info.responsibleName || "";
+    updateCompanyPopupLogoPreview(form, info.logoDataUrl || "");
+  }
+
+  function readCompanyPopupLogo(form) {
+    const img = form.closest(".popup-card")?.querySelector("#companyPopupLogoPreview img");
+    return img?.src || "";
+  }
+
+  function updateCompanyPopupLogoPreview(form, logoDataUrl) {
+    const preview = form.closest(".popup-card")?.querySelector("#companyPopupLogoPreview");
+    const removeBtn = form.closest(".popup-card")?.querySelector("#companyPopupRemoveLogo");
+    if (!preview) return;
+    preview.replaceChildren();
+    const safeUrl = String(logoDataUrl || "").trim();
+    if (safeUrl.startsWith("data:image/")) {
+      const img = document.createElement("img");
+      img.src = safeUrl;
+      img.alt = "Logo";
+      img.className = "func-logo-img";
+      preview.appendChild(img);
+      if (removeBtn) removeBtn.style.display = "";
+      return;
+    }
+    const placeholder = document.createElement("span");
+    placeholder.className = "func-logo-placeholder";
+    placeholder.textContent = "Sem logo";
+    preview.appendChild(placeholder);
+    if (removeBtn) removeBtn.style.display = "none";
+  }
+
+  function bindCompanyPopupForm(form, options = {}) {
+    const isEdit = Boolean(options.companyKey);
+    const companyKey = options.companyKey || "";
+
+    const logoInput = form.querySelector("#companyPopupLogoInput");
+    logoInput?.addEventListener("change", () => {
+      const file = logoInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        updateCompanyPopupLogoPreview(form, event.target.result);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    form.querySelector("#companyPopupRemoveLogo")?.addEventListener("click", () => {
+      if (logoInput) logoInput.value = "";
+      updateCompanyPopupLogoPreview(form, "");
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      try {
+        let targetKey = companyKey;
+        if (!isEdit) {
+          targetKey = AppData.registerCompany(payload.companyKey);
+        }
+        AppData.updateCompanyInfo(
+          {
+            legalName: payload.legalName,
+            cnpj: payload.cnpj,
+            responsibleName: payload.responsibleName
+          },
+          targetKey
+        );
+        AppData.updateCompanyLogo(readCompanyPopupLogo(form), targetKey);
+        if (!isEdit || targetKey === AppData.state.selectedCompany) {
+          AppData.setSelectedCompany(targetKey);
+        }
+        closeCompanyPopup();
+        window.App.renderCurrent();
+        window.App?.toast?.("Dados da empresa salvos.", "success");
+      } catch (error) {
+        alert(error.message || "Não foi possível salvar a empresa.");
+      }
+    });
+  }
+
+  function openCompanyPopup(options = {}) {
+    closeCompanyPopup();
+    const isEdit = Boolean(options.companyKey);
+    const overlay = document.createElement("div");
+    overlay.id = "companyPopup";
+    overlay.className = "popup-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = `
+      <div class="popup-card popup-card-company">
+        <div class="popup-header">
+          <h3>${isEdit ? "Editar empresa" : "Nova empresa"}</h3>
+          <button class="popup-close" id="companyPopupClose" type="button" aria-label="Fechar">✕</button>
+        </div>
+        <form id="companyPopupForm" class="popup-form func-popup-form func-form-horizontal">
+          ${renderCompanyFormHTML(isEdit, options.companyKey || "")}
+        </form>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector("#companyPopupForm");
+    bindCompanyPopupForm(form, options);
+    if (isEdit) fillCompanyPopupForm(form, options.companyKey);
+
+    overlay.querySelector("#companyPopupClose").addEventListener("click", closeCompanyPopup);
+    overlay.querySelector("#companyPopupCancel").addEventListener("click", closeCompanyPopup);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeCompanyPopup();
+    });
+
+    (isEdit ? form.elements.legalName : form.elements.companyKey)?.focus();
+  }
+
+  function companyRows() {
+    const active = AppData.state.selectedCompany;
+    return listCompanies()
+      .map((companyKey) => {
+        const block = AppData.getCompanyData(companyKey);
+        const info = block?.companyInfo || {};
+        const employeeCount = block?.employees?.length || 0;
+        const isActive = companyKey === active;
+        return `
+          <tr class="${isActive ? "func-company-row-active" : ""}">
+            <td>
+              ${isActive ? `<span class="pill success">Ativa</span>` : `<button type="button" class="link-button" data-activate-company="${esc(companyKey)}">Definir ativa</button>`}
+            </td>
+            <td><strong>${esc(companyKey)}</strong></td>
+            <td>${esc(info.legalName || companyKey)}</td>
+            <td>${esc(info.cnpj || "—")}</td>
+            <td>${esc(info.responsibleName || "—")}</td>
+            <td>${employeeCount}</td>
+            <td class="actions">
+              <button type="button" class="link-button" data-edit-company="${esc(companyKey)}">Editar</button>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
   }
 
   function departmentSelectOptions(allEmployees, selected) {
@@ -728,35 +935,31 @@
   }
 
   function bindEvents(container) {
-    const companyForm = container.querySelector("#companyForm");
-    companyForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const formData = new FormData(companyForm);
-      AppData.updateCompanyInfo(Object.fromEntries(formData.entries()));
-      window.App.renderCurrent();
-    });
-
-    // Logo upload
-    const logoInput = container.querySelector("#companyLogoInput");
-    logoInput?.addEventListener("change", () => {
-      const file = logoInput.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        AppData.updateCompanyLogo(event.target.result);
-        window.App.renderCurrent();
-      };
-      reader.readAsDataURL(file);
-    });
-
-    container.querySelector("#removeLogoBtn")?.addEventListener("click", () => {
-      AppData.updateCompanyLogo("");
-      window.App.renderCurrent();
+    container.querySelector("#btnNewCompany")?.addEventListener("click", () => {
+      openCompanyPopup();
     });
 
     container.querySelector("#btnNewEmployee")?.addEventListener("click", () => {
       openEmployeePopup(container);
     });
+
+    if (!container.dataset.companyActionsBound) {
+      container.dataset.companyActionsBound = "1";
+      container.addEventListener("click", (event) => {
+        const editCompany = event.target.closest("[data-edit-company]");
+        if (editCompany) {
+          event.preventDefault();
+          openCompanyPopup({ companyKey: editCompany.dataset.editCompany });
+          return;
+        }
+        const activateBtn = event.target.closest("[data-activate-company]");
+        if (activateBtn) {
+          event.preventDefault();
+          AppData.setSelectedCompany(activateBtn.dataset.activateCompany);
+          window.App.renderCurrent();
+        }
+      });
+    }
 
     if (!container.dataset.employeeActionsBound) {
       container.dataset.employeeActionsBound = "1";
@@ -767,8 +970,6 @@
           const company = editBtn.dataset.company || AppData.state.selectedCompany;
           if (company !== AppData.state.selectedCompany) {
             AppData.setSelectedCompany(company);
-            const globalSelect = document.getElementById("companySelect");
-            if (globalSelect) globalSelect.value = company;
           }
           const employee = AppData.getCompanyData(company).employees.find((item) => item.id === editBtn.dataset.edit);
           if (employee) openEmployeePopup(container, { employee, company });
@@ -816,11 +1017,24 @@
   }
 
   function render(container) {
-    const data = AppData.getCompanyData();
-    const companyInfo = data.companyInfo || { legalName: AppData.state.selectedCompany, cnpj: "" };
-    const allEmployees = getAllEmployeesFlat();
-    const filteredEmployees = filterEmployees(allEmployees);
-    const companyCount = data.employees.length;
+    if (!container) return;
+    let allEmployees = [];
+    let filteredEmployees = [];
+    let companyCount = 0;
+    try {
+      allEmployees = getAllEmployeesFlat();
+      filteredEmployees = filterEmployees(allEmployees);
+      companyCount = allEmployees.filter((item) => item.company === AppData.state.selectedCompany).length;
+    } catch (error) {
+      console.error("[Cadastro] Falha ao carregar funcionários:", error);
+      container.innerHTML = `
+        <div class="card" style="padding:20px">
+          <h2>Cadastro</h2>
+          <p class="help-text">Não foi possível carregar os dados. Atualize a página (Ctrl+F5). Se persistir, verifique o console do navegador.</p>
+          <p class="help-text"><small>${esc(error.message || error)}</small></p>
+        </div>`;
+      return;
+    }
     const importExtra = `
       <button id="downloadEmployeeTemplate" class="secondary" type="button">Modelo CSV</button>
       <button id="downloadHolidayTemplate" class="secondary" type="button">Modelo Feriados</button>
@@ -831,41 +1045,35 @@
       <div class="func-page">
         <header class="func-page-intro">
           <div class="func-page-intro-head">
-            <h2 class="func-module-title">Cadastro de Funcionários</h2>
-            <p class="func-module-subtitle">Empresa pagadora e consulta de colaboradores</p>
+            <h2 class="func-module-title">Cadastro</h2>
+            <p class="func-module-subtitle">Empresas do grupo e colaboradores</p>
           </div>
           <div class="func-stats-row stat-row">${renderEmployeeStats()}</div>
         </header>
 
-        <article class="card func-company-card">
-          <div class="card-header card-header-compact">
+        <article class="card func-companies-card">
+          <div class="card-header card-header-compact func-table-card-header">
             <div>
-              <p class="eyebrow">Dados da empresa</p>
-              <h2>Empresa pagadora</h2>
+              <p class="eyebrow">Empresas pagadoras</p>
+              <h2>Cadastro de empresa</h2>
             </div>
+            <button type="button" class="primary btn-sm" id="btnNewCompany">+ Nova empresa</button>
           </div>
-          <form id="companyForm" class="func-company-form">
-            <label>Razão social<input name="legalName" required value="${esc(companyInfo.legalName || AppData.state.selectedCompany)}"></label>
-            <label>CNPJ<input name="cnpj" required value="${esc(companyInfo.cnpj || "")}" placeholder="00.000.000/0000-00"></label>
-            <label>Responsável pela empresa<input name="responsibleName" value="${esc(companyInfo.responsibleName || "")}" placeholder="Nome completo do responsável"></label>
-            <button class="primary btn-sm" type="submit">Salvar empresa</button>
-          </form>
-          <div class="func-logo-section">
-            <p class="func-logo-label">Logo da empresa (usada na escala e nos recibos)</p>
-            <div class="func-logo-row">
-              <div class="func-logo-preview" id="logoPreview">
-                ${companyInfo.logoDataUrl
-                  ? `<img src="${companyInfo.logoDataUrl}" alt="Logo" class="func-logo-img">`
-                  : `<span class="func-logo-placeholder">Sem logo</span>`}
-              </div>
-              <div class="func-logo-controls">
-                <label class="btn secondary btn-sm func-logo-upload-btn">
-                  Selecionar imagem
-                  <input type="file" id="companyLogoInput" accept="image/*" style="display:none">
-                </label>
-                ${companyInfo.logoDataUrl ? `<button id="removeLogoBtn" class="secondary btn-sm" type="button">Remover logo</button>` : ""}
-              </div>
-            </div>
+          <div class="table-wrap">
+            <table class="table-premium func-companies-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Empresa</th>
+                  <th>Razão social</th>
+                  <th>CNPJ</th>
+                  <th>Responsável</th>
+                  <th>Funcionários</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>${companyRows()}</tbody>
+            </table>
           </div>
         </article>
 
@@ -919,7 +1127,11 @@
       })}
     `;
 
-    bindEvents(container);
+    try {
+      bindEvents(container);
+    } catch (error) {
+      console.error("[Cadastro] Falha ao vincular eventos:", error);
+    }
   }
 
   window.FuncionariosModule = { render };

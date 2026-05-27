@@ -5,6 +5,18 @@ if (window.firebase && firebase.apps.length) {
 (function () {
   const ROOT = "sistemaRH";
   const COMPANIES = ["Chez Pitu", "Pengold"];
+
+  function companiesInState(state) {
+    const keys = Object.keys(state?.companies || {});
+    const ordered = [];
+    COMPANIES.forEach((company) => {
+      if (state?.companies?.[company] || keys.includes(company)) ordered.push(company);
+    });
+    keys.forEach((company) => {
+      if (!ordered.includes(company)) ordered.push(company);
+    });
+    return ordered;
+  }
   const PUSH_GUARD_MS = 900;
 
   let db = null;
@@ -75,7 +87,7 @@ if (window.firebase && firebase.apps.length) {
 
     const vtDescontos = {};
     const contadorLancamentos = {};
-    COMPANIES.forEach((company) => {
+    companiesInState(state).forEach((company) => {
       const block = state.companies?.[company] || defaultCompanyData(company);
       empresas[company] = block.companyInfo || defaultCompanyData(company).companyInfo;
       funcionarios[company] = block.employees || [];
@@ -113,7 +125,7 @@ if (window.firebase && firebase.apps.length) {
 
   function buildHolidaysWorkedIndex(state) {
     const index = {};
-    COMPANIES.forEach((company) => {
+    companiesInState(state).forEach((company) => {
       const holidays = state.companies?.[company]?.holidays || [];
       index[company] = holidays.flatMap((holiday) =>
         (holiday.workedEmployees || []).map((item) => ({
@@ -139,7 +151,13 @@ if (window.firebase && firebase.apps.length) {
     }
 
     const companies = {};
-    COMPANIES.forEach((company) => {
+    const remoteCompanyKeys = new Set([
+      ...COMPANIES,
+      ...Object.keys(data.empresas || {}),
+      ...Object.keys(data.funcionarios || {}),
+      ...Object.keys(data.escalas || {})
+    ]);
+    [...remoteCompanyKeys].forEach((company) => {
       const base = defaultCompanyData(company);
       const feriasBlock = data.ferias?.[company];
       let vacations = [];

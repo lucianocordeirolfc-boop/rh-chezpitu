@@ -1,7 +1,7 @@
 (function () {
   const moduleTitles = {
     dashboard: "Dashboard",
-    funcionarios: "Cadastro de Funcionários",
+    funcionarios: "Cadastro",
     escala: "Escala de Folga",
     ferias: "Ausências",
     "vale-transporte": "Recibo de Vale-transporte",
@@ -24,18 +24,18 @@
   }
 
   function updateCompanySwitcherVisibility(moduleId) {
-    const switcher = document.querySelector(".company-switcher");
-    const select = document.getElementById("companySelect");
-    if (!switcher) return;
-    // Na Escala de Folga a empresa é escolhida apenas no seletor da própria página.
-    const isEscala = moduleId === "escala";
-    // Dupla proteção: CSS + inline style + desabilita o select (evita conflito mesmo se aparecer).
-    switcher.hidden = isEscala;
-    switcher.style.display = isEscala ? "none" : "";
-    if (select) {
-      select.disabled = isEscala;
-      if (!isEscala) select.value = AppData.state.selectedCompany;
-    }
+    const pill = document.getElementById("activeCompanyPill");
+    if (!pill) return;
+    // Escala e Cadastro têm seleção/gestão de empresa na própria página.
+    const hidePill = moduleId === "escala" || moduleId === "funcionarios";
+    pill.hidden = hidePill;
+    pill.style.display = hidePill ? "none" : "";
+    updateActiveCompanyPill();
+  }
+
+  function updateActiveCompanyPill() {
+    const nameEl = document.getElementById("activeCompanyName");
+    if (nameEl) nameEl.textContent = AppData.state.selectedCompany || "";
   }
 
   function render(moduleId = activeModuleId()) {
@@ -67,13 +67,18 @@
   }
 
   function setupCompanySelect() {
-    const select = document.getElementById("companySelect");
-    select.innerHTML = AppData.COMPANIES.map((company) => `<option value="${company}">${company}</option>`).join("");
-    select.value = AppData.state.selectedCompany;
-    select.addEventListener("change", () => {
-      AppData.setSelectedCompany(select.value);
-      renderCurrent();
-    });
+    updateActiveCompanyPill();
+    const legacySelect = document.getElementById("companySelect");
+    if (legacySelect) {
+      legacySelect.innerHTML = AppData.getCompanies().map(
+        (company) => `<option value="${company}">${company}</option>`
+      ).join("");
+      legacySelect.value = AppData.state.selectedCompany;
+      legacySelect.addEventListener("change", () => {
+        AppData.setSelectedCompany(legacySelect.value);
+        renderCurrent();
+      });
+    }
   }
 
   function setupMenu() {
@@ -212,10 +217,10 @@
       preserveLocalHolidays: true,
       localSnapshot: AppData.readLocalStateSnapshot()
     });
-    const select = document.getElementById("companySelect");
-    if (select && remoteState.selectedCompany) {
-      select.value = remoteState.selectedCompany;
+    if (remoteState.selectedCompany) {
+      AppData.setSelectedCompany(remoteState.selectedCompany, { save: false });
     }
+    updateActiveCompanyPill();
 
     refreshActiveModuleUI();
   }

@@ -189,6 +189,65 @@
     };
   }
 
+  function getCompanies() {
+    if (!state?.companies || typeof state.companies !== "object") {
+      return [...COMPANIES];
+    }
+    const keys = Object.keys(state.companies);
+    const ordered = [];
+    COMPANIES.forEach((company) => {
+      if (state.companies[company]) ordered.push(company);
+    });
+    keys.forEach((company) => {
+      if (!ordered.includes(company)) ordered.push(company);
+    });
+    if (!ordered.length) return [...COMPANIES];
+    return ordered;
+  }
+
+  function ensureVtStructuresForCompany(company) {
+    const vt = ensureValeTransporteState();
+    if (!vt.discountValues[company]) vt.discountValues[company] = {};
+    if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
+    const block = state.companies[company];
+    if (block && !block.vtDeductions) block.vtDeductions = {};
+  }
+
+  function registerCompany(companyKey) {
+    const name = String(companyKey || "").trim();
+    if (!name) throw new Error("Informe o nome da empresa.");
+    if (state.companies[name]) throw new Error("Esta empresa já está cadastrada.");
+    state.companies[name] = createCompanyData(name);
+    ensureCompanyDataShape(state.companies[name]);
+    ensureVtStructuresForCompany(name);
+    saveState();
+    return name;
+  }
+
+  function mergeSavedCompanyBlocks(parsed, defaults) {
+    parsed.companies = parsed.companies || {};
+    const allKeys = new Set([...COMPANIES, ...Object.keys(parsed.companies)]);
+    allKeys.forEach((company) => {
+      parsed.companies[company] = {
+        ...defaults.companies[company] || createCompanyData(company),
+        ...(parsed.companies[company] || {})
+      };
+      parsed.companies[company].companyInfo = {
+        ...(defaults.companies[company]?.companyInfo || createCompanyData(company).companyInfo),
+        ...(parsed.companies[company].companyInfo || {})
+      };
+      parsed.companies[company].employees = parsed.companies[company].employees || [];
+      parsed.companies[company].holidays = mergeHolidayLists([], parsed.companies[company].holidays || []);
+      parsed.companies[company].manualScale = parsed.companies[company].manualScale || {};
+      normalizeCompanyHolidays(parsed.companies[company]);
+      parsed.companies[company].vacations = parsed.companies[company].vacations || [];
+      parsed.companies[company].absences = parsed.companies[company].absences || [];
+      parsed.companies[company].vtDeductions = parsed.companies[company].vtDeductions || {};
+      normalizeCompanyBlock(parsed.companies[company]);
+    });
+    return parsed;
+  }
+
   function createDefaultState() {
     const companies = {};
     COMPANIES.forEach((company) => {
@@ -509,8 +568,7 @@
     return result;
   }
 
-  function ensureCompanyDataShape(company = state.selectedCompany) {
-    const block = getCompanyData(company);
+  function normalizeCompanyBlock(block) {
     if (!block) return null;
     block.employees = Array.isArray(block.employees) ? block.employees : [];
     block.vacations = Array.isArray(block.vacations) ? block.vacations : [];
@@ -523,6 +581,10 @@
     return block;
   }
 
+  function ensureCompanyDataShape(company = state.selectedCompany) {
+    return normalizeCompanyBlock(getCompanyData(company));
+  }
+
   function loadState() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) {
@@ -532,31 +594,18 @@
     try {
       const parsed = JSON.parse(saved);
       const defaults = createDefaultState();
-      parsed.companies = parsed.companies || {};
-      COMPANIES.forEach((company) => {
-        parsed.companies[company] = {
-          ...defaults.companies[company],
-          ...(parsed.companies[company] || {})
-        };
-        parsed.companies[company].companyInfo = {
-          ...defaults.companies[company].companyInfo,
-          ...(parsed.companies[company].companyInfo || {})
-        };
-        parsed.companies[company].employees = parsed.companies[company].employees || [];
-        parsed.companies[company].holidays = mergeHolidayLists([], parsed.companies[company].holidays || []);
-        parsed.companies[company].manualScale = parsed.companies[company].manualScale || {};
-        normalizeCompanyHolidays(parsed.companies[company]);
-        parsed.companies[company].vacations = parsed.companies[company].vacations || [];
-        parsed.companies[company].absences = parsed.companies[company].absences || [];
-        parsed.companies[company].vtDeductions = parsed.companies[company].vtDeductions || {};
-      });
+      mergeSavedCompanyBlocks(parsed, defaults);
       parsed.escalaSelectedYearMonth = parsed.escalaSelectedYearMonth || monthKey();
       parsed.calendarHolidays = parsed.calendarHolidays || [];
       parsed.coverageAlerts = parsed.coverageAlerts || [];
       parsed.coveragePrincipalBindings = parsed.coveragePrincipalBindings || {};
       parsed.scaleCodeConfig = parsed.scaleCodeConfig || {};
       parsed.valeTransporte = normalizeValeTransporteBlock(parsed.valeTransporte, defaults.valeTransporte);
-      return restoreVtBackupIntoState({ ...defaults, ...parsed });
+      const restored = restoreVtBackupIntoState({ ...defaults, ...parsed });
+      if (!restored.companies?.[restored.selectedCompany]) {
+        restored.selectedCompany = COMPANIES[0];
+      }
+      return restored;
     } catch (error) {
       console.warn("Não foi possível carregar os dados salvos.", error);
       return createDefaultState();
@@ -653,7 +702,13 @@
     const localVt = localSnapshot?.valeTransporte || previous.valeTransporte || {};
 
     remoteState.companies = remoteState.companies || {};
-    COMPANIES.forEach((company) => {
+    const companyKeys = new Set([
+      ...COMPANIES,
+      ...Object.keys(remoteState.companies),
+      ...Object.keys(localCompanies)
+    ]);
+    companyKeys.forEach((company) => {
+      const defaultBlock = defaults.companies[company] || createCompanyData(company);
       const localHolidays = preserveLocalHolidays ? localCompanies?.[company]?.holidays || [] : [];
       const remoteHolidays = remoteState.companies[company]?.holidays || [];
       const remoteDeductions = remoteState.companies[company]?.vtDeductions || {};
@@ -663,13 +718,14 @@
       );
 
       remoteState.companies[company] = {
-        ...defaults.companies[company],
+        ...defaultBlock,
         ...(remoteState.companies[company] || {})
       };
       remoteState.companies[company].companyInfo = {
-        ...defaults.companies[company].companyInfo,
+        ...defaultBlock.companyInfo,
         ...(remoteState.companies[company].companyInfo || {})
       };
+      normalizeCompanyBlock(remoteState.companies[company]);
       const localEmployees = localCompanies?.[company]?.employees || [];
       const remoteEmployees = remoteState.companies[company].employees || [];
       remoteState.companies[company].employees = remoteEmployees.length ? remoteEmployees : localEmployees;
@@ -723,6 +779,10 @@
     syncVtDeductionsFromValeTransporte();
     syncVtDeductionsToValeTransporte();
     state = restoreVtBackupIntoState(state);
+    if (!state.companies?.[state.selectedCompany]) {
+      const first = getCompanies()[0];
+      if (first) state.selectedCompany = first;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     saveVtBackup();
   }
@@ -732,25 +792,27 @@
   }
 
   function setSelectedCompany(company, options = {}) {
-    if (!COMPANIES.includes(company)) return;
+    if (!state.companies[company]) return;
     if (state.selectedCompany === company && options.force !== true) return;
     state.selectedCompany = company;
     if (options.save !== false) saveState();
   }
 
-  function updateCompanyInfo(companyInfo) {
-    const data = getCompanyData();
+  function updateCompanyInfo(companyInfo, company = state.selectedCompany) {
+    const data = getCompanyData(company);
+    if (!data) return;
     data.companyInfo = {
       ...(data.companyInfo || {}),
-      legalName: companyInfo.legalName.trim(),
-      cnpj: companyInfo.cnpj.trim(),
+      legalName: String(companyInfo.legalName || "").trim(),
+      cnpj: String(companyInfo.cnpj || "").trim(),
       responsibleName: String(companyInfo.responsibleName ?? data.companyInfo?.responsibleName ?? "").trim()
     };
     saveState();
   }
 
-  function updateCompanyLogo(logoDataUrl) {
-    const data = getCompanyData();
+  function updateCompanyLogo(logoDataUrl, company = state.selectedCompany) {
+    const data = getCompanyData(company);
+    if (!data) return;
     data.companyInfo = {
       ...(data.companyInfo || {}),
       logoDataUrl: logoDataUrl || ""
@@ -797,11 +859,14 @@
   }
 
   function getTotalEmployeeCount() {
-    return COMPANIES.reduce((total, company) => total + (state.companies[company]?.employees?.length || 0), 0);
+    return getCompanies().reduce(
+      (total, company) => total + (state.companies[company]?.employees?.length || 0),
+      0
+    );
   }
 
   function getEmployeeCounts() {
-    const byCompany = COMPANIES.map((company) => ({
+    const byCompany = getCompanies().map((company) => ({
       company,
       total: state.companies[company]?.employees?.length || 0,
       active: (state.companies[company]?.employees || []).filter((employee) => employee.status === "Ativo").length
@@ -1641,6 +1706,8 @@
 
   window.AppData = {
     COMPANIES,
+    getCompanies,
+    registerCompany,
     WEEK_DAYS,
     SCALE_CODES,
     VT_WORKED_CODES,

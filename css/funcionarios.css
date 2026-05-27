@@ -1,4 +1,4 @@
-/* Cadastro de Funcionários — layout corporativo horizontal */
+/* Cadastro — layout corporativo horizontal */
 
 .func-page {
   display: flex;
@@ -150,8 +150,24 @@
   font-size: 0.78rem;
 }
 
-.func-company-card {
+.func-companies-card {
   padding: 14px 18px;
+}
+
+.func-companies-table .func-company-row-active td {
+  background: color-mix(in srgb, var(--sea-100) 35%, transparent);
+}
+
+.func-popup-logo-section {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.popup-card-company {
+  width: min(640px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
 }
 
 /* ─── Seção de logo da empresa ─── */
