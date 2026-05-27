@@ -292,6 +292,7 @@
           <td><span class="pill ${badgeClass}">${status}</span></td>
           <td class="actions holiday-actions">
             ${line.employeeId ? `<input class="compact-date" type="date" data-compensation-date="${line.holiday.id}|${line.employeeId}" value="${esc(line.compensationDate)}" title="Data de compensação">` : ""}
+            <button class="link-button" data-edit-holiday="${line.holiday.id}" type="button">Editar</button>
             <button class="link-button danger" data-remove-holiday="${line.holiday.id}">Excluir</button>
           </td>
         </tr>
@@ -442,10 +443,80 @@
   }
 
   function bindTableActions(container) {
+    function showEditHolidayModal(holidayId) {
+      document.getElementById("holidayEditPicker")?.remove();
+
+      const data = AppData.getCompanyData();
+      const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+      if (!holiday) return;
+
+      const picker = document.createElement("div");
+      picker.id = "holidayEditPicker";
+      picker.className = "co-holiday-picker";
+      picker.innerHTML = `
+        <p class="co-picker-title">Editar feriado</p>
+        <p class="co-picker-hint">A alteração da data reflete para todos os funcionários vinculados a este feriado.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+            Nome do feriado
+            <input id="editHolidayName" class="field-select" value="${esc(holiday.name)}" autocomplete="off">
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+            Data do feriado
+            <input id="editHolidayDate" type="date" class="field-select" value="${esc(holiday.date)}">
+          </label>
+        </div>
+        <div class="co-picker-actions">
+          <button id="editHolidayCancel" class="secondary btn-sm" type="button">Cancelar</button>
+          <button id="editHolidaySave" class="primary btn-sm" type="button">Salvar</button>
+        </div>
+      `;
+
+      const backdrop = document.createElement("div");
+      backdrop.className = "modal-backdrop";
+      const wrapper = document.createElement("div");
+      wrapper.className = "modal-center";
+      wrapper.appendChild(picker);
+      backdrop.appendChild(wrapper);
+      document.body.appendChild(backdrop);
+
+      picker.querySelector("#editHolidayCancel").addEventListener("click", () => {
+        backdrop.remove();
+      });
+
+      picker.querySelector("#editHolidaySave").addEventListener("click", () => {
+        const nextName = String(picker.querySelector("#editHolidayName").value || "").trim();
+        const nextDate = String(picker.querySelector("#editHolidayDate").value || "").trim();
+        if (!nextName || !nextDate) {
+          alert("Preencha nome e data do feriado.");
+          return;
+        }
+        AppData.updateHoliday(holidayId, { name: nextName, date: nextDate });
+        backdrop.remove();
+        window.App.renderCurrent();
+      });
+
+      setTimeout(() => {
+        const outsideClick = (e) => {
+          if (!wrapper.contains(e.target)) {
+            backdrop.remove();
+            document.removeEventListener("mousedown", outsideClick);
+          }
+        };
+        document.addEventListener("mousedown", outsideClick);
+      }, 0);
+    }
+
     container.querySelectorAll("[data-remove-holiday]").forEach((button) => {
       button.addEventListener("click", () => {
         AppData.removeHoliday(button.dataset.removeHoliday);
         window.App.renderCurrent();
+      });
+    });
+
+    container.querySelectorAll("[data-edit-holiday]").forEach((button) => {
+      button.addEventListener("click", () => {
+        showEditHolidayModal(button.dataset.editHoliday);
       });
     });
 

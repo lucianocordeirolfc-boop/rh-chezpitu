@@ -959,6 +959,58 @@
     saveState();
   }
 
+  function updateHoliday(id, patch = {}, options = {}) {
+    const data = getCompanyData(options.company || state.selectedCompany);
+    const list = data.holidays || [];
+    const idx = list.findIndex((holiday) => holiday.id === id);
+    if (idx < 0) return false;
+
+    const holiday = list[idx];
+    const oldName = String(holiday.name || "").trim();
+    const oldDate = String(holiday.date || "").trim();
+    const nextName = patch.name !== undefined ? String(patch.name || "").trim() : oldName;
+    const nextDate = patch.date !== undefined ? String(patch.date || "").trim() : oldDate;
+
+    if (!nextName || !nextDate) return false;
+    if (nextName === oldName && nextDate === oldDate) return false;
+
+    const conflict = list.find(
+      (item) =>
+        item.id !== id &&
+        item.date === nextDate &&
+        normalizeSearchText(item.name) === normalizeSearchText(nextName)
+    );
+
+    if (conflict) {
+      const byEmployee = new Map();
+      [...(holiday.workedEmployees || []), ...(conflict.workedEmployees || [])].forEach((item) => {
+        if (!item?.employeeId) return;
+        const prev = byEmployee.get(item.employeeId) || {};
+        byEmployee.set(item.employeeId, { ...prev, ...item });
+      });
+      holiday.workedEmployees = [...byEmployee.values()];
+
+      Object.keys(data.manualScale || {}).forEach((key) => {
+        const entry = data.manualScale[key];
+        if (entry && typeof entry === "object" && entry.linkedHolidayId === conflict.id) {
+          data.manualScale[key] = { ...entry, linkedHolidayId: id };
+        }
+      });
+
+      data.holidays = list.filter((item) => item.id !== conflict.id);
+    }
+
+    holiday.name = nextName;
+    holiday.date = nextDate;
+    (holiday.workedEmployees || []).forEach((item) => syncWorkedEmployeeStatus(item, holiday.date));
+
+    if (options.save !== false) {
+      runScaleIntegrations([oldDate.slice(0, 7), nextDate.slice(0, 7)].filter(Boolean));
+      saveState();
+    }
+    return true;
+  }
+
   function normalizeSearchText(value) {
     return String(value || "")
       .trim()
@@ -1464,6 +1516,7 @@
     monthKey,
     removeEmployee,
     removeHoliday,
+    updateHoliday,
     removeVacation,
     saveState,
     setManualScale,
