@@ -5,7 +5,7 @@ if (window.firebase && firebase.apps.length) {
 (function () {
   const ROOT = "sistemaRH";
   const COMPANIES = ["Chez Pitu", "Pengold"];
-  const PUSH_GUARD_MS = 500;
+  const PUSH_GUARD_MS = 900;
 
   let db = null;
   let ready = false;

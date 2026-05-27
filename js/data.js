@@ -415,9 +415,25 @@
     return parsed;
   }
 
-  function runScaleIntegrations(yearMonths) {
+  function runScaleIntegrations(yearMonths, options = {}) {
     if (!window.ScaleRules?.recomputeScaleIntegrations) return { created: 0 };
-    return window.ScaleRules.recomputeScaleIntegrations(yearMonths);
+    const result = window.ScaleRules.recomputeScaleIntegrations(yearMonths, options);
+    if (options.save !== false && (result?.created || 0) > 0) saveState();
+    return result;
+  }
+
+  function ensureCompanyDataShape(company = state.selectedCompany) {
+    const block = getCompanyData(company);
+    if (!block) return null;
+    block.employees = Array.isArray(block.employees) ? block.employees : [];
+    block.vacations = Array.isArray(block.vacations) ? block.vacations : [];
+    block.absences = Array.isArray(block.absences) ? block.absences : [];
+    block.holidays = Array.isArray(block.holidays) ? block.holidays : [];
+    block.manualScale = block.manualScale && typeof block.manualScale === "object" ? block.manualScale : {};
+    block.vtDeductions = block.vtDeductions && typeof block.vtDeductions === "object" ? block.vtDeductions : {};
+    block.contadorLancamentos =
+      block.contadorLancamentos && typeof block.contadorLancamentos === "object" ? block.contadorLancamentos : {};
+    return block;
   }
 
   function loadState() {
@@ -567,11 +583,24 @@
         ...defaults.companies[company].companyInfo,
         ...(remoteState.companies[company].companyInfo || {})
       };
-      remoteState.companies[company].employees = remoteState.companies[company].employees || [];
+      const localEmployees = localCompanies?.[company]?.employees || [];
+      const remoteEmployees = remoteState.companies[company].employees || [];
+      remoteState.companies[company].employees = remoteEmployees.length ? remoteEmployees : localEmployees;
+
       remoteState.companies[company].holidays = mergeHolidayLists(localHolidays, remoteHolidays);
-      remoteState.companies[company].manualScale = remoteState.companies[company].manualScale || {};
-      remoteState.companies[company].vacations = remoteState.companies[company].vacations || [];
-      remoteState.companies[company].absences = remoteState.companies[company].absences || [];
+
+      const localManualScale = localCompanies?.[company]?.manualScale || {};
+      const remoteManualScale = remoteState.companies[company].manualScale || {};
+      remoteState.companies[company].manualScale =
+        Object.keys(remoteManualScale).length > 0 ? { ...localManualScale, ...remoteManualScale } : { ...localManualScale };
+
+      const localVacations = localCompanies?.[company]?.vacations || [];
+      const remoteVacations = remoteState.companies[company].vacations || [];
+      remoteState.companies[company].vacations = remoteVacations.length ? remoteVacations : localVacations;
+
+      const localAbsences = localCompanies?.[company]?.absences || [];
+      const remoteAbsences = remoteState.companies[company].absences || [];
+      remoteState.companies[company].absences = remoteAbsences.length ? remoteAbsences : localAbsences;
       remoteState.companies[company].vtDeductions = mergeRecordMapsPreferLocal(remoteDeductions, localDeductions);
       remoteState.companies[company].contadorLancamentos = mergeLancamentosMaps(
         localCompanies?.[company]?.contadorLancamentos || {},
@@ -615,10 +644,11 @@
     return state.companies[company];
   }
 
-  function setSelectedCompany(company) {
+  function setSelectedCompany(company, options = {}) {
     if (!COMPANIES.includes(company)) return;
+    if (state.selectedCompany === company && options.force !== true) return;
     state.selectedCompany = company;
-    saveState();
+    if (options.save !== false) saveState();
   }
 
   function updateCompanyInfo(companyInfo) {
@@ -1523,6 +1553,7 @@
     addDays,
     diffDays,
     getCompanyData,
+    ensureCompanyDataShape,
     getDaysInMonth,
     getEmployeeName,
     getScaleCode,

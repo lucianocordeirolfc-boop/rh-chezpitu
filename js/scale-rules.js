@@ -201,15 +201,17 @@
     });
   }
 
-  function computeCoverageAlertsForMonth(yearMonth, state) {
+  function computeCoverageAlertsForMonth(yearMonth, state, options = {}) {
     const days = AppData.getDaysInMonth(yearMonth);
     const alerts = [];
+    const allowedCompanies = options.companies?.length ? new Set(options.companies) : null;
 
     COVERAGE_PRINCIPALS.forEach((principal) => {
       const found = findPrincipalAcrossCompanies(principal, state);
       if (!found) return;
 
       const { employee, company } = found;
+      if (allowedCompanies && !allowedCompanies.has(company)) return;
       const data = AppData.getCompanyData(company);
 
       days.forEach((date) => {
@@ -271,10 +273,11 @@
     );
   }
 
-  function syncAutoHolidaysWorkedForMonth(yearMonth, state) {
+  function syncAutoHolidaysWorkedForMonth(yearMonth, state, options = {}) {
     let created = 0;
+    const targetCompanies = options.companies?.length ? options.companies : AppData.COMPANIES;
 
-    AppData.COMPANIES.forEach((company) => {
+    targetCompanies.forEach((company) => {
       const data = AppData.getCompanyData(company);
       const days = AppData.getDaysInMonth(yearMonth);
 
@@ -326,19 +329,27 @@
     return created;
   }
 
-  function recomputeScaleIntegrations(yearMonths) {
+  function recomputeScaleIntegrations(yearMonths, options = {}) {
     const state = AppData.state;
     const months = [...new Set((yearMonths || []).filter(Boolean))];
     if (!months.length) months.push(AppData.monthKey());
+    const companyScope = options.companies?.length ? new Set(options.companies) : null;
 
-    const allAlerts = (state.coverageAlerts || []).filter(
-      (alert) => !months.includes(alert.yearMonth)
-    );
+    let allAlerts = [...(state.coverageAlerts || [])];
     let created = 0;
 
     months.forEach((yearMonth) => {
-      allAlerts.push(...computeCoverageAlertsForMonth(yearMonth, state));
-      created += syncAutoHolidaysWorkedForMonth(yearMonth, state);
+      if (companyScope) {
+        allAlerts = allAlerts.filter(
+          (alert) => !(alert.yearMonth === yearMonth && companyScope.has(alert.principalCompany))
+        );
+        allAlerts.push(...computeCoverageAlertsForMonth(yearMonth, state, options));
+        created += syncAutoHolidaysWorkedForMonth(yearMonth, state, options);
+      } else {
+        allAlerts = allAlerts.filter((alert) => alert.yearMonth !== yearMonth);
+        allAlerts.push(...computeCoverageAlertsForMonth(yearMonth, state));
+        created += syncAutoHolidaysWorkedForMonth(yearMonth, state);
+      }
     });
 
     state.coverageAlerts = allAlerts;

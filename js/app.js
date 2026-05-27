@@ -167,12 +167,21 @@
   }
 
   function refreshScaleIntegrations(persist = true) {
-    AppData.runScaleIntegrations(collectScaleMonths());
-    if (persist) AppData.saveState();
+    const month = AppData.getEscalaSelectedYearMonth() || AppData.monthKey();
+    const company = AppData.state.selectedCompany;
+    AppData.runScaleIntegrations([month], { companies: [company], save: persist });
   }
 
   function refreshActiveModuleUI() {
     const moduleId = activeModuleId();
+
+    if (moduleId === "escala") {
+      const container = document.getElementById("escala");
+      if (container && window.EscalaModule?.softRefreshFromSync) {
+        window.EscalaModule.softRefreshFromSync();
+        return;
+      }
+    }
 
     if (moduleId === "feriados") {
       const container = document.getElementById("feriados");
@@ -206,11 +215,6 @@
     const select = document.getElementById("companySelect");
     if (select && remoteState.selectedCompany) {
       select.value = remoteState.selectedCompany;
-    }
-
-    AppData.runScaleIntegrations(collectScaleMonths());
-    if (!fromRemote) {
-      AppData.saveState();
     }
 
     refreshActiveModuleUI();

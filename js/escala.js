@@ -14,7 +14,14 @@
     "Dezembro"
   ];
 
+  const SCALE_DEBUG = false;
+
+  function scaleLog(...args) {
+    if (SCALE_DEBUG) console.log("[Escala]", ...args);
+  }
+
   const scaleState = {
+    viewCompany: AppData.state.selectedCompany,
     yearMonth: AppData.getEscalaSelectedYearMonth(),
     department: "todos",
     search: "",
@@ -24,6 +31,23 @@
     printIssueDate: AppData.todayISO(),
     printNotes: ""
   };
+
+  let renderLock = false;
+  let pendingRender = false;
+  let companySaveTimer = null;
+  let monthIntegrationTimer = null;
+
+  function getViewCompany() {
+    const company = scaleState.viewCompany || AppData.state.selectedCompany;
+    return AppData.COMPANIES.includes(company) ? company : AppData.COMPANIES[0];
+  }
+
+  function setViewCompany(company) {
+    if (!AppData.COMPANIES.includes(company)) return;
+    scaleLog("setViewCompany", company);
+    scaleState.viewCompany = company;
+    AppData.setSelectedCompany(company, { save: false });
+  }
 
   function esc(value) {
     return window.App?.escapeHTML(value) || String(value ?? "");
@@ -180,10 +204,10 @@
         if (!search) return true;
         return [employee.name, employee.role, employee.department].some((field) => normalizeSearch(field).includes(search));
       })
-      .map((employee) => ({ ...employee, _scaleCompany: AppData.state.selectedCompany }));
+      .map((employee) => ({ ...employee, _scaleCompany: getViewCompany() }));
 
     getPrincipalEmployeesExtra().forEach((employee) => {
-      if (employee._scaleCompany !== AppData.state.selectedCompany) return;
+      if (employee._scaleCompany !== getViewCompany()) return;
 
       const matchesDepartment =
         scaleState.department === "todos" || employee.department === scaleState.department;
@@ -221,52 +245,40 @@
 
   function getHolidayDates(data) {
     if (window.ScaleRules?.getHolidayDatesForCompany) {
-      return ScaleRules.getHolidayDatesForCompany(AppData.state.selectedCompany, AppData.state);
+      return ScaleRules.getHolidayDatesForCompany(getViewCompany(), AppData.state);
     }
     return new Set(data.holidays.map((holiday) => holiday.date));
   }
 
   function filterAlertsForSelectedCompany(alerts) {
-    const company = AppData.state.selectedCompany;
+    const company = getViewCompany();
     return (alerts || []).filter((alert) => alert.principalCompany === company);
   }
 
-  let lastIntegrationMonth = "";
-  let lastIntegrationAt = 0;
-
-  function runIntegrationsForView() {
+  /** Somente leitura — nunca recalcula nem salva ao trocar empresa. */
+  function getAlertsForView() {
     try {
-      if (!window.ScaleRules?.recomputeScaleIntegrations) {
-        return [];
-      }
-
       const month = scaleState.yearMonth;
-      const now = Date.now();
-      const shouldRecompute =
-        month !== lastIntegrationMonth ||
-        now - lastIntegrationAt > 60_000;
-
-      const before = JSON.stringify(filterAlertsForSelectedCompany(window.ScaleRules.getCoverageAlertsForMonth(month)));
-      const result = shouldRecompute ? AppData.runScaleIntegrations([month]) : { created: 0 };
-      const alerts = filterAlertsForSelectedCompany(
-        window.ScaleRules.getCoverageAlertsForMonth(month) || []
-      );
-      const after = JSON.stringify(alerts);
-
-      if (shouldRecompute) {
-        lastIntegrationMonth = month;
-        lastIntegrationAt = now;
-      }
-
-      if (shouldRecompute && (result?.created > 0 || before !== after)) {
-        AppData.saveState();
-      }
-
-      return alerts;
+      if (!window.ScaleRules?.getCoverageAlertsForMonth) return [];
+      return filterAlertsForSelectedCompany(window.ScaleRules.getCoverageAlertsForMonth(month) || []);
     } catch (error) {
-      console.error("[Escala] Erro ao calcular alertas de cobertura:", error);
+      console.error("[Escala] Erro ao ler alertas:", error);
       return [];
     }
+  }
+
+  /** Recálculo pesado apenas ao mudar mês/ano (debounced). */
+  function scheduleMonthIntegrations(month) {
+    window.clearTimeout(monthIntegrationTimer);
+    monthIntegrationTimer = window.setTimeout(() => {
+      try {
+        const company = getViewCompany();
+        scaleLog("scheduleMonthIntegrations", month, company);
+        AppData.runScaleIntegrations([month], { companies: [company], save: true });
+      } catch (error) {
+        console.error("[Escala] Erro ao recalcular integrações do mês:", error);
+      }
+    }, 400);
   }
 
   function buildAlertLookups(alerts) {
@@ -370,7 +382,7 @@
   function getPrintCompanyInfo(data) {
     const info = data.companyInfo || {};
     return {
-      legalName: info.legalName || AppData.state.selectedCompany,
+      legalName: info.legalName || getViewCompany(),
       cnpj: info.cnpj || "",
       responsibleName: info.responsibleName || "",
       logoDataUrl: info.logoDataUrl || ""
@@ -378,7 +390,7 @@
   }
 
   function companyClass() {
-    const name = AppData.state.selectedCompany || "";
+    const name = getViewCompany() || "";
     return "scale-company-" + name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   }
 
@@ -407,7 +419,7 @@
       <div class="scale-toolbar scale-toolbar-compact">
         <label>Empresa
           <select id="scaleCompany">
-            ${AppData.COMPANIES.map((company) => `<option value="${company}" ${company === AppData.state.selectedCompany ? "selected" : ""}>${company}</option>`).join("")}
+            ${AppData.COMPANIES.map((company) => `<option value="${company}" ${company === getViewCompany() ? "selected" : ""}>${company}</option>`).join("")}
           </select>
         </label>
         <label>Mês
@@ -492,7 +504,7 @@
         const employeeRows = departmentEmployees
           .map((employee) => {
             const employeeData = getScaleDataForEmployee(employee, data);
-            const scaleCompany = employee._scaleCompany || AppData.state.selectedCompany;
+            const scaleCompany = employee._scaleCompany || getViewCompany();
             const cells = days
               .map((day) => {
                 const cell = getScaleCell(employee, day, employeeData);
@@ -522,7 +534,7 @@
               })
               .join("");
 
-            const companyTag = employee._isCoveragePrincipal && employee._scaleCompany !== AppData.state.selectedCompany
+            const companyTag = employee._isCoveragePrincipal && employee._scaleCompany !== getViewCompany()
               ? `<small class="emp-company-tag">${esc(employee._scaleCompany)}</small>`
               : "";
 
@@ -704,6 +716,10 @@
   }
 
   function renderCurrent(container) {
+    if (renderLock) {
+      pendingRender = true;
+      return;
+    }
     render(container, scaleState.yearMonth);
   }
 
@@ -751,7 +767,7 @@
 
   function exportExcel(employees, days, data) {
     const rows = [
-      ["Empresa", AppData.state.selectedCompany],
+      ["Empresa", getViewCompany()],
       ["Competência", scaleState.yearMonth],
       [],
       ["Funcionário", "Cargo", "Setor", "Folga fixa", ...days.map((day) => `${day.slice(-2)} ${AppData.weekdayName(day).slice(0, 3)}`)]
@@ -771,7 +787,7 @@
     const blob = new Blob([`\uFEFF${csv}`], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `escala-${AppData.state.selectedCompany}-${scaleState.yearMonth}.csv`;
+    link.download = `escala-${getViewCompany()}-${scaleState.yearMonth}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   }
@@ -799,20 +815,29 @@
 
   function bindEvents(container, employees, days, data) {
     container.querySelector("#scaleCompany").addEventListener("change", (event) => {
-      AppData.setSelectedCompany(event.target.value);
+      const nextCompany = event.target.value;
+      scaleLog("change company", nextCompany);
+      setViewCompany(nextCompany);
       scaleState.department = "todos";
       scaleState.printSector = "";
       scaleState.search = "";
       renderCurrent(container);
+      window.clearTimeout(companySaveTimer);
+      companySaveTimer = window.setTimeout(() => {
+        scaleLog("persist selectedCompany", nextCompany);
+        AppData.saveState();
+      }, 500);
     });
 
     container.querySelector("#scaleMonth").addEventListener("change", () => {
       setPeriodFromControls(container);
+      scheduleMonthIntegrations(scaleState.yearMonth);
       renderCurrent(container);
     });
 
     container.querySelector("#scaleYear").addEventListener("change", () => {
       setPeriodFromControls(container);
+      scheduleMonthIntegrations(scaleState.yearMonth);
       renderCurrent(container);
     });
 
@@ -831,7 +856,7 @@
     function showCoHolidayPicker(cell, employeeId, date, scaleCompany) {
       document.getElementById("coHolidayPicker")?.remove();
 
-      const data = AppData.getCompanyData(scaleCompany || AppData.state.selectedCompany);
+      const data = AppData.getCompanyData(scaleCompany || getViewCompany());
       const holidays = data.holidays || [];
       const currentEntry = AppData.getManualScaleEntry(employeeId, date, data);
       const currentLinkedId = typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
@@ -900,7 +925,7 @@
     function showDateRangePicker(employeeId, date, code, scaleCompany) {
       document.getElementById("dateRangePicker")?.remove();
 
-      var data = AppData.getCompanyData(scaleCompany || AppData.state.selectedCompany);
+      var data = AppData.getCompanyData(scaleCompany || getViewCompany());
       var emp = (data.employees || []).find(function (e) { return e.id === employeeId; });
       var empName = emp ? emp.name : employeeId;
 
@@ -1083,7 +1108,7 @@
 
     container.querySelectorAll(".scale-select").forEach((select) => {
       select.addEventListener("change", () => {
-        const scaleCompany = select.dataset.scaleCompany || AppData.state.selectedCompany;
+        const scaleCompany = select.dataset.scaleCompany || getViewCompany();
         if (select.value === "CO") {
           showCoHolidayPicker(
             select.closest(".scale-cell"),
@@ -1123,7 +1148,7 @@
         if (!code || code === "" || code === "FOLGA" || code === "DOM") {
           var empId = select.dataset.employee;
           var date = select.dataset.date;
-          var scaleCompany = select.dataset.scaleCompany || AppData.state.selectedCompany;
+          var scaleCompany = select.dataset.scaleCompany || getViewCompany();
           var data = AppData.getCompanyData(scaleCompany);
           var emp = data.employees.find(function (emp) { return emp.id === empId; });
           var empName = emp ? emp.name : empId;
@@ -1170,9 +1195,23 @@
   }
 
   function render(container, currentMonth = scaleState.yearMonth) {
+    if (renderLock) {
+      pendingRender = true;
+      return;
+    }
+    renderLock = true;
+    const t0 = SCALE_DEBUG ? performance.now() : 0;
+
     try {
       scaleState.yearMonth = currentMonth;
+      if (!AppData.COMPANIES.includes(scaleState.viewCompany)) {
+        scaleState.viewCompany = AppData.state.selectedCompany;
+      }
       AppData.setEscalaSelectedYearMonth(scaleState.yearMonth, { save: false });
+
+      const viewCompany = getViewCompany();
+      scaleLog("render start", viewCompany, scaleState.yearMonth);
+
       if (window.ScaleRules?.getCoveragePrincipalStatus) {
         try {
           window.ScaleRules.getCoveragePrincipalStatus(AppData.state);
@@ -1181,13 +1220,13 @@
         }
       }
 
-      const data = AppData.getCompanyData();
-      if (!data.employees) data.employees = [];
+      const data = AppData.ensureCompanyDataShape(viewCompany);
+      if (!data) throw new Error(`Dados da empresa "${viewCompany}" indisponíveis.`);
       ensureValidDepartment(data);
       syncPrintDefaults(data);
       const employees = getFilteredEmployees(data);
       const days = AppData.getDaysInMonth(scaleState.yearMonth);
-      const coverageAlerts = runIntegrationsForView();
+      const coverageAlerts = getAlertsForView();
       const alertLookups = buildAlertLookups(coverageAlerts);
 
       container.innerHTML = `
@@ -1211,6 +1250,7 @@
       `;
 
       bindEvents(container, employees, days, data);
+      if (SCALE_DEBUG) scaleLog("render done", (performance.now() - t0).toFixed(0) + "ms", employees.length, "func.");
     } catch (error) {
       console.error("[Escala] Falha ao renderizar:", error);
       container.innerHTML = `
@@ -1220,8 +1260,22 @@
           <p class="help-text">Atualize com Ctrl+F5. Se persistir, verifique o cadastro de funcionários.</p>
         </section>
       `;
+    } finally {
+      renderLock = false;
+      if (pendingRender) {
+        pendingRender = false;
+        window.requestAnimationFrame(() => render(container, scaleState.yearMonth));
+      }
     }
   }
 
-  window.EscalaModule = { render };
+  function softRefreshFromSync() {
+    const container = document.getElementById("escala");
+    if (!container) return;
+    scaleState.viewCompany = AppData.state.selectedCompany;
+    scaleLog("softRefreshFromSync", scaleState.viewCompany);
+    renderCurrent(container);
+  }
+
+  window.EscalaModule = { render, softRefreshFromSync, getViewCompany };
 })();
