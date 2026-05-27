@@ -861,9 +861,31 @@
       const currentEntry = AppData.getManualScaleEntry(employeeId, date, data);
       const currentLinkedId = typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
 
-      const holidayOpts = holidays.length
-        ? holidays.map((h) => `<option value="${esc(h.id)}" ${h.id === currentLinkedId ? "selected" : ""}>${esc(h.name || h.date)}</option>`).join("")
-        : `<option value="" disabled>Nenhum feriado cadastrado</option>`;
+      const eligible = holidays
+        .map((holiday) => {
+          const item = (holiday.workedEmployees || []).find((row) => row.employeeId === employeeId);
+          if (!item) return null;
+          // Regra: listar apenas feriados que o funcionário trabalhou e ainda não compensou.
+          // Se o feriado já está vinculado ao próprio CO desta data, mantém disponível para editar.
+          const isSameCo = item.linkedFromScale && (item.scaleCoDate === date || item.compensationDate === date);
+          const isAvailable = !item.compensationDate || isSameCo;
+          if (!isAvailable) return null;
+          const status = AppData.resolveWorkedHolidayStatus(item, holiday.date);
+          return { holiday, item, status };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
+
+      const holidayOpts = eligible.length
+        ? eligible
+            .map(
+              ({ holiday, status }) =>
+                `<option value="${esc(holiday.id)}" ${holiday.id === currentLinkedId ? "selected" : ""}>${esc(
+                  holiday.name || holiday.date
+                )} — ${esc(status.label)}</option>`
+            )
+            .join("")
+        : `<option value="" disabled>Nenhum feriado pendente para este funcionário</option>`;
 
       const picker = document.createElement("div");
       picker.id = "coHolidayPicker";
@@ -875,6 +897,7 @@
           <option value="">— Sem vínculo específico —</option>
           ${holidayOpts}
         </select>
+        ${eligible.length ? "" : `<p class="co-picker-hint">Este funcionário não possui feriados trabalhados pendentes.</p>`}
         <div class="co-picker-actions">
           <button id="coPickerCancel" class="secondary btn-sm" type="button">Cancelar CO</button>
           <button id="coPickerConfirm" class="primary btn-sm" type="button">Confirmar CO</button>
