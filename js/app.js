@@ -42,6 +42,7 @@
       button.classList.toggle("active", button.dataset.module === moduleId);
     });
 
+    document.body.dataset.activeModule = moduleId;
     updateCompanySwitcherVisibility(moduleId);
     document.getElementById("pageTitle").textContent = moduleTitles[moduleId];
     const container = document.getElementById(moduleId);

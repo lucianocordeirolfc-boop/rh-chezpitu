@@ -276,6 +276,11 @@ body[data-sidebar="collapsed"] .app-shell {
   flex-wrap: wrap;
 }
 
+/* Na Escala, a empresa é escolhida no seletor interno da página. */
+body[data-active-module="escala"] .company-switcher {
+  display: none !important;
+}
+
 .sync-status {
   display: inline-flex;
   align-items: center;
