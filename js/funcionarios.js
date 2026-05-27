@@ -164,18 +164,23 @@
 
   function renderEmployeeStats() {
     const counts = AppData.getEmployeeCounts();
-    const active = AppData.state.selectedCompany;
     return counts.byCompany
       .map(
         (item) => `
-        <button type="button" class="stat-chip module-company-chip ${item.company === active ? "is-active" : ""}" data-select-company="${esc(item.company)}">
+        <article class="stat-chip">
           <span>${esc(item.company)}</span>
           <strong>${item.total}</strong>
-        </button>
+        </article>
       `
       )
       .concat(`<article class="stat-chip highlight"><span>Total</span><strong>${counts.total}</strong></article>`)
       .join("");
+  }
+
+  function applyPageCompanyToEmployeeList(allEmployees) {
+    const pageCo = AppData.getPageCompany("funcionarios");
+    if (AppData.isPageCompanyAll(pageCo)) return allEmployees;
+    return allEmployees.filter((employee) => employee.company === pageCo);
   }
 
   function renderTopbarFilters(employees) {
@@ -224,8 +229,8 @@
     return `
       <div class="func-list-toolbar">
         <div class="func-list-toolbar-meta">
-          <span class="func-list-toolbar-eyebrow">Empresa ativa no sistema</span>
-          <strong class="func-list-toolbar-company">${esc(AppData.state.selectedCompany)}</strong>
+          <span class="func-list-toolbar-eyebrow">Visualizando</span>
+          <strong class="func-list-toolbar-company">${esc(window.CompanyUI?.pageLabel?.("funcionarios") || AppData.getPageCompany("funcionarios"))}</strong>
           <small id="employeeListCount" class="func-list-toolbar-count">${filteredCount} exibidos · ${companyCount} na empresa · ${totalCount} no grupo</small>
         </div>
         <div class="func-list-toolbar-controls">
@@ -351,9 +356,6 @@
           targetKey
         );
         AppData.updateCompanyLogo(readCompanyPopupLogo(form), targetKey);
-        if (!isEdit || targetKey === AppData.state.selectedCompany) {
-          AppData.setSelectedCompany(targetKey);
-        }
         closeCompanyPopup();
         window.App.renderCurrent();
         window.App?.toast?.("Dados da empresa salvos.", "success");
@@ -398,18 +400,13 @@
   }
 
   function companyRows() {
-    const active = AppData.state.selectedCompany;
     return listCompanies()
       .map((companyKey) => {
         const block = AppData.getCompanyData(companyKey);
         const info = block?.companyInfo || {};
         const employeeCount = block?.employees?.length || 0;
-        const isActive = companyKey === active;
         return `
-          <tr class="${isActive ? "func-company-row-active" : ""}">
-            <td>
-              ${isActive ? `<span class="pill success">Ativa</span>` : `<button type="button" class="link-button" data-activate-company="${esc(companyKey)}">Definir ativa</button>`}
-            </td>
+          <tr>
             <td><strong>${esc(companyKey)}</strong></td>
             <td>${esc(info.legalName || companyKey)}</td>
             <td>${esc(info.cnpj || "—")}</td>
@@ -536,7 +533,7 @@
       <div class="func-form-row cols-vt">
         <label>Valor diário VT<input name="vtDaily" inputmode="decimal" placeholder="17,30" autocomplete="off"></label>
         <label>Origem<span id="employeeOriginDisplay" class="func-origin-readonly">Manual</span></label>
-        <label>Empresa<select name="employeeCompany">${companyFormOptions(AppData.state.selectedCompany)}</select></label>
+        <label>Empresa<select name="employeeCompany">${companyFormOptions(AppData.getPrimaryPageCompany("funcionarios"))}</select></label>
       </div>
       <div class="func-form-row">
         <label class="full">Observações<textarea name="notes" rows="2"></textarea></label>
@@ -553,7 +550,10 @@
     const originEl = form.querySelector("#employeeOriginDisplay");
     if (originEl) originEl.textContent = "Manual";
     const companyField = form.elements.employeeCompany;
-    if (companyField) companyField.value = AppData.state.selectedCompany;
+    if (companyField) {
+      const pageCo = AppData.getPageCompany("funcionarios");
+      companyField.value = AppData.isPageCompanyAll(pageCo) ? AppData.COMPANIES[0] : pageCo;
+    }
     if (form.elements.admissionDate) form.elements.admissionDate.value = AppData.todayISO();
 
     const shiftSelect = form.querySelector("#shiftSelect");
@@ -742,7 +742,7 @@
         payload.department = newDept;
       }
 
-      const targetCompany = payload.employeeCompany || AppData.state.selectedCompany;
+      const targetCompany = payload.employeeCompany || AppData.getPrimaryPageCompany("funcionarios");
       delete payload.employeeCompany;
       const existing = AppData.getCompanyData(targetCompany).employees.find((item) => item.id === payload.id);
       const previousFixedDay = existing?.fixedDay || "";
@@ -792,7 +792,7 @@
     bindEmployeeForm(form, pageContainer);
 
     if (isEdit) {
-      fillEmployeeForm(form, options.employee, options.company || AppData.state.selectedCompany);
+      fillEmployeeForm(form, options.employee, options.company);
     } else {
       resetEmployeeForm(form);
     }
@@ -838,13 +838,16 @@
   }
 
   function updateEmployeeList(container) {
-    const allEmployees = getAllEmployeesFlat();
+    const allEmployees = applyPageCompanyToEmployeeList(getAllEmployeesFlat());
     const filtered = filterEmployees(allEmployees);
     const tbody = container.querySelector("#employeeListBody");
     const countEl = container.querySelector("#employeeListCount");
     if (tbody) tbody.innerHTML = employeeRows(filtered);
     if (countEl) {
-      const companyTotal = allEmployees.filter((item) => item.company === AppData.state.selectedCompany).length;
+      const pageCo = AppData.getPageCompany("funcionarios");
+      const companyTotal = AppData.isPageCompanyAll(pageCo)
+        ? allEmployees.length
+        : allEmployees.filter((item) => item.company === pageCo).length;
       countEl.textContent = `${filtered.length} exibidos · ${companyTotal} na empresa · ${allEmployees.length} no grupo`;
     }
   }
@@ -871,7 +874,7 @@
         }
 
         const result = AppData.importEmployeesBatch(rows, {
-          fallbackCompany: AppData.state.selectedCompany,
+          fallbackCompany: AppData.getPrimaryPageCompany("funcionarios"),
           mapRow: ImportUtils.mapEmployeeRow
         });
 
@@ -951,13 +954,6 @@
         if (editCompany) {
           event.preventDefault();
           openCompanyPopup({ companyKey: editCompany.dataset.editCompany });
-          return;
-        }
-        const activateBtn = event.target.closest("[data-activate-company]");
-        if (activateBtn) {
-          event.preventDefault();
-          AppData.setSelectedCompany(activateBtn.dataset.activateCompany);
-          window.App.renderCurrent();
         }
       });
     }
@@ -968,10 +964,7 @@
         const editBtn = event.target.closest("[data-edit]");
         if (editBtn) {
           event.preventDefault();
-          const company = editBtn.dataset.company || AppData.state.selectedCompany;
-          if (company !== AppData.state.selectedCompany) {
-            AppData.setSelectedCompany(company);
-          }
+          const company = editBtn.dataset.company;
           const employee = AppData.getCompanyData(company).employees.find((item) => item.id === editBtn.dataset.edit);
           if (employee) openEmployeePopup(container, { employee, company });
           return;
@@ -981,7 +974,7 @@
         if (removeBtn) {
           event.preventDefault();
           if (!confirm("Excluir este funcionário e seus vínculos de escala, férias e feriados?")) return;
-          const company = removeBtn.dataset.company || AppData.state.selectedCompany;
+          const company = removeBtn.dataset.company;
           AppData.removeEmployee(removeBtn.dataset.remove, company);
           closeEmployeePopup();
           window.App.renderCurrent();
@@ -998,7 +991,7 @@
       ImportUtils.downloadCSV(
         "modelo-funcionarios.csv",
         ["nome", "cpf", "ctps", "cargo", "setor", "status", "admissao", "folgaFixa", "vt", "empresa", "turnoPadrao"],
-        ["", "", "", "Recepcionista", "Recepção", "Ativo", "2024-01-15", "", "17,30", AppData.state.selectedCompany, ""]
+        ["", "", "", "Recepcionista", "Recepção", "Ativo", "2024-01-15", "", "17,30", AppData.getPrimaryPageCompany("funcionarios"), ""]
       );
     });
 
@@ -1006,7 +999,7 @@
       ImportUtils.downloadCSV(
         "modelo-feriados.csv",
         ["empresa", "funcionario", "nomeFeriado", "dataTrabalhada", "prazoCompensacao", "dataCompensacao", "status", "observacoes"],
-        [AppData.state.selectedCompany, "", "Natal", "2025-12-25", "", "", "Pendente", ""]
+        [AppData.getPrimaryPageCompany("funcionarios"), "", "Natal", "2025-12-25", "", "", "Pendente", ""]
       );
     });
 
@@ -1015,7 +1008,7 @@
     });
 
     bindListFilters(container);
-    window.CompanyUI?.bindCompanyBar?.(container, () => window.App.renderCurrent());
+    window.CompanyUI?.bindToolbar?.(container, "funcionarios", () => window.App.renderCurrent());
   }
 
   function render(container) {
@@ -1024,9 +1017,12 @@
     let filteredEmployees = [];
     let companyCount = 0;
     try {
-      allEmployees = getAllEmployeesFlat();
+      allEmployees = applyPageCompanyToEmployeeList(getAllEmployeesFlat());
       filteredEmployees = filterEmployees(allEmployees);
-      companyCount = allEmployees.filter((item) => item.company === AppData.state.selectedCompany).length;
+      const pageCo = AppData.getPageCompany("funcionarios");
+      companyCount = AppData.isPageCompanyAll(pageCo)
+        ? allEmployees.length
+        : allEmployees.filter((item) => item.company === pageCo).length;
     } catch (error) {
       console.error("[Cadastro] Falha ao carregar funcionários:", error);
       container.innerHTML = `
@@ -1045,6 +1041,7 @@
 
     container.innerHTML = `
       <div class="func-page">
+        ${window.CompanyUI?.renderToolbar?.("funcionarios", { allowAll: true }) || ""}
         <header class="func-page-intro">
           <div class="func-page-intro-head">
             <h2 class="func-module-title">Cadastro</h2>
@@ -1065,7 +1062,6 @@
             <table class="table-premium func-companies-table">
               <thead>
                 <tr>
-                  <th>Status</th>
                   <th>Empresa</th>
                   <th>Razão social</th>
                   <th>CNPJ</th>

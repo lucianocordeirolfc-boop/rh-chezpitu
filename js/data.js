@@ -4,6 +4,21 @@
 
   const COMPANIES = ["Chez Pitu", "Pengold"];
   const DEFAULT_SELECTED_COMPANY = "Pengold";
+  /** Valor interno do filtro "Todas" por página (não é chave de companies). */
+  const PAGE_COMPANY_ALL = "__todas__";
+
+  const PAGE_FILTER_KEYS = {
+    dashboard: "dashboardEmpresaSelecionada",
+    funcionarios: "cadastroEmpresaSelecionada",
+    escala: "escalaEmpresaSelecionada",
+    ferias: "ausenciasEmpresaSelecionada",
+    "vale-transporte": "vtEmpresaSelecionada",
+    feriados: "feriadosEmpresaSelecionada",
+    contador: "contadorEmpresaSelecionada"
+  };
+
+  const PAGE_MODULE_IDS = Object.keys(PAGE_FILTER_KEYS);
+
   const WEEK_DAYS = [
     "Segunda-feira",
     "Terça-feira",
@@ -249,14 +264,118 @@
     return parsed;
   }
 
+  function createDefaultPageFilters(legacyCompany = DEFAULT_SELECTED_COMPANY) {
+    const filters = {};
+    const singleDefault = COMPANIES.includes(legacyCompany) ? legacyCompany : COMPANIES[0];
+    PAGE_MODULE_IDS.forEach((moduleId) => {
+      filters[moduleId] = singleDefault;
+    });
+    filters.dashboard = PAGE_COMPANY_ALL;
+    filters.funcionarios = PAGE_COMPANY_ALL;
+    return filters;
+  }
+
+  function isValidStoredPageFilter(value, companiesMap = state?.companies) {
+    if (value === PAGE_COMPANY_ALL || value === "todas" || value === "Todas") return true;
+    return Boolean(companiesMap?.[value]) || COMPANIES.includes(value);
+  }
+
+  function normalizePageFilterValue(value, fallback = DEFAULT_SELECTED_COMPANY, companiesMap = state?.companies) {
+    if (value === PAGE_COMPANY_ALL || value === "todas" || value === "Todas" || value === "ambas") {
+      return PAGE_COMPANY_ALL;
+    }
+    if (value && (companiesMap?.[value] || COMPANIES.includes(value))) return value;
+    const fb = COMPANIES.includes(fallback) ? fallback : COMPANIES[0];
+    return fb;
+  }
+
+  function isPageCompanyAll(value) {
+    return normalizePageFilterValue(value) === PAGE_COMPANY_ALL;
+  }
+
+  function migratePageFilters(parsed, defaults) {
+    const legacy = parsed.selectedCompany || defaults.selectedCompany;
+    const companiesMap = parsed.companies || defaults.companies || {};
+    parsed.pageFilters = { ...createDefaultPageFilters(legacy), ...(parsed.pageFilters || {}) };
+    PAGE_MODULE_IDS.forEach((moduleId) => {
+      const lsKey = PAGE_FILTER_KEYS[moduleId];
+      let value = parsed.pageFilters[moduleId];
+      if (!isValidStoredPageFilter(value, companiesMap)) {
+        try {
+          const fromLs = lsKey ? localStorage.getItem(lsKey) : null;
+          if (fromLs) value = fromLs;
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      if (!isValidStoredPageFilter(value, companiesMap)) {
+        value = moduleId === "dashboard" || moduleId === "funcionarios" ? PAGE_COMPANY_ALL : legacy;
+      }
+      parsed.pageFilters[moduleId] = normalizePageFilterValue(value, legacy, companiesMap);
+      if (lsKey) {
+        try {
+          localStorage.setItem(lsKey, parsed.pageFilters[moduleId]);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    });
+    return parsed.pageFilters;
+  }
+
+  function getPageCompany(moduleId) {
+    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters(state.selectedCompany);
+    return normalizePageFilterValue(state.pageFilters[moduleId], state.selectedCompany);
+  }
+
+  function setPageCompany(moduleId, company, options = {}) {
+    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters(state.selectedCompany);
+    const normalized = normalizePageFilterValue(company, state.selectedCompany);
+    state.pageFilters[moduleId] = normalized;
+    const lsKey = PAGE_FILTER_KEYS[moduleId];
+    if (lsKey) {
+      try {
+        localStorage.setItem(lsKey, normalized);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    if (options.save !== false) saveState();
+  }
+
+  function resolveCompaniesForPage(moduleId, options = {}) {
+    const allowAll = options.allowAll !== false;
+    const page = getPageCompany(moduleId);
+    if (isPageCompanyAll(page)) {
+      return allowAll ? getCompanies() : [getCompanies()[0] || COMPANIES[0]];
+    }
+    return [page];
+  }
+
+  function getPrimaryPageCompany(moduleId) {
+    return resolveCompaniesForPage(moduleId, { allowAll: false })[0];
+  }
+
+  function findEmployeeRecord(employeeId) {
+    if (!employeeId) return null;
+    for (const company of getCompanies()) {
+      const employee = getCompanyData(company)?.employees?.find((item) => item.id === employeeId);
+      if (employee) return { employee, company };
+    }
+    return null;
+  }
+
   function createDefaultState() {
     const companies = {};
     COMPANIES.forEach((company) => {
       companies[company] = createCompanyData(company);
     });
 
+    const selectedCompany = COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0];
+
     return {
-      selectedCompany: COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0],
+      selectedCompany,
+      pageFilters: createDefaultPageFilters(selectedCompany),
       escalaSelectedYearMonth: monthKey(),
       companies,
       calendarHolidays: [],
@@ -602,10 +721,12 @@
       parsed.coveragePrincipalBindings = parsed.coveragePrincipalBindings || {};
       parsed.scaleCodeConfig = parsed.scaleCodeConfig || {};
       parsed.valeTransporte = normalizeValeTransporteBlock(parsed.valeTransporte, defaults.valeTransporte);
+      migratePageFilters(parsed, defaults);
       const restored = restoreVtBackupIntoState({ ...defaults, ...parsed });
       if (!restored.companies?.[restored.selectedCompany]) {
         restored.selectedCompany = COMPANIES[0];
       }
+      if (!restored.pageFilters) restored.pageFilters = createDefaultPageFilters(restored.selectedCompany);
       return restored;
     } catch (error) {
       console.warn("Não foi possível carregar os dados salvos.", error);
@@ -753,9 +874,21 @@
       normalizeCompanyHolidays(remoteState.companies[company]);
     });
     const remoteVt = remoteState.valeTransporte || {};
-    state = {
+    const mergedPageFilters = {
+      ...defaults.pageFilters,
+      ...(previous.pageFilters || {}),
+      ...(remoteState.pageFilters || {})
+    };
+    const stateDraft = {
       ...defaults,
       ...remoteState,
+      companies: remoteState.companies,
+      pageFilters: mergedPageFilters,
+      selectedCompany: remoteState.selectedCompany || previous.selectedCompany || defaults.selectedCompany
+    };
+    migratePageFilters(stateDraft, defaults);
+    state = {
+      ...stateDraft,
       escalaSelectedYearMonth:
         localSnapshot?.escalaSelectedYearMonth ||
         previous.escalaSelectedYearMonth ||
@@ -792,6 +925,7 @@
     return state.companies[company];
   }
 
+  /** @deprecated Não usar para filtrar telas — use setPageCompany(moduleId, company). */
   function setSelectedCompany(company, options = {}) {
     if (!state.companies[company]) return;
     if (state.selectedCompany === company && options.force !== true) return;
@@ -799,8 +933,9 @@
     if (options.save !== false) saveState();
   }
 
-  function updateCompanyInfo(companyInfo, company = state.selectedCompany) {
-    const data = getCompanyData(company);
+  function updateCompanyInfo(companyInfo, company) {
+    const resolved = company || getPrimaryPageCompany("funcionarios");
+    const data = getCompanyData(resolved);
     if (!data) return;
     data.companyInfo = {
       ...(data.companyInfo || {}),
@@ -811,8 +946,9 @@
     saveState();
   }
 
-  function updateCompanyLogo(logoDataUrl, company = state.selectedCompany) {
-    const data = getCompanyData(company);
+  function updateCompanyLogo(logoDataUrl, company) {
+    const resolved = company || getPrimaryPageCompany("funcionarios");
+    const data = getCompanyData(resolved);
     if (!data) return;
     data.companyInfo = {
       ...(data.companyInfo || {}),
@@ -1391,7 +1527,10 @@
   }
 
   function setManualScale(employeeId, date, code, linkedHolidayId, company) {
-    const resolvedCompany = company || state.selectedCompany;
+    const resolvedCompany =
+      company ||
+      AppData.findEmployeeRecord(employeeId)?.company ||
+      AppData.getPrimaryPageCompany("escala");
     const data = getCompanyData(resolvedCompany);
     const key = `${employeeId}|${date}`;
     const previousCode = getPreviousManualScaleCode(data, employeeId, date);
@@ -1707,8 +1846,16 @@
 
   window.AppData = {
     COMPANIES,
+    PAGE_COMPANY_ALL,
+    PAGE_FILTER_KEYS,
     getCompanies,
     registerCompany,
+    getPageCompany,
+    setPageCompany,
+    resolveCompaniesForPage,
+    getPrimaryPageCompany,
+    isPageCompanyAll,
+    findEmployeeRecord,
     WEEK_DAYS,
     SCALE_CODES,
     VT_WORKED_CODES,

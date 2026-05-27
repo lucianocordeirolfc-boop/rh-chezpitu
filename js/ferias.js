@@ -297,7 +297,8 @@
   }
 
   function render(container) {
-    const data = AppData.getCompanyData();
+    const company = AppData.getPrimaryPageCompany("ferias");
+    const data = AppData.getCompanyData(company);
     const activeEmployees = data.employees.filter((employee) => employee.status === "Ativo");
     const absences = data.absences || [];
 
@@ -451,7 +452,7 @@
 
     container.innerHTML = `
       <div class="ausencias-module">
-        ${window.CompanyUI?.renderCompanyBar?.() || ""}
+        ${window.CompanyUI?.renderToolbar?.("ferias") || ""}
         <div class="ausencias-tabs-bar">
           <div class="ausencias-tabs">
             <button class="ausencias-tab-btn ${activeTab === "ferias" ? "active" : ""}" data-tab="ferias">
@@ -479,7 +480,7 @@
     `;
 
     bindEvents(container);
-    window.CompanyUI?.bindCompanyBar?.(container, () => render(container));
+    window.CompanyUI?.bindToolbar?.(container, "ferias", () => render(container));
   }
 
   window.FeriasModule = { render };

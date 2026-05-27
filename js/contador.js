@@ -244,9 +244,7 @@
       saveLancamento(targetCompany, yearMonth, record);
       App.toast("Lançamento salvo.", "success");
 
-      if (targetCompany === AppData.state.selectedCompany) {
-        renderContent(container, yearMonth);
-      }
+      renderContent(container, yearMonth);
 
       employeeSelect.value = "";
       LANCAMENTO_FIELDS.forEach(function (f) {
@@ -370,7 +368,7 @@
   }
 
   function renderResumoTabContent(container, yearMonth) {
-    var selectedCompany = AppData.state.selectedCompany;
+    var selectedCompany = AppData.getPrimaryPageCompany("contador");
     return '<div id="resumoGridContainer">' +
       renderResumoGrid(selectedCompany, yearMonth) +
     '</div>';
@@ -390,7 +388,7 @@
     var printBtn = document.getElementById("btnPrintResumo");
     if (printBtn) {
       printBtn.addEventListener("click", function () {
-        var company = companySel ? companySel.value : AppData.state.selectedCompany;
+        var company = companySel ? companySel.value : AppData.getPrimaryPageCompany("contador");
 
         var existing = document.getElementById("resumoPrintContainer");
         if (existing) existing.remove();
@@ -427,12 +425,12 @@
   }
 
   function renderContent(container, yearMonth) {
-    var company = AppData.state.selectedCompany;
+    var company = AppData.getPrimaryPageCompany("contador");
     var activeTab = container._contadorActiveTab || "lancamentos";
 
     var companies = window.CompanyUI && CompanyUI.listCompanies ? CompanyUI.listCompanies() : AppData.COMPANIES;
     var companyOptions = companies.map(function (c) {
-      var sel = c === AppData.state.selectedCompany ? " selected" : "";
+      var sel = c === AppData.getPrimaryPageCompany("contador") ? " selected" : "";
       return '<option value="' + c + '"' + sel + '>' + c + '</option>';
     }).join("");
 
@@ -446,7 +444,7 @@
     }
 
     var html =
-      (window.CompanyUI && CompanyUI.renderCompanyBar ? CompanyUI.renderCompanyBar() : "") +
+      (window.CompanyUI && CompanyUI.renderToolbar ? CompanyUI.renderToolbar("contador") : "") +
       '<div class="module-header">' +
         '<h2>Informações Contador</h2>' +
       '</div>' +
@@ -464,8 +462,22 @@
 
     container.innerHTML = html;
 
-    if (window.CompanyUI && CompanyUI.bindCompanyBar) {
-      CompanyUI.bindCompanyBar(container, function () {
+    if (window.CompanyUI && CompanyUI.bindToolbar) {
+      CompanyUI.bindToolbar(container, "contador", function (company) {
+        var resumoSel = document.getElementById("resumoCompanySelect");
+        if (resumoSel && company && !AppData.isPageCompanyAll(company)) {
+          resumoSel.value = company;
+        }
+        renderContent(container, yearMonth);
+      });
+    }
+
+    var resumoCompanySel = document.getElementById("resumoCompanySelect");
+    if (resumoCompanySel) {
+      resumoCompanySel.addEventListener("change", function () {
+        AppData.setPageCompany("contador", resumoCompanySel.value);
+        var pageSel = document.getElementById("contadorPageCompany");
+        if (pageSel) pageSel.value = resumoCompanySel.value;
         renderContent(container, yearMonth);
       });
     }

@@ -146,7 +146,7 @@
 
   function refreshScaleIntegrations(persist = true) {
     const month = AppData.getEscalaSelectedYearMonth() || AppData.monthKey();
-    const company = AppData.state.selectedCompany;
+    const company = AppData.getPrimaryPageCompany("escala");
     AppData.runScaleIntegrations([month], { companies: [company], save: persist });
   }
 
@@ -190,8 +190,10 @@
       preserveLocalHolidays: true,
       localSnapshot: AppData.readLocalStateSnapshot()
     });
-    if (remoteState.selectedCompany) {
-      AppData.setSelectedCompany(remoteState.selectedCompany, { save: false });
+    if (remoteState.pageFilters) {
+      Object.keys(remoteState.pageFilters).forEach((moduleId) => {
+        AppData.setPageCompany(moduleId, remoteState.pageFilters[moduleId], { save: false });
+      });
     }
 
     refreshActiveModuleUI();

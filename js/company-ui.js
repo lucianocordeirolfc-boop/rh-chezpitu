@@ -1,99 +1,120 @@
 (function () {
+  const SELECT_IDS = {
+    dashboard: "dashboardPageCompany",
+    funcionarios: "cadastroPageCompany",
+    escala: "scaleCompany",
+    ferias: "ausenciasPageCompany",
+    "vale-transporte": "vtPageCompany",
+    feriados: "feriadosPageCompany",
+    contador: "contadorPageCompany"
+  };
+
   function esc(value) {
     return window.App?.escapeHTML(value) || String(value ?? "");
   }
 
-  function listCompanies() {
-    if (typeof AppData.getCompanies === "function") {
-      const list = AppData.getCompanies();
-      if (list.length) return list;
-    }
-    return AppData.COMPANIES || [];
+  function pageLabel(moduleId) {
+    const value = AppData.getPageCompany(moduleId);
+    if (AppData.isPageCompanyAll(value)) return "Todas as empresas";
+    return value;
   }
 
-  /** Barra de empresa (padrão Cadastro): chips clicáveis + empresa ativa. */
-  function renderCompanyBar() {
-    const active = AppData.state.selectedCompany;
-    const counts = AppData.getEmployeeCounts();
-    const byCompany = new Map(counts.byCompany.map((item) => [item.company, item.total]));
+  /**
+   * Seletor de empresa no estilo Escala de Folga.
+   * @param {string} moduleId
+   * @param {{ allowAll?: boolean, selectId?: string, className?: string }} options
+   */
+  function renderToolbar(moduleId, options = {}) {
+    const allowAll = Boolean(options.allowAll);
+    const selectId = options.selectId || SELECT_IDS[moduleId] || `${moduleId}PageCompany`;
+    const selected = AppData.getPageCompany(moduleId);
+    const companies = AppData.getCompanies();
+    const allValue = AppData.PAGE_COMPANY_ALL;
+
+    const optionsHtml = (allowAll
+      ? `<option value="${allValue}" ${AppData.isPageCompanyAll(selected) ? "selected" : ""}>Todas</option>`
+      : "") +
+      companies
+        .map(
+          (company) =>
+            `<option value="${esc(company)}" ${company === selected ? "selected" : ""}>${esc(company)}</option>`
+        )
+        .join("");
+
+    const extraClass = options.className ? ` ${options.className}` : "";
 
     return `
-      <div class="module-company-bar" data-company-bar>
-        <div class="module-company-bar-meta">
-          <span class="module-company-bar-eyebrow">Empresa ativa no sistema</span>
-          <strong class="module-company-bar-name">${esc(active)}</strong>
-        </div>
-        <div class="module-company-chips stat-row">
-          ${listCompanies()
-            .map((company) => {
-              const isActive = company === active;
-              const total = byCompany.get(company) ?? 0;
-              return `
-                <button
-                  type="button"
-                  class="stat-chip module-company-chip ${isActive ? "is-active" : ""}"
-                  data-select-company="${esc(company)}"
-                  title="${isActive ? "Empresa ativa" : "Exibir dados de " + company}"
-                >
-                  <span>${esc(company)}</span>
-                  <strong>${total}</strong>
-                </button>`;
-            })
-            .join("")}
-        </div>
+      <div class="page-company-toolbar${extraClass}" data-page-toolbar="${esc(moduleId)}">
+        <label class="module-company-select-label">Empresa
+          <select id="${esc(selectId)}" class="module-company-select" data-page-module="${esc(moduleId)}">
+            ${optionsHtml}
+          </select>
+        </label>
       </div>
     `;
   }
 
-  /** Seletor compacto no estilo Escala de Folga. */
-  function renderCompanySelect(id, selected) {
-    const value = selected || AppData.state.selectedCompany;
-    return `
-      <label class="module-company-select-label">Empresa
-        <select id="${esc(id)}" class="module-company-select" data-company-select="${esc(id)}">
-          ${listCompanies()
-            .map(
-              (company) =>
-                `<option value="${esc(company)}" ${company === value ? "selected" : ""}>${esc(company)}</option>`
-            )
-            .join("")}
-        </select>
-      </label>
-    `;
-  }
-
-  function bindCompanyBar(container, onChange) {
+  function bindToolbar(container, moduleId, onChange) {
     if (!container) return;
-    container.addEventListener("click", (event) => {
-      const btn = event.target.closest("[data-select-company]");
-      if (!btn || !container.contains(btn)) return;
-      event.preventDefault();
-      const company = btn.dataset.selectCompany;
-      if (!company || company === AppData.state.selectedCompany) return;
-      AppData.setSelectedCompany(company);
-      if (typeof onChange === "function") onChange(company);
+    const selectId = SELECT_IDS[moduleId] || `${moduleId}PageCompany`;
+    const select =
+      container.querySelector(`#${selectId}`) || container.querySelector(`[data-page-module="${moduleId}"]`);
+    if (!select) return;
+
+    if (select.dataset.pageBound === moduleId) return;
+    select.dataset.pageBound = moduleId;
+
+    select.addEventListener("change", () => {
+      AppData.setPageCompany(moduleId, select.value);
+      if (typeof onChange === "function") onChange(select.value);
       else window.App?.renderCurrent?.();
     });
   }
 
+  /** @deprecated use renderToolbar */
+  function renderCompanyBar() {
+    return "";
+  }
+
+  /** @deprecated use bindToolbar */
+  function bindCompanyBar() {
+    /* noop */
+  }
+
+  /** @deprecated */
+  function renderCompanySelect(id, selected, allowAll = false) {
+    const moduleId =
+      id === "scaleCompany"
+        ? "escala"
+        : Object.entries(SELECT_IDS).find(([, v]) => v === id)?.[0] || "escala";
+    return renderToolbar(moduleId, { allowAll, selectId: id }).replace(
+      '<div class="page-company-toolbar"',
+      '<label class="module-company-select-label">Empresa'
+    );
+  }
+
+  /** @deprecated */
   function bindCompanySelect(container, selectId, onChange) {
-    const select = container.querySelector(`#${selectId}`);
-    if (!select || select.dataset.bound) return;
-    select.dataset.bound = "1";
-    select.addEventListener("change", () => {
-      const company = select.value;
-      if (!company) return;
-      AppData.setSelectedCompany(company);
-      if (typeof onChange === "function") onChange(company);
-      else window.App?.renderCurrent?.();
-    });
+    const moduleId =
+      selectId === "scaleCompany"
+        ? "escala"
+        : Object.entries(SELECT_IDS).find(([, v]) => v === selectId)?.[0];
+    if (moduleId) bindToolbar(container, moduleId, onChange);
+  }
+
+  function listCompanies() {
+    return AppData.getCompanies();
   }
 
   window.CompanyUI = {
     listCompanies,
+    pageLabel,
+    renderToolbar,
+    bindToolbar,
     renderCompanyBar,
-    renderCompanySelect,
     bindCompanyBar,
-    bindCompanySelect
+    renderCompanySelect,
+    bindCompanySelect,
+    SELECT_IDS
   };
 })();

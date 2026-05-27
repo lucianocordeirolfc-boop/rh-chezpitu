@@ -106,6 +106,7 @@ if (window.firebase && firebase.apps.length) {
       configuracoes: {
         selectedCompany:
           state.selectedCompany || (COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0]),
+        pageFilters: state.pageFilters || {},
         escalaYearMonth: state.escalaSelectedYearMonth || "",
         updatedAt: Date.now()
       },
@@ -188,6 +189,7 @@ if (window.firebase && firebase.apps.length) {
       selectedCompany:
         data.configuracoes?.selectedCompany ||
         (COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0]),
+      pageFilters: data.configuracoes?.pageFilters || {},
       escalaSelectedYearMonth: data.configuracoes?.escalaYearMonth || "",
       companies,
       valeTransporte: data.valeTransporte || {},

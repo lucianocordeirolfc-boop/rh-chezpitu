@@ -95,7 +95,8 @@
     return data.employees.find((employee) => employee.id === employeeId);
   }
 
-  function buildLines(data) {
+  function buildLines(data, companyKey) {
+    const companyLabel = companyKey || AppData.getPrimaryPageCompany("feriados");
     return (data.holidays || []).flatMap((holiday) => {
       const dueDate = AppData.addDays(holiday.date, 120);
       const today = AppData.todayISO();
@@ -112,7 +113,7 @@
             dueDate,
             daysLeft,
             workedItem: null,
-            company: AppData.state.selectedCompany
+            company: companyLabel
           }
         ];
       }
@@ -138,7 +139,7 @@
             dueDate,
             daysLeft: resolved.daysLeft,
             workedItem: item,
-            company: AppData.state.selectedCompany
+            company: companyLabel
           };
         });
     });
@@ -405,8 +406,9 @@
   }
 
   function refreshTable(container) {
-    const data = AppData.getCompanyData();
-    const allLines = buildLines(data);
+    const company = AppData.getPrimaryPageCompany("feriados");
+    const data = AppData.getCompanyData(company);
+    const allLines = buildLines(data, company);
     const filteredLines = applyFilters(allLines);
     const tbody = container.querySelector("[data-holiday-tbody]");
     if (tbody) {
@@ -416,7 +418,7 @@
       });
     }
 
-    const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(AppData.state.selectedCompany) || 0;
+    const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(company) || 0;
     renderMetrics(container, allLines, autoPendingCount);
 
     const alertsPanel = container.querySelector("[data-holiday-alerts]");
@@ -426,7 +428,7 @@
   }
 
   function setCompensationDate(holidayId, employeeId, compensationDate) {
-    const data = AppData.getCompanyData();
+    const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
     const holiday = data.holidays.find((item) => item.id === holidayId);
     if (!holiday) return { ok: true };
 
@@ -448,7 +450,7 @@
 
   function bindTableActions(container) {
     function confirmDeleteHoliday(holidayId) {
-      const data = AppData.getCompanyData();
+      const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
       const holiday = (data.holidays || []).find((item) => item.id === holidayId);
       const total = holiday?.workedEmployees?.length || 0;
       const msg = total
@@ -460,7 +462,7 @@
     function showEditHolidayModal(holidayId) {
       document.getElementById("holidayEditPicker")?.remove();
 
-      const data = AppData.getCompanyData();
+      const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
       const holiday = (data.holidays || []).find((item) => item.id === holidayId);
       if (!holiday) return;
 
@@ -665,7 +667,7 @@
         }
 
         const result = AppData.importHolidaysBatch(rows, {
-          fallbackCompany: AppData.state.selectedCompany,
+          fallbackCompany: AppData.getPrimaryPageCompany("feriados"),
           mapRow: ImportUtils.mapHolidayRow
         });
 
@@ -708,7 +710,7 @@
         return item;
       });
 
-      const data = AppData.getCompanyData();
+      const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
       const existing = data.holidays.find(
         (holiday) => holiday.date === date && AppData.normalizeSearchText(holiday.name) === AppData.normalizeSearchText(name)
       );
@@ -782,8 +784,8 @@
           "observacoes"
         ],
         [
-          AppData.state.selectedCompany,
-          AppData.getCompanyData().employees[0]?.name || "Nome do funcionário",
+          AppData.getPrimaryPageCompany("feriados"),
+          AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados")).employees[0]?.name || "Nome do funcionário",
           "Natal",
           "2025-12-25",
           "",
@@ -874,7 +876,7 @@
       map.set(AppData.normalizeSearchText(name), { name, date: holiday.date });
     });
 
-    (AppData.getCompanyData().holidays || []).forEach((holiday) => {
+    (AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados")).holidays || []).forEach((holiday) => {
       const name = String(holiday.name || "").trim();
       if (!name) return;
       const key = AppData.normalizeSearchText(name);
@@ -983,12 +985,13 @@
     ensureSearchDelegation();
     AppData.syncAllCalendarHolidaysToCompanies();
 
-    const data = AppData.getCompanyData();
+    const company = AppData.getPrimaryPageCompany("feriados");
+    const data = AppData.getCompanyData(company);
     const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
-    const allLines = buildLines(data);
+    const allLines = buildLines(data, company);
     const filteredLines = applyFilters(allLines);
     const lineStats = computeStatsFromLines(allLines);
-    const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(AppData.state.selectedCompany) || 0;
+    const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(company) || 0;
 
     const companyList = window.CompanyUI?.listCompanies?.() || AppData.COMPANIES;
     const calendarCompanyOptions = [
@@ -997,7 +1000,7 @@
     ].join("");
 
     container.innerHTML = `
-      ${window.CompanyUI?.renderCompanyBar?.() || ""}
+      ${window.CompanyUI?.renderToolbar?.("feriados") || ""}
       <div class="dash-metrics" data-holiday-metrics>
         <article class="stat-chip"><span>Registros</span><strong>${allLines.length}</strong></article>
         <article class="stat-chip"><span>Pendentes</span><strong>${lineStats.pending}</strong></article>
@@ -1122,7 +1125,7 @@
 
     bindStaticEvents(container);
     bindFilterEvents(container);
-    window.CompanyUI?.bindCompanyBar?.(container, () => render(container));
+    window.CompanyUI?.bindToolbar?.(container, "feriados", () => render(container));
     bindTableActions(container);
   }
 

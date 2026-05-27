@@ -58,7 +58,7 @@
   }
 
   function getCompanyInfo(data) {
-    return data.companyInfo || { legalName: AppData.state.selectedCompany, cnpj: "" };
+    return data.companyInfo || { legalName: "", cnpj: "" };
   }
 
   function validateReceipts(receipts, data) {
@@ -287,7 +287,8 @@
   }
 
   function refreshVtCalculations(container, yearMonth) {
-    const data = AppData.getCompanyData();
+    const company = AppData.getPrimaryPageCompany("vale-transporte");
+    const data = AppData.getCompanyData(company);
     const receipts = buildReceipts(yearMonth, data);
     const validation = validateReceipts(receipts, data);
 
@@ -403,7 +404,8 @@
   function render(container, yearMonth) {
     const resolvedMonth = yearMonth || getActiveYearMonth();
 
-    const data = AppData.getCompanyData();
+    const company = AppData.getPrimaryPageCompany("vale-transporte");
+    const data = AppData.getCompanyData(company);
     const receipts = buildReceipts(resolvedMonth, data);
     const validation = validateReceipts(receipts, data);
     const total = receipts.reduce((sum, receipt) => sum + receipt.total, 0);
@@ -417,7 +419,7 @@
     }
 
     container.innerHTML = `
-      ${window.CompanyUI?.renderCompanyBar?.() || ""}
+      ${window.CompanyUI?.renderToolbar?.("vale-transporte") || ""}
       <article class="card card-compact">
         <div class="card-header card-header-compact vt-header">
           <div>
@@ -489,13 +491,14 @@
     container._vtReceipts = receipts;
     container._vtYearMonth = resolvedMonth;
     bindEvents(container, resolvedMonth);
-    window.CompanyUI?.bindCompanyBar?.(container, () => render(container, resolvedMonth));
+    window.CompanyUI?.bindToolbar?.(container, "vale-transporte", () => render(container, resolvedMonth));
   }
 
   function refreshDeductionList(container, yearMonth) {
     const list = container.querySelector("[data-vt-deduct-list]");
     if (!list) return;
-    const data = AppData.getCompanyData();
+    const company = AppData.getPrimaryPageCompany("vale-transporte");
+    const data = AppData.getCompanyData(company);
     const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
     list.innerHTML = deductionRows(employees, yearMonth);
     bindDeductionInputs(container, yearMonth);

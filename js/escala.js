@@ -21,7 +21,7 @@
   }
 
   const scaleState = {
-    viewCompany: AppData.state.selectedCompany,
+    viewCompany: AppData.getPrimaryPageCompany("escala"),
     yearMonth: AppData.getEscalaSelectedYearMonth(),
     department: "todos",
     search: "",
@@ -38,15 +38,19 @@
   let monthIntegrationTimer = null;
 
   function getViewCompany() {
-    const company = scaleState.viewCompany || AppData.state.selectedCompany;
-    return AppData.COMPANIES.includes(company) ? company : AppData.COMPANIES[0];
+    const company = AppData.getPageCompany("escala");
+    if (AppData.isPageCompanyAll(company)) {
+      return AppData.getCompanies()[0] || AppData.COMPANIES[0];
+    }
+    scaleState.viewCompany = company;
+    return company;
   }
 
   function setViewCompany(company) {
     if (!AppData.state.companies[company]) return;
     scaleLog("setViewCompany", company);
     scaleState.viewCompany = company;
-    AppData.setSelectedCompany(company, { save: false });
+    AppData.setPageCompany("escala", company);
   }
 
   function esc(value) {
@@ -417,7 +421,7 @@
 
     return `
       <div class="scale-toolbar scale-toolbar-compact">
-        ${window.CompanyUI?.renderCompanySelect?.("scaleCompany", getViewCompany()) || ""}
+        ${window.CompanyUI?.renderToolbar?.("escala") || ""}
         <label>Mês
           <select id="scaleMonth">${monthOptions(month)}</select>
         </label>
@@ -810,19 +814,13 @@
   }
 
   function bindEvents(container, employees, days, data) {
-    container.querySelector("#scaleCompany").addEventListener("change", (event) => {
-      const nextCompany = event.target.value;
+    window.CompanyUI?.bindToolbar?.(container, "escala", (nextCompany) => {
       scaleLog("change company", nextCompany);
       setViewCompany(nextCompany);
       scaleState.department = "todos";
       scaleState.printSector = "";
       scaleState.search = "";
       renderCurrent(container);
-      window.clearTimeout(companySaveTimer);
-      companySaveTimer = window.setTimeout(() => {
-        scaleLog("persist selectedCompany", nextCompany);
-        AppData.saveState();
-      }, 500);
     });
 
     container.querySelector("#scaleMonth").addEventListener("change", () => {
@@ -1223,8 +1221,8 @@
 
     try {
       scaleState.yearMonth = currentMonth;
-      if (!AppData.COMPANIES.includes(scaleState.viewCompany)) {
-        scaleState.viewCompany = AppData.state.selectedCompany;
+      if (!AppData.state.companies[scaleState.viewCompany]) {
+        scaleState.viewCompany = AppData.getPrimaryPageCompany("escala");
       }
       AppData.setEscalaSelectedYearMonth(scaleState.yearMonth, { save: false });
 
@@ -1291,7 +1289,7 @@
   function softRefreshFromSync() {
     const container = document.getElementById("escala");
     if (!container) return;
-    scaleState.viewCompany = AppData.state.selectedCompany;
+    scaleState.viewCompany = AppData.getPrimaryPageCompany("escala");
     scaleLog("softRefreshFromSync", scaleState.viewCompany);
     renderCurrent(container);
   }
