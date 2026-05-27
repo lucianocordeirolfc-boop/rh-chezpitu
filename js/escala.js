@@ -226,6 +226,11 @@
     return new Set(data.holidays.map((holiday) => holiday.date));
   }
 
+  function filterAlertsForSelectedCompany(alerts) {
+    const company = AppData.state.selectedCompany;
+    return (alerts || []).filter((alert) => alert.principalCompany === company);
+  }
+
   function runIntegrationsForView() {
     try {
       if (!window.ScaleRules?.recomputeScaleIntegrations) {
@@ -233,9 +238,14 @@
       }
 
       const month = scaleState.yearMonth;
-      const before = JSON.stringify(window.ScaleRules.getCoverageAlertsForMonth(month));
+      const company = AppData.state.selectedCompany;
+      const before = JSON.stringify(
+        filterAlertsForSelectedCompany(window.ScaleRules.getCoverageAlertsForMonth(month))
+      );
       const result = AppData.runScaleIntegrations([month]);
-      const alerts = window.ScaleRules.getCoverageAlertsForMonth(month) || [];
+      const alerts = filterAlertsForSelectedCompany(
+        window.ScaleRules.getCoverageAlertsForMonth(month) || []
+      );
       const after = JSON.stringify(alerts);
 
       if (result?.created > 0 || before !== after) {
@@ -780,9 +790,9 @@
   function bindEvents(container, employees, days, data) {
     container.querySelector("#scaleCompany").addEventListener("change", (event) => {
       AppData.setSelectedCompany(event.target.value);
-      document.getElementById("companySelect").value = event.target.value;
       scaleState.department = "todos";
       scaleState.printSector = "";
+      scaleState.search = "";
       renderCurrent(container);
     });
 

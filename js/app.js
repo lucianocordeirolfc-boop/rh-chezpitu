@@ -23,6 +23,17 @@
     return document.querySelector(".menu-item.active")?.dataset.module || "dashboard";
   }
 
+  function updateCompanySwitcherVisibility(moduleId) {
+    const switcher = document.querySelector(".company-switcher");
+    const select = document.getElementById("companySelect");
+    if (!switcher) return;
+    // Na Escala de Folga a empresa é escolhida apenas no seletor da própria página.
+    switcher.hidden = moduleId === "escala";
+    if (select && moduleId !== "escala") {
+      select.value = AppData.state.selectedCompany;
+    }
+  }
+
   function render(moduleId = activeModuleId()) {
     document.querySelectorAll(".module").forEach((section) => {
       section.classList.toggle("active", section.id === moduleId);
@@ -31,6 +42,7 @@
       button.classList.toggle("active", button.dataset.module === moduleId);
     });
 
+    updateCompanySwitcherVisibility(moduleId);
     document.getElementById("pageTitle").textContent = moduleTitles[moduleId];
     const container = document.getElementById(moduleId);
 
