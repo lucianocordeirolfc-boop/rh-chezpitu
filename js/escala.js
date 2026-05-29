@@ -895,6 +895,8 @@
       document.getElementById("coHolidayPicker")?.remove();
 
       const data = AppData.getCompanyData(scaleCompany || getViewCompany());
+      const employee = (data.employees || []).find((entry) => entry.id === employeeId);
+      const employeeLabel = employee?.name || employeeId;
       const currentEntry = AppData.getManualScaleEntry(employeeId, date, data);
       const currentLinkedId = typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
 
@@ -919,7 +921,8 @@
       picker.className = "co-holiday-picker";
       picker.innerHTML = `
         <p class="co-picker-title">Feriado trabalhado — CO</p>
-        <p class="co-picker-hint">Selecione o feriado que originou esta compensação:</p>
+        <p class="co-picker-hint">Funcionário: <strong>${esc(displayName(employeeLabel))}</strong></p>
+        <p class="co-picker-hint">Somente feriados pendentes deste funcionário:</p>
         <select id="coHolidaySelect" class="co-picker-select">
           <option value="">— Sem vínculo específico —</option>
           ${holidayOpts}

@@ -901,6 +901,9 @@
       date: String(holiday.date || "").trim(),
       workedEmployees: Array.isArray(holiday.workedEmployees) ? holiday.workedEmployees : []
     };
+    if (isPadroeiraBuziosName(normalized.name)) {
+      normalized.date = correctPadroeiraBuziosDate(normalized.date);
+    }
     normalized.workedEmployees = normalized.workedEmployees.map((item) => ({
       ...item,
       employeeId: item.employeeId,
@@ -1255,12 +1258,16 @@
     saveState();
   }
 
-  function addHoliday(holiday) {
-    const data = getCompanyData();
+  function addHoliday(holiday, options = {}) {
+    const company = options.company || getPrimaryPageCompany("feriados");
+    const data = getCompanyData(company);
+    let name = String(holiday.name || "").trim();
+    let date = String(holiday.date || "").trim();
+    if (isPadroeiraBuziosName(name)) date = correctPadroeiraBuziosDate(date);
     data.holidays.push({
       id: uid("feriado"),
-      name: holiday.name.trim(),
-      date: holiday.date,
+      name,
+      date,
       workedEmployees: holiday.workedEmployees || []
     });
     saveState();
