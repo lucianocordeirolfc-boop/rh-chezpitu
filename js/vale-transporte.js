@@ -1,8 +1,7 @@
 (function () {
   const vtUiState = {
     editingField: null,
-    debounceTimers: new Map(),
-    skipNextRemoteRender: false
+    debounceTimers: new Map()
   };
 
   function esc(value) {
@@ -39,11 +38,11 @@
     return AppData.getVtSelectedYearMonth();
   }
 
-  function calculateReceipt(employee, yearMonth, data) {
+  function calculateReceipt(employee, yearMonth, data, company) {
     const days = AppData.getDaysInMonth(yearMonth);
     const workedDays = days.filter((day) => AppData.VT_WORKED_CODES.has(AppData.getScaleCode(employee, day, data))).length;
     const dailyValue = ImportUtils.repairVtDailyValue(Number(employee.vtDaily || 0));
-    const deductDays = AppData.getVtDeduction(employee.id, yearMonth, data);
+    const deductDays = AppData.getVtDeduction(employee.id, yearMonth, data, company);
     const effectiveDays = Math.max(0, workedDays - deductDays);
 
     return {
@@ -53,7 +52,7 @@
       effectiveDays,
       dailyValue,
       total: effectiveDays * dailyValue,
-      discountAmount: AppData.getDiscountValue(employee.id, yearMonth) || 0
+      discountAmount: AppData.getDiscountValue(employee.id, yearMonth, company) || 0
     };
   }
 
@@ -115,12 +114,12 @@
       .join("");
   }
 
-  function deductionRows(employees, yearMonth) {
+  function deductionRows(employees, yearMonth, company, data) {
     if (!employees.length) return `<p class="vt-deduct-empty">Nenhum funcionário ativo.</p>`;
     return employees
       .map((employee) => {
-        const daysDisplay = AppData.getVtDeductionDisplay(employee.id, yearMonth);
-        const discountDisplay = AppData.formatDiscountDisplay(AppData.getDiscountValue(employee.id, yearMonth));
+        const daysDisplay = AppData.getVtDeductionDisplay(employee.id, yearMonth, data, company);
+        const discountDisplay = AppData.formatDiscountDisplay(AppData.getDiscountValue(employee.id, yearMonth, company));
         return `
         <div class="vt-deduct-row" data-vt-employee="${esc(employee.id)}">
           <span class="vt-deduct-name">${esc(employee.name)}</span>
@@ -250,9 +249,9 @@
       .join("");
   }
 
-  function buildReceipts(yearMonth, data) {
-    const activeEmployees = (data.employees || []).filter((employee) => employee.status === "Ativo");
-    return activeEmployees.map((employee) => calculateReceipt(employee, yearMonth, data));
+  function buildReceipts(yearMonth, data, company) {
+    const activeEmployees = (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee));
+    return activeEmployees.map((employee) => calculateReceipt(employee, yearMonth, data, company));
   }
 
   function updateSummaryStrip(container, receipts) {
@@ -289,7 +288,7 @@
   function refreshVtCalculations(container, yearMonth) {
     const company = AppData.getPrimaryPageCompany("vale-transporte");
     const data = AppData.getCompanyData(company);
-    const receipts = buildReceipts(yearMonth, data);
+    const receipts = buildReceipts(yearMonth, data, company);
     const validation = validateReceipts(receipts, data);
 
     receipts.forEach((receipt) => updateEmployeeTableRow(container, receipt));
@@ -308,14 +307,16 @@
 
   function persistDeductionField(input) {
     if (!input?.dataset?.employeeId || !input.dataset.yearMonth) return;
+    const company = AppData.getPrimaryPageCompany("vale-transporte");
     if (input.dataset.field === "discount") {
       const parsed = AppData.saveDiscountValue(input.dataset.employeeId, input.dataset.yearMonth, input.value, {
-        save: true
+        save: true,
+        company
       });
       input.value = parsed === null ? "" : AppData.formatDiscountDisplay(parsed);
       return;
     }
-    AppData.setVtDeduction(input.dataset.employeeId, input.dataset.yearMonth, input.value, { save: true });
+    AppData.setVtDeduction(input.dataset.employeeId, input.dataset.yearMonth, input.value, { save: true, company });
   }
 
   function flushAllDeductionInputs(container) {
@@ -406,7 +407,7 @@
 
     const company = AppData.getPrimaryPageCompany("vale-transporte");
     const data = AppData.getCompanyData(company);
-    const receipts = buildReceipts(resolvedMonth, data);
+    const receipts = buildReceipts(resolvedMonth, data, company);
     const validation = validateReceipts(receipts, data);
     const total = receipts.reduce((sum, receipt) => sum + receipt.total, 0);
     const discountTotal = receipts.reduce((sum, receipt) => sum + (receipt.discountAmount || 0), 0);
@@ -461,7 +462,7 @@
         </div>
         <p class="vt-deduct-hint">Informe os dias de VT não utilizados no mês anterior (atestados, faltas) que devem ser abatidos do total a receber nesta competência. Na planilha de descontos, informe valores em reais quando aplicável.</p>
         <div class="vt-deduct-list" data-vt-deduct-list>
-          ${deductionRows((data.employees || []).filter((employee) => employee.status === "Ativo"), resolvedMonth)}
+          ${deductionRows((data.employees || []).filter((employee) => AppData.isEmployeeActive(employee)), resolvedMonth, company, data)}
         </div>
       </article>
 
@@ -499,8 +500,8 @@
     if (!list) return;
     const company = AppData.getPrimaryPageCompany("vale-transporte");
     const data = AppData.getCompanyData(company);
-    const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
-    list.innerHTML = deductionRows(employees, yearMonth);
+    const employees = (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee));
+    list.innerHTML = deductionRows(employees, yearMonth, company, data);
     bindDeductionInputs(container, yearMonth);
   }
 
@@ -511,8 +512,6 @@
       render(container, yearMonth);
       return;
     }
-    AppData.restoreVtBackupIntoState(AppData.state);
-    AppData.syncVtDeductionsFromValeTransporte();
     refreshDeductionList(container, yearMonth);
     refreshVtCalculations(container, yearMonth);
     const monthInput = container.querySelector("#vtMonth");

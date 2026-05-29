@@ -98,14 +98,12 @@ if (window.firebase && firebase.apps.length) {
         absences: block.absences || []
       };
       feriados[company] = block.holidays || [];
-      vtDescontos[company] = block.vtDeductions || {};
+      vtDescontos[company] = state.valeTransporte?.deductionDays?.[company] || {};
       contadorLancamentos[company] = block.contadorLancamentos || {};
     });
 
     return {
       configuracoes: {
-        selectedCompany:
-          state.selectedCompany || (COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0]),
         pageFilters: state.pageFilters || {},
         escalaYearMonth: state.escalaSelectedYearMonth || "",
         updatedAt: Date.now()
@@ -180,19 +178,20 @@ if (window.firebase && firebase.apps.length) {
         vacations,
         absences,
         holidays: data.feriados?.[company] || [],
-        vtDeductions: data.vtDescontos?.[company] || {},
         contadorLancamentos: data.contadorLancamentos?.[company] || {}
       };
     });
 
+    const vtFromFirebase = data.valeTransporte || {};
+    if (!vtFromFirebase.deductionDays && data.vtDescontos) {
+      vtFromFirebase.deductionDays = { ...data.vtDescontos };
+    }
+
     return {
-      selectedCompany:
-        data.configuracoes?.selectedCompany ||
-        (COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0]),
       pageFilters: data.configuracoes?.pageFilters || {},
       escalaSelectedYearMonth: data.configuracoes?.escalaYearMonth || "",
       companies,
-      valeTransporte: data.valeTransporte || {},
+      valeTransporte: vtFromFirebase,
       calendarHolidays: data.feriadosCalendario || data.calendarHolidays || [],
       coverageAlerts: data.coverageAlerts || [],
       coveragePrincipalBindings: data.coveragePrincipalBindings || {},
@@ -332,7 +331,6 @@ if (window.firebase && firebase.apps.length) {
 
       applyRemote(remoteState);
       setStatus("online", "Atualizado em tempo real");
-      if (typeof onUiRefresh === "function") onUiRefresh();
     };
 
     const ref = db.ref(ROOT);
@@ -351,7 +349,6 @@ if (window.firebase && firebase.apps.length) {
       loadFromFirebase().then((remoteState) => {
         if (remoteState) {
           applyRemote(remoteState);
-          if (typeof onUiRefresh === "function") onUiRefresh();
         } else if (window.AppData?.state) {
           save(window.AppData.state);
         }

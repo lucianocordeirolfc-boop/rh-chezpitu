@@ -47,8 +47,7 @@
   }
 
   function formatDateBR(isoDate) {
-    const [year, month, day] = isoDate.split("-");
-    return `${day}/${month}/${year}`;
+    return AppData.formatDateBR(isoDate);
   }
 
   function getCodeConfig(state) {
@@ -93,7 +92,7 @@
   }
 
   function isEmployeeActive(employee) {
-    return String(employee?.status || "").trim().toLocaleLowerCase("pt-BR") !== "inativo";
+    return AppData.isEmployeeActive(employee);
   }
 
   function nameTokens(nameKey) {

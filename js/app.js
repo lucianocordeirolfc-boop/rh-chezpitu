@@ -127,6 +127,7 @@
 
   window.App = {
     escapeHTML,
+    esc: escapeHTML,
     formatDisplayName,
     renderCurrent,
     render,
@@ -185,27 +186,17 @@
     if (fromRemote) {
       const localSnapshot = AppData.readLocalStateSnapshot() || JSON.parse(JSON.stringify(AppData.state));
       payload = AppData.mergeRemoteIntoLocal(localSnapshot, remoteState);
+    } else {
+      payload = AppData.finalizeIncomingState(remoteState);
     }
-    AppData.setRemoteState(payload, {
-      preserveLocalHolidays: true,
-      localSnapshot: AppData.readLocalStateSnapshot()
-    });
-    if (remoteState.pageFilters) {
-      Object.keys(remoteState.pageFilters).forEach((moduleId) => {
-        AppData.setPageCompany(moduleId, remoteState.pageFilters[moduleId], { save: false });
-      });
-    }
-
+    AppData.setRemoteState(payload);
     refreshActiveModuleUI();
   }
 
   function initSync() {
     if (!window.FirebaseSync?.init()) return;
 
-    window.FirebaseSync.startSync(
-      (remoteState) => applyRemoteState(remoteState, true),
-      () => refreshActiveModuleUI()
-    );
+    window.FirebaseSync.startSync((remoteState) => applyRemoteState(remoteState, true));
   }
 
   let appBooted = false;

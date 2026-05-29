@@ -10,10 +10,6 @@
     { key: "vales",          label: "Vales (R$)",             type: "number" }
   ];
 
-  function getActiveTab() {
-    return "lancamentos";
-  }
-
   function getLancamentos(company, yearMonth) {
     var data = AppData.getCompanyData(company);
     if (!data.contadorLancamentos) data.contadorLancamentos = {};
@@ -37,9 +33,6 @@
     }
 
     AppData.saveState();
-    if (window.FirebaseSync?.isReady()) {
-      window.FirebaseSync.save(AppData.state);
-    }
   }
 
   function deleteLancamento(company, yearMonth, employeeId) {
@@ -49,16 +42,13 @@
       return l.employeeId !== employeeId;
     });
     AppData.saveState();
-    if (window.FirebaseSync?.isReady()) {
-      window.FirebaseSync.save(AppData.state);
-    }
   }
 
   function getEmployeesForCompany(company) {
     var data = AppData.getCompanyData(company);
     if (!data || !data.employees) return [];
     return data.employees
-      .filter(function (e) { return e.status === "Ativo"; })
+      .filter(function (e) { return AppData.isEmployeeActive(e); })
       .sort(function (a, b) { return (a.name || "").localeCompare(b.name || "", "pt-BR"); });
   }
 
@@ -375,20 +365,10 @@
   }
 
   function bindResumoEvents(container, yearMonth) {
-    var companySel = document.getElementById("resumoCompanySelect");
-    if (companySel) {
-      companySel.addEventListener("change", function () {
-        var gridContainer = document.getElementById("resumoGridContainer");
-        if (gridContainer) {
-          gridContainer.innerHTML = renderResumoGrid(companySel.value, yearMonth);
-        }
-      });
-    }
-
     var printBtn = document.getElementById("btnPrintResumo");
     if (printBtn) {
       printBtn.addEventListener("click", function () {
-        var company = companySel ? companySel.value : AppData.getPrimaryPageCompany("contador");
+        var company = AppData.getPrimaryPageCompany("contador");
 
         var existing = document.getElementById("resumoPrintContainer");
         if (existing) existing.remove();
@@ -424,76 +404,15 @@
     }
   }
 
-  function renderContent(container, yearMonth) {
-    var company = AppData.getPrimaryPageCompany("contador");
-    var activeTab = container._contadorActiveTab || "lancamentos";
-
-    var companies = window.CompanyUI && CompanyUI.listCompanies ? CompanyUI.listCompanies() : AppData.COMPANIES;
-    var companyOptions = companies.map(function (c) {
-      var sel = c === AppData.getPrimaryPageCompany("contador") ? " selected" : "";
-      return '<option value="' + c + '"' + sel + '>' + c + '</option>';
-    }).join("");
-
-    var toolbarRight = '';
-    if (activeTab === "lancamentos") {
-      toolbarRight = '<button class="btn btn-primary" id="btnNovoLancamento">+ Novo Lançamento</button>';
-    } else {
-      toolbarRight =
-        '<select id="resumoCompanySelect" class="field-select field-select-compact">' + companyOptions + '</select>' +
-        '<button class="btn btn-primary btn-sm" id="btnPrintResumo">Imprimir / PDF</button>';
-    }
-
-    var html =
-      (window.CompanyUI && CompanyUI.renderToolbar ? CompanyUI.renderToolbar("contador") : "") +
-      '<div class="module-header">' +
-        '<h2>Informações Contador</h2>' +
-      '</div>' +
-      '<div class="contador-tabs">' +
-        '<button class="contador-tab' + (activeTab === "lancamentos" ? " active" : "") + '" data-tab="lancamentos">Lançamentos</button>' +
-        '<button class="contador-tab' + (activeTab === "resumo" ? " active" : "") + '" data-tab="resumo">Resumo</button>' +
-      '</div>' +
-      '<div class="contador-toolbar">' +
-        renderMonthSelector(yearMonth) +
-        toolbarRight +
-      '</div>' +
-      '<div id="contadorTabContent">' +
-        (activeTab === "lancamentos" ? renderLancamentosTable(company, yearMonth) : renderResumoTabContent(container, yearMonth)) +
-      '</div>';
-
-    container.innerHTML = html;
-
-    if (window.CompanyUI && CompanyUI.bindToolbar) {
-      CompanyUI.bindToolbar(container, "contador", function (company) {
-        var resumoSel = document.getElementById("resumoCompanySelect");
-        if (resumoSel && company && !AppData.isPageCompanyAll(company)) {
-          resumoSel.value = company;
-        }
-        renderContent(container, yearMonth);
-      });
-    }
-
-    var resumoCompanySel = document.getElementById("resumoCompanySelect");
-    if (resumoCompanySel) {
-      resumoCompanySel.addEventListener("change", function () {
-        AppData.setPageCompany("contador", resumoCompanySel.value);
-        var pageSel = document.getElementById("contadorPageCompany");
-        if (pageSel) pageSel.value = resumoCompanySel.value;
-        renderContent(container, yearMonth);
-      });
-    }
-
-    if (activeTab === "resumo") {
-      bindResumoEvents(container, yearMonth);
-    }
-
-    var novoBtn = document.getElementById("btnNovoLancamento");
-    if (novoBtn) {
-      novoBtn.addEventListener("click", function () {
-        openPopup(container, company, yearMonth, null);
-      });
-    }
+  function bindContainerEvents(container) {
+    if (container._contadorEventsBound) return;
+    container._contadorEventsBound = true;
 
     container.addEventListener("click", function (e) {
+      var yearMonth = container._contadorYearMonth;
+      if (!yearMonth) return;
+      var company = AppData.getPrimaryPageCompany("contador");
+
       var editBtn = e.target.closest(".btn-edit-lancamento");
       if (editBtn) {
         var empId = editBtn.dataset.emp;
@@ -510,6 +429,67 @@
         App.toast("Lançamento excluído.", "info");
       }
     });
+  }
+
+  function renderCompanySelector(selectedCompany) {
+    var companies = window.CompanyUI && CompanyUI.listCompanies ? CompanyUI.listCompanies() : AppData.COMPANIES;
+    var options = companies.map(function (c) {
+      var sel = c === selectedCompany ? " selected" : "";
+      return '<option value="' + App.escapeHTML(c) + '"' + sel + '>' + App.escapeHTML(c) + '</option>';
+    }).join("");
+    return '<label class="contador-company-label">Empresa ' +
+      '<select id="contadorPageCompany" class="field-select field-select-compact module-company-select" data-page-module="contador">' +
+      options +
+      '</select></label>';
+  }
+
+  function renderContent(container, yearMonth) {
+    var company = AppData.getPrimaryPageCompany("contador");
+    var activeTab = container._contadorActiveTab || "lancamentos";
+
+    var toolbarRight = '';
+    if (activeTab === "lancamentos") {
+      toolbarRight = '<button class="btn btn-primary" id="btnNovoLancamento">+ Novo Lançamento</button>';
+    } else {
+      toolbarRight = '<button class="btn btn-primary btn-sm" id="btnPrintResumo">Imprimir / PDF</button>';
+    }
+
+    var html =
+      '<div class="module-header">' +
+        '<h2>Informações Contador</h2>' +
+      '</div>' +
+      '<div class="contador-tabs">' +
+        '<button class="contador-tab' + (activeTab === "lancamentos" ? " active" : "") + '" data-tab="lancamentos">Lançamentos</button>' +
+        '<button class="contador-tab' + (activeTab === "resumo" ? " active" : "") + '" data-tab="resumo">Resumo</button>' +
+      '</div>' +
+      '<div class="contador-toolbar">' +
+        renderMonthSelector(yearMonth) +
+        renderCompanySelector(company) +
+        toolbarRight +
+      '</div>' +
+      '<div id="contadorTabContent">' +
+        (activeTab === "lancamentos" ? renderLancamentosTable(company, yearMonth) : renderResumoTabContent(container, yearMonth)) +
+      '</div>';
+
+    container.innerHTML = html;
+    container._contadorYearMonth = yearMonth;
+
+    if (window.CompanyUI && CompanyUI.bindToolbar) {
+      CompanyUI.bindToolbar(container, "contador", function () {
+        renderContent(container, yearMonth);
+      });
+    }
+
+    if (activeTab === "resumo") {
+      bindResumoEvents(container, yearMonth);
+    }
+
+    var novoBtn = document.getElementById("btnNovoLancamento");
+    if (novoBtn) {
+      novoBtn.addEventListener("click", function () {
+        openPopup(container, company, yearMonth, null);
+      });
+    }
 
     var monthSel = document.getElementById("contadorMonth");
     var yearSel = document.getElementById("contadorYear");
@@ -530,6 +510,7 @@
   }
 
   function render(container) {
+    bindContainerEvents(container);
     var ym = currentYearMonth();
     renderContent(container, ym);
   }

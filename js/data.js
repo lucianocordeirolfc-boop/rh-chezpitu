@@ -1,9 +1,20 @@
 (function () {
   const STORAGE_KEY = "chezPituPeopleSystem.v1";
-  const VT_BACKUP_KEY = "chezPituVtBackup.v1";
+  const LEGACY_VT_BACKUP_KEY = "chezPituVtBackup.v1";
 
   const COMPANIES = ["Chez Pitu", "Pengold"];
   const DEFAULT_SELECTED_COMPANY = "Pengold";
+  const HOLIDAY_COMPENSATION_DAYS = 120;
+
+  const ABSENCE_TYPE_SCALE_CODES = {
+    "Atestado médico": "ATESTADO",
+    "Licença maternidade": "LICENÇA",
+    "Licença paternidade": "LICENÇA",
+    "Licença INSS / Afastamento": "LICENÇA",
+    "Licença não remunerada": "LICENÇA",
+    "Falta justificada": "FALTA",
+    Outro: "FALTA"
+  };
   /** Valor interno do filtro "Todas" por página (não é chave de companies). */
   const PAGE_COMPANY_ALL = "__todas__";
 
@@ -200,7 +211,6 @@
       absences: [],
       holidays: [],
       manualScale: {},
-      vtDeductions: {},
       contadorLancamentos: {}
     };
   }
@@ -225,8 +235,6 @@
     const vt = ensureValeTransporteState();
     if (!vt.discountValues[company]) vt.discountValues[company] = {};
     if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
-    const block = state.companies[company];
-    if (block && !block.vtDeductions) block.vtDeductions = {};
   }
 
   function registerCompany(companyKey) {
@@ -258,7 +266,6 @@
       normalizeCompanyHolidays(parsed.companies[company]);
       parsed.companies[company].vacations = parsed.companies[company].vacations || [];
       parsed.companies[company].absences = parsed.companies[company].absences || [];
-      parsed.companies[company].vtDeductions = parsed.companies[company].vtDeductions || {};
       normalizeCompanyBlock(parsed.companies[company]);
     });
     return parsed;
@@ -294,7 +301,11 @@
   }
 
   function migratePageFilters(parsed, defaults) {
-    const legacy = parsed.selectedCompany || defaults.selectedCompany;
+    const legacy =
+      parsed.selectedCompany ||
+      parsed.pageFilters?.escala ||
+      parsed.pageFilters?.funcionarios ||
+      DEFAULT_SELECTED_COMPANY;
     const companiesMap = parsed.companies || defaults.companies || {};
     parsed.pageFilters = { ...createDefaultPageFilters(legacy), ...(parsed.pageFilters || {}) };
     PAGE_MODULE_IDS.forEach((moduleId) => {
@@ -314,32 +325,25 @@
       parsed.pageFilters[moduleId] = normalizePageFilterValue(value, legacy, companiesMap);
       if (lsKey) {
         try {
-          localStorage.setItem(lsKey, parsed.pageFilters[moduleId]);
+          localStorage.removeItem(lsKey);
         } catch (_) {
           /* ignore */
         }
       }
     });
+    delete parsed.selectedCompany;
     return parsed.pageFilters;
   }
 
   function getPageCompany(moduleId) {
-    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters(state.selectedCompany);
-    return normalizePageFilterValue(state.pageFilters[moduleId], state.selectedCompany);
+    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters();
+    return normalizePageFilterValue(state.pageFilters[moduleId], DEFAULT_SELECTED_COMPANY);
   }
 
   function setPageCompany(moduleId, company, options = {}) {
-    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters(state.selectedCompany);
-    const normalized = normalizePageFilterValue(company, state.selectedCompany);
+    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters();
+    const normalized = normalizePageFilterValue(company, DEFAULT_SELECTED_COMPANY);
     state.pageFilters[moduleId] = normalized;
-    const lsKey = PAGE_FILTER_KEYS[moduleId];
-    if (lsKey) {
-      try {
-        localStorage.setItem(lsKey, normalized);
-      } catch (_) {
-        /* ignore */
-      }
-    }
     if (options.save !== false) saveState();
   }
 
@@ -371,11 +375,8 @@
       companies[company] = createCompanyData(company);
     });
 
-    const selectedCompany = COMPANIES.includes(DEFAULT_SELECTED_COMPANY) ? DEFAULT_SELECTED_COMPANY : COMPANIES[0];
-
     return {
-      selectedCompany,
-      pageFilters: createDefaultPageFilters(selectedCompany),
+      pageFilters: createDefaultPageFilters(),
       escalaSelectedYearMonth: monthKey(),
       companies,
       calendarHolidays: [],
@@ -393,6 +394,25 @@
   /** Dados locais prevalecem sobre remoto vazio/desatualizado (evita apagar descontos VT no sync). */
   function mergeRecordMapsPreferLocal(remoteMap = {}, localMap = {}) {
     return { ...remoteMap, ...localMap };
+  }
+
+  function mergeEmployeesById(localArr = [], remoteArr = []) {
+    const byId = {};
+    remoteArr.forEach((employee) => {
+      if (employee?.id) byId[employee.id] = employee;
+    });
+    localArr.forEach((employee) => {
+      if (employee?.id) byId[employee.id] = employee;
+    });
+    return Object.values(byId);
+  }
+
+  function isEmployeeActive(employee) {
+    return String(employee?.status || "").trim().toLocaleLowerCase("pt-BR") === "ativo";
+  }
+
+  function resolveVtCompany(company) {
+    return company || getPrimaryPageCompany("vale-transporte");
   }
 
   function mergeDiscountValuesByCompany(localVt = {}, remoteVt = {}) {
@@ -425,79 +445,128 @@
     };
   }
 
-  function saveVtBackup() {
-    try {
-      syncVtDeductionsToValeTransporte();
-      const vt = ensureValeTransporteState();
-      const companiesVt = {};
-      COMPANIES.forEach((company) => {
-        companiesVt[company] = { ...(getCompanyData(company).vtDeductions || {}) };
-      });
-      localStorage.setItem(
-        VT_BACKUP_KEY,
-        JSON.stringify({
-          selectedYearMonth: vt.selectedYearMonth,
-          discountValues: vt.discountValues,
-          deductionDays: vt.deductionDays,
-          companiesVt,
-          updatedAt: Date.now()
-        })
-      );
-    } catch (error) {
-      console.warn("[VT] Falha ao gravar backup local.", error);
-    }
+  function mergeRecordsById(localArr = [], remoteArr = [], idField = "id") {
+    const byId = {};
+    remoteArr.forEach((record) => {
+      if (record?.[idField]) byId[record[idField]] = record;
+    });
+    localArr.forEach((record) => {
+      if (record?.[idField]) byId[record[idField]] = record;
+    });
+    return Object.values(byId);
   }
 
-  function restoreVtBackupIntoState(targetState) {
+  function getHolidayCompensationDueDate(holidayDate) {
+    return addDays(holidayDate, HOLIDAY_COMPENSATION_DAYS);
+  }
+
+  function isCompensationWithinDeadline(workedDate, compensationDate) {
+    if (!compensationDate) return true;
+    return diffDays(workedDate, compensationDate) <= HOLIDAY_COMPENSATION_DAYS;
+  }
+
+  function getAbsenceScaleCode(absenceType) {
+    return ABSENCE_TYPE_SCALE_CODES[String(absenceType || "").trim()] || "FALTA";
+  }
+
+  function companyKeysFromState(targetState) {
+    return [...new Set([...COMPANIES, ...Object.keys(targetState?.companies || {})])];
+  }
+
+  function migrateVtStorage(targetState) {
     if (!targetState) return targetState;
+    if (!targetState.valeTransporte) targetState.valeTransporte = createDefaultState().valeTransporte;
+    const vt = targetState.valeTransporte;
+    if (!vt.discountValues) vt.discountValues = {};
+    if (!vt.deductionDays) vt.deductionDays = {};
+
+    companyKeysFromState(targetState).forEach((company) => {
+      if (!targetState.companies?.[company]) {
+        targetState.companies[company] = createCompanyData(company);
+      }
+      if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
+      if (!vt.discountValues[company]) vt.discountValues[company] = {};
+      const legacyCompanyVt = targetState.companies[company].vtDeductions;
+      if (legacyCompanyVt && typeof legacyCompanyVt === "object") {
+        vt.deductionDays[company] = mergeRecordMapsPreferLocal(vt.deductionDays[company], legacyCompanyVt);
+      }
+      delete targetState.companies[company].vtDeductions;
+    });
+
     try {
-      const raw = localStorage.getItem(VT_BACKUP_KEY);
-      if (!raw) return targetState;
-
-      const backup = JSON.parse(raw);
-      if (!targetState.valeTransporte) targetState.valeTransporte = createDefaultState().valeTransporte;
-      if (!targetState.companies) targetState.companies = {};
-
-      const backupVt = {
-        selectedYearMonth: backup.selectedYearMonth,
-        discountValues: backup.discountValues || {},
-        deductionDays: backup.deductionDays || {}
-      };
-
-      targetState.valeTransporte.selectedYearMonth =
-        backupVt.selectedYearMonth || targetState.valeTransporte.selectedYearMonth;
-      targetState.valeTransporte.discountValues = mergeDiscountValuesByCompany(backupVt, targetState.valeTransporte);
-      targetState.valeTransporte.deductionDays = mergeDeductionDaysByCompany(backupVt, targetState.valeTransporte);
-
-      COMPANIES.forEach((company) => {
-        if (!targetState.companies[company]) {
-          targetState.companies[company] = createCompanyData(company);
-        }
-        if (!targetState.companies[company].vtDeductions) targetState.companies[company].vtDeductions = {};
-        const fromBackup = mergeRecordMapsPreferLocal(
-          backup.deductionDays?.[company],
-          backup.companiesVt?.[company]
-        );
-        targetState.companies[company].vtDeductions = mergeRecordMapsPreferLocal(
-          targetState.companies[company].vtDeductions,
-          fromBackup
-        );
-      });
+      const raw = localStorage.getItem(LEGACY_VT_BACKUP_KEY);
+      if (raw) {
+        const backup = JSON.parse(raw);
+        const backupVt = {
+          selectedYearMonth: backup.selectedYearMonth,
+          discountValues: backup.discountValues || {},
+          deductionDays: backup.deductionDays || {}
+        };
+        vt.selectedYearMonth = vt.selectedYearMonth || backupVt.selectedYearMonth;
+        vt.discountValues = mergeDiscountValuesByCompany(vt, backupVt);
+        vt.deductionDays = mergeDeductionDaysByCompany(vt, backupVt);
+        COMPANIES.forEach((company) => {
+          const fromCompaniesVt = backup.companiesVt?.[company] || {};
+          vt.deductionDays[company] = mergeRecordMapsPreferLocal(vt.deductionDays[company] || {}, fromCompaniesVt);
+        });
+        localStorage.removeItem(LEGACY_VT_BACKUP_KEY);
+      }
     } catch (error) {
-      console.warn("[VT] Falha ao restaurar backup local.", error);
+      console.warn("[VT] Falha ao migrar backup legado.", error);
     }
+
     return targetState;
   }
 
+  function finalizeIncomingState(rawState) {
+    const defaults = createDefaultState();
+    const next = {
+      ...defaults,
+      ...rawState,
+      pageFilters: {
+        ...defaults.pageFilters,
+        ...(rawState.pageFilters || {})
+      },
+      companies: rawState.companies || defaults.companies,
+      valeTransporte: normalizeValeTransporteBlock(rawState.valeTransporte, defaults.valeTransporte)
+    };
+    migratePageFilters(next, defaults);
+    migrateVtStorage(next);
+    delete next.selectedCompany;
+    companyKeysFromState(next).forEach((company) => {
+      if (!next.companies[company]) next.companies[company] = createCompanyData(company);
+      normalizeCompanyBlock(next.companies[company]);
+      normalizeCompanyHolidays(next.companies[company]);
+    });
+    return next;
+  }
+
   function mergeRemoteIntoLocal(localState, remoteState) {
-    if (!localState) return remoteState;
-    if (!remoteState) return localState;
+    if (!localState) return finalizeIncomingState(remoteState);
+    if (!remoteState) return finalizeIncomingState(localState);
 
     const local = JSON.parse(JSON.stringify(localState));
     const remote = JSON.parse(JSON.stringify(remoteState));
+    const defaults = createDefaultState();
     const merged = {
+      ...defaults,
       ...remote,
       ...local,
+      pageFilters: {
+        ...defaults.pageFilters,
+        ...(remote.pageFilters || {}),
+        ...(local.pageFilters || {})
+      },
+      escalaSelectedYearMonth: local.escalaSelectedYearMonth || remote.escalaSelectedYearMonth || monthKey(),
+      calendarHolidays: (remote.calendarHolidays || []).length
+        ? remote.calendarHolidays
+        : local.calendarHolidays || [],
+      coverageAlerts: (remote.coverageAlerts || []).length ? remote.coverageAlerts : local.coverageAlerts || [],
+      coveragePrincipalBindings: {
+        ...(remote.coveragePrincipalBindings || {}),
+        ...(local.coveragePrincipalBindings || {})
+      },
+      scaleCodeConfig: { ...(remote.scaleCodeConfig || {}), ...(local.scaleCodeConfig || {}) },
       companies: {},
       valeTransporte: {
         selectedYearMonth:
@@ -506,36 +575,58 @@
           monthKey(),
         discountValues: mergeDiscountValuesByCompany(local.valeTransporte, remote.valeTransporte),
         deductionDays: mergeDeductionDaysByCompany(local.valeTransporte, remote.valeTransporte)
-      },
-      escalaSelectedYearMonth: local.escalaSelectedYearMonth || remote.escalaSelectedYearMonth
+      }
     };
 
-    COMPANIES.forEach((company) => {
+    const companyKeys = new Set([
+      ...COMPANIES,
+      ...Object.keys(local.companies || {}),
+      ...Object.keys(remote.companies || {})
+    ]);
+
+    companyKeys.forEach((company) => {
       const localCo = local.companies?.[company] || {};
       const remoteCo = remote.companies?.[company] || {};
-      const localDays = mergeRecordMapsPreferLocal(
-        localCo.vtDeductions || {},
-        local.valeTransporte?.deductionDays?.[company] || {}
+      const defaultBlock = defaults.companies[company] || createCompanyData(company);
+
+      merged.valeTransporte.deductionDays[company] = mergeRecordMapsPreferLocal(
+        mergeRecordMapsPreferLocal(
+          remote.valeTransporte?.deductionDays?.[company] || {},
+          remoteCo.vtDeductions || {}
+        ),
+        mergeRecordMapsPreferLocal(
+          local.valeTransporte?.deductionDays?.[company] || {},
+          localCo.vtDeductions || {}
+        )
+      );
+      merged.valeTransporte.discountValues[company] = mergeRecordMapsPreferLocal(
+        remote.valeTransporte?.discountValues?.[company] || {},
+        local.valeTransporte?.discountValues?.[company] || {}
       );
 
       merged.companies[company] = {
+        ...defaultBlock,
         ...remoteCo,
-        vtDeductions: mergeRecordMapsPreferLocal(remoteCo.vtDeductions || {}, localDays),
-        employees: remoteCo.employees?.length ? remoteCo.employees : localCo.employees,
-        manualScale:
-          Object.keys(remoteCo.manualScale || {}).length > 0 ? remoteCo.manualScale : localCo.manualScale,
-        holidays: remoteCo.holidays?.length ? remoteCo.holidays : localCo.holidays,
-        vacations: remoteCo.vacations?.length ? remoteCo.vacations : localCo.vacations,
-        absences: remoteCo.absences?.length ? remoteCo.absences : localCo.absences,
-        companyInfo: { ...localCo.companyInfo, ...remoteCo.companyInfo },
+        ...localCo,
+        companyInfo: {
+          ...defaultBlock.companyInfo,
+          ...(remoteCo.companyInfo || {}),
+          ...(localCo.companyInfo || {})
+        },
+        employees: mergeEmployeesById(localCo.employees, remoteCo.employees),
+        manualScale: mergeRecordMapsPreferLocal(remoteCo.manualScale || {}, localCo.manualScale || {}),
+        holidays: mergeHolidayLists(localCo.holidays, remoteCo.holidays),
+        vacations: mergeRecordsById(localCo.vacations, remoteCo.vacations),
+        absences: mergeRecordsById(localCo.absences, remoteCo.absences),
         contadorLancamentos: mergeLancamentosMaps(
           localCo.contadorLancamentos || {},
           remoteCo.contadorLancamentos || {}
         )
       };
+      delete merged.companies[company].vtDeductions;
     });
 
-    return restoreVtBackupIntoState(merged);
+    return finalizeIncomingState(merged);
   }
 
   function readLocalStateSnapshot() {
@@ -548,27 +639,9 @@
     }
   }
 
-  function syncVtDeductionsToValeTransporte() {
-    const vt = ensureValeTransporteState();
-    if (!vt.deductionDays) vt.deductionDays = {};
-    COMPANIES.forEach((company) => {
-      vt.deductionDays[company] = { ...(getCompanyData(company).vtDeductions || {}) };
-    });
-  }
-
-  function syncVtDeductionsFromValeTransporte() {
-    const vt = ensureValeTransporteState();
-    if (!vt.deductionDays) return;
-    COMPANIES.forEach((company) => {
-      const data = getCompanyData(company);
-      if (!data.vtDeductions) data.vtDeductions = {};
-      data.vtDeductions = mergeRecordMapsPreferLocal(vt.deductionDays[company] || {}, data.vtDeductions);
-    });
-  }
-
   function ensureValeTransporteState() {
     if (!state.valeTransporte || typeof state.valeTransporte !== "object") {
-      state.valeTransporte = { selectedYearMonth: monthKey(), discountValues: {} };
+      state.valeTransporte = { selectedYearMonth: monthKey(), discountValues: {}, deductionDays: {} };
     }
     if (!state.valeTransporte.discountValues || typeof state.valeTransporte.discountValues !== "object") {
       state.valeTransporte.discountValues = {};
@@ -652,7 +725,8 @@
     return ImportUtils.formatVtInput(value);
   }
 
-  function getDiscountValue(employeeId, yearMonth, company = state.selectedCompany) {
+  function getDiscountValue(employeeId, yearMonth, company) {
+    company = resolveVtCompany(company);
     const vt = ensureValeTransporteState();
     const companyValues = vt.discountValues[company] || {};
     const key = discountStorageKey(employeeId, yearMonth);
@@ -663,7 +737,7 @@
   }
 
   function saveDiscountValue(employeeId, yearMonth, rawInput, options = {}) {
-    const company = options.company || state.selectedCompany;
+    const company = resolveVtCompany(options.company);
     const shouldSave = options.save !== false;
     const vt = ensureValeTransporteState();
     if (!vt.discountValues[company]) vt.discountValues[company] = {};
@@ -695,20 +769,26 @@
     block.absences = Array.isArray(block.absences) ? block.absences : [];
     block.holidays = Array.isArray(block.holidays) ? block.holidays : [];
     block.manualScale = block.manualScale && typeof block.manualScale === "object" ? block.manualScale : {};
-    block.vtDeductions = block.vtDeductions && typeof block.vtDeductions === "object" ? block.vtDeductions : {};
     block.contadorLancamentos =
       block.contadorLancamentos && typeof block.contadorLancamentos === "object" ? block.contadorLancamentos : {};
+    delete block.vtDeductions;
     return block;
   }
 
-  function ensureCompanyDataShape(company = state.selectedCompany) {
+  function resolveCompanyKey(company) {
+    const key = String(company || "").trim();
+    if (key && state.companies?.[key]) return key;
+    return getCompanies()[0] || COMPANIES[0];
+  }
+
+  function ensureCompanyDataShape(company) {
     return normalizeCompanyBlock(getCompanyData(company));
   }
 
   function loadState() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) {
-      return createDefaultState();
+      return finalizeIncomingState(createDefaultState());
     }
 
     try {
@@ -720,27 +800,18 @@
       parsed.coverageAlerts = parsed.coverageAlerts || [];
       parsed.coveragePrincipalBindings = parsed.coveragePrincipalBindings || {};
       parsed.scaleCodeConfig = parsed.scaleCodeConfig || {};
-      parsed.valeTransporte = normalizeValeTransporteBlock(parsed.valeTransporte, defaults.valeTransporte);
-      migratePageFilters(parsed, defaults);
-      const restored = restoreVtBackupIntoState({ ...defaults, ...parsed });
-      if (!restored.companies?.[restored.selectedCompany]) {
-        restored.selectedCompany = COMPANIES[0];
-      }
-      if (!restored.pageFilters) restored.pageFilters = createDefaultPageFilters(restored.selectedCompany);
-      return restored;
+      return finalizeIncomingState({ ...defaults, ...parsed });
     } catch (error) {
       console.warn("Não foi possível carregar os dados salvos.", error);
-      return createDefaultState();
+      return finalizeIncomingState(createDefaultState());
     }
   }
 
   let state = loadState();
-  syncVtDeductionsFromValeTransporte();
 
   function saveState() {
-    syncVtDeductionsToValeTransporte();
+    delete state.selectedCompany;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    saveVtBackup();
     if (window.FirebaseSync?.isReady()) {
       window.FirebaseSync.save(state);
     }
@@ -813,124 +884,19 @@
     companyBlock.holidays = mergeHolidayLists([], companyBlock.holidays || []);
   }
 
-  // Aplica estado recebido do Firebase (chamado pelo sync em tempo real)
-  function setRemoteState(remoteState, options = {}) {
+  // Persiste estado já mesclado (merge ocorre apenas em mergeRemoteIntoLocal).
+  function setRemoteState(remoteState) {
     if (!remoteState || typeof remoteState !== "object") return;
-    const defaults = createDefaultState();
-    const preserveLocalHolidays = options.preserveLocalHolidays !== false;
-    const previous = state;
-    const localSnapshot = options.localSnapshot || null;
-    const localCompanies = localSnapshot?.companies || previous.companies || {};
-    const localVt = localSnapshot?.valeTransporte || previous.valeTransporte || {};
-
-    remoteState.companies = remoteState.companies || {};
-    const companyKeys = new Set([
-      ...COMPANIES,
-      ...Object.keys(remoteState.companies),
-      ...Object.keys(localCompanies)
-    ]);
-    companyKeys.forEach((company) => {
-      const defaultBlock = defaults.companies[company] || createCompanyData(company);
-      const localHolidays = preserveLocalHolidays ? localCompanies?.[company]?.holidays || [] : [];
-      const remoteHolidays = remoteState.companies[company]?.holidays || [];
-      const remoteDeductions = remoteState.companies[company]?.vtDeductions || {};
-      const localDeductions = mergeRecordMapsPreferLocal(
-        localCompanies?.[company]?.vtDeductions || {},
-        localVt?.deductionDays?.[company] || {}
-      );
-
-      remoteState.companies[company] = {
-        ...defaultBlock,
-        ...(remoteState.companies[company] || {})
-      };
-      remoteState.companies[company].companyInfo = {
-        ...defaultBlock.companyInfo,
-        ...(remoteState.companies[company].companyInfo || {})
-      };
-      normalizeCompanyBlock(remoteState.companies[company]);
-      const localEmployees = localCompanies?.[company]?.employees || [];
-      const remoteEmployees = remoteState.companies[company].employees || [];
-      remoteState.companies[company].employees = remoteEmployees.length ? remoteEmployees : localEmployees;
-
-      remoteState.companies[company].holidays = mergeHolidayLists(localHolidays, remoteHolidays);
-
-      const localManualScale = localCompanies?.[company]?.manualScale || {};
-      const remoteManualScale = remoteState.companies[company].manualScale || {};
-      remoteState.companies[company].manualScale =
-        Object.keys(remoteManualScale).length > 0 ? { ...localManualScale, ...remoteManualScale } : { ...localManualScale };
-
-      const localVacations = localCompanies?.[company]?.vacations || [];
-      const remoteVacations = remoteState.companies[company].vacations || [];
-      remoteState.companies[company].vacations = remoteVacations.length ? remoteVacations : localVacations;
-
-      const localAbsences = localCompanies?.[company]?.absences || [];
-      const remoteAbsences = remoteState.companies[company].absences || [];
-      remoteState.companies[company].absences = remoteAbsences.length ? remoteAbsences : localAbsences;
-      remoteState.companies[company].vtDeductions = mergeRecordMapsPreferLocal(remoteDeductions, localDeductions);
-      remoteState.companies[company].contadorLancamentos = mergeLancamentosMaps(
-        localCompanies?.[company]?.contadorLancamentos || {},
-        remoteState.companies[company].contadorLancamentos || {}
-      );
-      normalizeCompanyHolidays(remoteState.companies[company]);
-    });
-    const remoteVt = remoteState.valeTransporte || {};
-    const mergedPageFilters = {
-      ...defaults.pageFilters,
-      ...(previous.pageFilters || {}),
-      ...(remoteState.pageFilters || {})
-    };
-    const stateDraft = {
-      ...defaults,
-      ...remoteState,
-      companies: remoteState.companies,
-      pageFilters: mergedPageFilters,
-      selectedCompany: remoteState.selectedCompany || previous.selectedCompany || defaults.selectedCompany
-    };
-    migratePageFilters(stateDraft, defaults);
-    state = {
-      ...stateDraft,
-      escalaSelectedYearMonth:
-        localSnapshot?.escalaSelectedYearMonth ||
-        previous.escalaSelectedYearMonth ||
-        remoteState.escalaSelectedYearMonth ||
-        defaults.escalaSelectedYearMonth,
-      calendarHolidays: remoteState.calendarHolidays || [],
-      coverageAlerts: remoteState.coverageAlerts || [],
-      coveragePrincipalBindings: remoteState.coveragePrincipalBindings || {},
-      scaleCodeConfig: remoteState.scaleCodeConfig || {},
-      valeTransporte: {
-        ...defaults.valeTransporte,
-        ...remoteVt,
-        selectedYearMonth:
-          localVt.selectedYearMonth ||
-          previous.valeTransporte?.selectedYearMonth ||
-          remoteVt.selectedYearMonth ||
-          defaults.valeTransporte.selectedYearMonth,
-        discountValues: mergeDiscountValuesByCompany(localVt, remoteVt),
-        deductionDays: mergeDeductionDaysByCompany(localVt, remoteVt)
-      }
-    };
-    syncVtDeductionsFromValeTransporte();
-    syncVtDeductionsToValeTransporte();
-    state = restoreVtBackupIntoState(state);
-    if (!state.companies?.[state.selectedCompany]) {
-      const first = getCompanies()[0];
-      if (first) state.selectedCompany = first;
-    }
+    state = finalizeIncomingState(remoteState);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    saveVtBackup();
   }
 
-  function getCompanyData(company = state.selectedCompany) {
-    return state.companies[company];
-  }
-
-  /** @deprecated Não usar para filtrar telas — use setPageCompany(moduleId, company). */
-  function setSelectedCompany(company, options = {}) {
-    if (!state.companies[company]) return;
-    if (state.selectedCompany === company && options.force !== true) return;
-    state.selectedCompany = company;
-    if (options.save !== false) saveState();
+  function getCompanyData(company) {
+    const resolved = resolveCompanyKey(company);
+    if (!state.companies[resolved]) {
+      state.companies[resolved] = createCompanyData(resolved);
+    }
+    return normalizeCompanyBlock(state.companies[resolved]);
   }
 
   function updateCompanyInfo(companyInfo, company) {
@@ -1006,7 +972,7 @@
     const byCompany = getCompanies().map((company) => ({
       company,
       total: state.companies[company]?.employees?.length || 0,
-      active: (state.companies[company]?.employees || []).filter((employee) => employee.status === "Ativo").length
+      active: (state.companies[company]?.employees || []).filter((employee) => isEmployeeActive(employee)).length
     }));
     return {
       total: byCompany.reduce((sum, item) => sum + item.total, 0),
@@ -1081,17 +1047,18 @@
     return fallbackCompany;
   }
 
-  function upsertEmployee(employee, company = state.selectedCompany, options = {}) {
-    const data = getCompanyData(company);
+  function upsertEmployee(employee, company, options = {}) {
+    const resolved = company || getPrimaryPageCompany("funcionarios");
+    const data = getCompanyData(resolved);
     const hasFixedDay = Object.prototype.hasOwnProperty.call(employee, "fixedDay");
     const cpfFormatted = formatCpf(employee.cpf || "");
     const cpfDigits = normalizeCpfDigits(cpfFormatted);
     const existingById = employee.id ? data.employees.find((item) => item.id === employee.id) : null;
-    const existingByCpf = cpfDigits ? findEmployeeByCpf(cpfDigits, company) : null;
+    const existingByCpf = cpfDigits ? findEmployeeByCpf(cpfDigits, resolved) : null;
     const existing = existingById || existingByCpf;
 
     if (cpfDigits && !options.allowCrossCompany) {
-      const otherCompany = findEmployeeCompanyByCpf(cpfDigits, company);
+      const otherCompany = findEmployeeCompanyByCpf(cpfDigits, resolved);
       if (otherCompany && (!existing || existing.id !== otherCompany.employee.id)) {
         throw new Error(`CPF já cadastrado em ${otherCompany.company}.`);
       }
@@ -1151,8 +1118,8 @@
     if (shouldSave) saveState();
   }
 
-  function removeEmployee(id, company = state.selectedCompany) {
-    removeEmployeeFromCompany(company, id, true);
+  function removeEmployee(id, company) {
+    removeEmployeeFromCompany(company || getPrimaryPageCompany("funcionarios"), id, true);
   }
 
   function monthsTouchedByRange(startDate, endDate) {
@@ -1167,8 +1134,8 @@
     return [...months];
   }
 
-  function addVacation(vacation) {
-    const data = getCompanyData();
+  function addVacation(vacation, company) {
+    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
     data.vacations.push({
       id: uid("ferias"),
       employeeId: vacation.employeeId,
@@ -1180,16 +1147,17 @@
     saveState();
   }
 
-  function removeVacation(id) {
-    const data = getCompanyData();
+  function removeVacation(id, company) {
+    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
     const vacation = data.vacations.find((item) => item.id === id);
     data.vacations = data.vacations.filter((item) => item.id !== id);
     if (vacation) runScaleIntegrations(monthsTouchedByRange(vacation.startDate, vacation.endDate));
     saveState();
   }
 
-  function addAbsence(absence) {
-    const data = getCompanyData();
+  function addAbsence(absence, company) {
+    const resolved = company || getPrimaryPageCompany("ferias");
+    const data = getCompanyData(resolved);
     if (!data.absences) data.absences = [];
     data.absences.push({
       id: uid("ausencia"),
@@ -1200,12 +1168,15 @@
       cid: absence.cid || "",
       note: absence.note || ""
     });
+    runScaleIntegrations(monthsTouchedByRange(absence.startDate, absence.endDate));
     saveState();
   }
 
-  function removeAbsence(id) {
-    const data = getCompanyData();
-    data.absences = (data.absences || []).filter((absence) => absence.id !== id);
+  function removeAbsence(id, company) {
+    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const absence = (data.absences || []).find((item) => item.id === id);
+    data.absences = (data.absences || []).filter((item) => item.id !== id);
+    if (absence) runScaleIntegrations(monthsTouchedByRange(absence.startDate, absence.endDate));
     saveState();
   }
 
@@ -1286,7 +1257,7 @@
   }
 
   function removeWorkedEmployeeFromHoliday(holidayId, employeeId, options = {}) {
-    const company = options.company || state.selectedCompany;
+    const company = options.company || getPrimaryPageCompany("feriados");
     const data = getCompanyData(company);
     const holiday = (data.holidays || []).find((item) => item.id === holidayId);
     if (!holiday) return false;
@@ -1310,7 +1281,7 @@
   }
 
   function updateHoliday(id, patch = {}, options = {}) {
-    const data = getCompanyData(options.company || state.selectedCompany);
+    const data = getCompanyData(options.company || getPrimaryPageCompany("feriados"));
     const list = data.holidays || [];
     const idx = list.findIndex((holiday) => holiday.id === id);
     if (idx < 0) return false;
@@ -1370,7 +1341,7 @@
   }
 
   function resolveWorkedHolidayStatus(item, holidayDate, today = todayISO()) {
-    const dueDate = addDays(holidayDate, 120);
+    const dueDate = getHolidayCompensationDueDate(holidayDate);
     const daysLeft = diffDays(today, dueDate);
 
     if (item.compensationDate) {
@@ -1429,7 +1400,10 @@
   }
 
   function linkScaleCoToHoliday(employeeId, coDate, options = {}) {
-    const company = options.company || state.selectedCompany;
+    const company =
+      options.company ||
+      findEmployeeRecord(employeeId)?.company ||
+      getPrimaryPageCompany("escala");
     const data = getCompanyData(company);
     const today = todayISO();
     const target = findOldestLinkableHolidayWorked(data, employeeId, options.preferredHolidayId, coDate);
@@ -1450,9 +1424,9 @@
     item.linkedHolidayId = holiday.id;
     syncWorkedEmployeeStatus(item, holiday.date);
 
-    const daysAfter = diffDays(holiday.date, coDate);
-    const warning =
-      daysAfter > 120 ? "Compensação agendada fora do prazo de 120 dias." : "";
+    const warning = isCompensationWithinDeadline(holiday.date, coDate)
+      ? ""
+      : `Compensação agendada fora do prazo de ${HOLIDAY_COMPENSATION_DAYS} dias.`;
 
     return {
       linked: true,
@@ -1464,7 +1438,10 @@
   }
 
   function unlinkScaleCoFromHoliday(employeeId, coDate, options = {}) {
-    const company = options.company || state.selectedCompany;
+    const company =
+      options.company ||
+      findEmployeeRecord(employeeId)?.company ||
+      getPrimaryPageCompany("escala");
     const data = getCompanyData(company);
     let changed = false;
 
@@ -1495,8 +1472,8 @@
     return typeof entry === "object" ? entry.code : entry;
   }
 
-  function getHolidayStats(company = state.selectedCompany) {
-    const data = getCompanyData(company);
+  function getHolidayStats(company) {
+    const data = getCompanyData(company || getPrimaryPageCompany("feriados"));
     const today = todayISO();
     const stats = {
       pending: 0,
@@ -1512,7 +1489,6 @@
         if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return;
 
         const resolved = resolveWorkedHolidayStatus(item, holiday.date, today);
-        item.status = resolved.label;
         if (resolved.key === "pendente") stats.pending += 1;
         if (resolved.key === "agendado") stats.agendado += 1;
         if (resolved.key === "compensado") stats.compensado += 1;
@@ -1566,41 +1542,32 @@
   }
 
   function setVtDeduction(employeeId, yearMonth, days, options = {}) {
-    const company = options.company || state.selectedCompany;
-    const data = getCompanyData(company);
-    if (!data.vtDeductions) data.vtDeductions = {};
+    const company = resolveVtCompany(options.company);
     const vt = ensureValeTransporteState();
     if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
     const key = `${employeeId}|${yearMonth}`;
     const raw = String(days ?? "").trim();
 
     if (raw === "") {
-      delete data.vtDeductions[key];
       delete vt.deductionDays[company][key];
     } else {
-      const value = Math.max(0, parseInt(raw, 10) || 0);
-      data.vtDeductions[key] = value;
-      vt.deductionDays[company][key] = value;
+      vt.deductionDays[company][key] = Math.max(0, parseInt(raw, 10) || 0);
     }
 
     if (options.save !== false) saveState();
   }
 
-  function getVtDeduction(employeeId, yearMonth, data = getCompanyData(), company = state.selectedCompany) {
+  function getVtDeduction(employeeId, yearMonth, data, company) {
+    company = resolveVtCompany(company);
     const key = `${employeeId}|${yearMonth}`;
-    if (data.vtDeductions && Object.prototype.hasOwnProperty.call(data.vtDeductions, key)) {
-      return Math.max(0, parseInt(data.vtDeductions[key], 10) || 0);
-    }
     const fromVt = ensureValeTransporteState().deductionDays?.[company]?.[key];
     if (fromVt === undefined || fromVt === null || fromVt === "") return 0;
     return Math.max(0, parseInt(fromVt, 10) || 0);
   }
 
-  function getVtDeductionDisplay(employeeId, yearMonth, data = getCompanyData(), company = state.selectedCompany) {
+  function getVtDeductionDisplay(employeeId, yearMonth, data, company) {
+    company = resolveVtCompany(company);
     const key = `${employeeId}|${yearMonth}`;
-    if (data.vtDeductions && Object.prototype.hasOwnProperty.call(data.vtDeductions, key)) {
-      return String(data.vtDeductions[key]);
-    }
     const fromVt = ensureValeTransporteState().deductionDays?.[company]?.[key];
     if (fromVt === undefined || fromVt === null || fromVt === "") return "";
     return String(fromVt);
@@ -1618,12 +1585,48 @@
     return Math.ceil(new Date(`${isoDate}T00:00:00`).getDate() / 7);
   }
 
+  function findAbsenceForDate(employeeId, date, data) {
+    return (data.absences || []).find(
+      (item) => item.employeeId === employeeId && isBetween(date, item.startDate, item.endDate)
+    );
+  }
+
+  function getManualScaleCodeValue(employeeId, date, data) {
+    const key = `${employeeId}|${date}`;
+    if (!Object.prototype.hasOwnProperty.call(data.manualScale, key)) return undefined;
+    const manual = data.manualScale[key];
+    return typeof manual === "object" ? manual.code : manual;
+  }
+
+  function getScaleAbsenceConflict(employee, date, data = getCompanyData()) {
+    const absence = findAbsenceForDate(employee.id, date, data);
+    if (!absence) return null;
+
+    const manualCode = getManualScaleCodeValue(employee.id, date, data);
+    if (manualCode === undefined) return null;
+
+    const absenceCode = getAbsenceScaleCode(absence.type);
+    if (manualCode === absenceCode) return null;
+
+    return {
+      employeeId: employee.id,
+      employeeName: getEmployeeName(employee.id, data),
+      date,
+      absenceType: absence.type,
+      absenceCode,
+      manualCode
+    };
+  }
+
   function getScaleCode(employee, date, data = getCompanyData()) {
     const vacation = data.vacations.find((item) => item.employeeId === employee.id && isBetween(date, item.startDate, item.endDate));
     if (vacation) return "FÉRIAS";
 
-    const manual = data.manualScale[`${employee.id}|${date}`];
-    if (manual !== undefined) return typeof manual === "object" ? manual.code : manual;
+    const absence = findAbsenceForDate(employee.id, date, data);
+    if (absence) return getAbsenceScaleCode(absence.type);
+
+    const manual = getManualScaleCodeValue(employee.id, date, data);
+    if (manual !== undefined) return manual;
 
     const compensation = data.holidays.some((holiday) =>
       holiday.workedEmployees.some((item) => item.employeeId === employee.id && item.compensationDate === date)
@@ -1666,7 +1669,7 @@
   }
 
   function importEmployeesBatch(rows, options = {}) {
-    const fallbackCompany = options.fallbackCompany || state.selectedCompany;
+    const fallbackCompany = options.fallbackCompany || getPrimaryPageCompany("funcionarios");
     const mapRow = options.mapRow || ((row) => row);
     const result = { imported: 0, skipped: 0, updated: 0, messages: [] };
     const cpfSeenInBatch = new Set();
@@ -1749,7 +1752,7 @@
   }
 
   function importHolidaysBatch(rows, options = {}) {
-    const fallbackCompany = options.fallbackCompany || state.selectedCompany;
+    const fallbackCompany = options.fallbackCompany || getPrimaryPageCompany("funcionarios");
     const mapRow = options.mapRow || ((row) => row);
     const result = { imported: 0, skipped: 0, messages: [] };
     let touched = false;
@@ -1787,7 +1790,7 @@
         return;
       }
 
-      const dueDate = mapped.dueDate || addDays(workedDate, 120);
+      const dueDate = mapped.dueDate || getHolidayCompensationDueDate(workedDate);
       let compensationDate = String(mapped.compensationDate || "").trim();
       const statusText = String(mapped.status || "").toLocaleLowerCase("pt-BR");
 
@@ -1795,9 +1798,9 @@
         compensationDate = dueDate;
       }
 
-      if (compensationDate && diffDays(workedDate, compensationDate) > 120) {
+      if (compensationDate && !isCompensationWithinDeadline(workedDate, compensationDate)) {
         result.skipped += 1;
-        result.messages.push(`Linha ${index + 1}: compensação fora do prazo de 120 dias.`);
+        result.messages.push(`Linha ${index + 1}: compensação fora do prazo de ${HOLIDAY_COMPENSATION_DAYS} dias.`);
         return;
       }
 
@@ -1848,6 +1851,8 @@
     COMPANIES,
     PAGE_COMPANY_ALL,
     PAGE_FILTER_KEYS,
+    HOLIDAY_COMPENSATION_DAYS,
+    ABSENCE_TYPE_SCALE_CODES,
     getCompanies,
     registerCompany,
     getPageCompany,
@@ -1856,6 +1861,16 @@
     getPrimaryPageCompany,
     isPageCompanyAll,
     findEmployeeRecord,
+    isEmployeeActive,
+    mergeEmployeesById,
+    mergeRecordsById,
+    getHolidayCompensationDueDate,
+    isCompensationWithinDeadline,
+    getAbsenceScaleCode,
+    findAbsenceForDate,
+    getScaleAbsenceConflict,
+    finalizeIncomingState,
+    migrateVtStorage,
     WEEK_DAYS,
     SCALE_CODES,
     VT_WORKED_CODES,
@@ -1890,7 +1905,6 @@
     removeVacation,
     saveState,
     setManualScale,
-    setSelectedCompany,
     state,
     todayISO,
     updateCompanyInfo,
@@ -1898,9 +1912,6 @@
     setRemoteState,
     mergeRemoteIntoLocal,
     readLocalStateSnapshot,
-    restoreVtBackupIntoState,
-    syncVtDeductionsFromValeTransporte,
-    syncVtDeductionsToValeTransporte,
     getManualScaleEntry,
     setVtDeduction,
     getVtDeduction,

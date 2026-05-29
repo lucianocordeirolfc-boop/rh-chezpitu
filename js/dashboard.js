@@ -5,7 +5,7 @@
 
   function compensationLines(data) {
     return data.holidays.flatMap((holiday) => {
-      const dueDate = AppData.addDays(holiday.date, 120);
+      const dueDate = AppData.getHolidayCompensationDueDate(holiday.date);
       return holiday.workedEmployees
         .filter((item) => {
           const emp = data.employees.find((e) => e.id === item.employeeId);
@@ -46,7 +46,7 @@
     companies.forEach((company) => {
       const data = AppData.getCompanyData(company);
       if (!data) return;
-      const activeEmployees = data.employees.filter((employee) => employee.status === "Ativo");
+      const activeEmployees = data.employees.filter((employee) => AppData.isEmployeeActive(employee));
       activeTotal += activeEmployees.length;
       totalEmployees += data.employees.length;
       todayOff = todayOff.concat(

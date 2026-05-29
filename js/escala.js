@@ -36,6 +36,8 @@
   let pendingRender = false;
   let companySaveTimer = null;
   let monthIntegrationTimer = null;
+  let syncRefreshTimer = null;
+  let lastCompanySwitchAt = 0;
 
   function getViewCompany() {
     const company = AppData.getPageCompany("escala");
@@ -145,19 +147,21 @@
   function getScaleCell(employee, date, data) {
     const finalCode = AppData.getScaleCode(employee, date, data);
     const manualCode = getManualCode(employee.id, date, data);
-    const isManual = manualCode !== undefined && finalCode !== "FÉRIAS";
+    const absenceConflict = AppData.getScaleAbsenceConflict(employee, date, data);
+    const isManual = manualCode !== undefined && !absenceConflict && finalCode !== "FÉRIAS";
     const linkedHolidayName = finalCode === "CO" ? getLinkedHolidayName(employee.id, date, data) : null;
 
     return {
       finalCode,
       isManual,
+      absenceConflict,
       linkedHolidayName,
       receivesVT: AppData.VT_WORKED_CODES.has(finalCode)
     };
   }
 
   function isActiveEmployee(employee) {
-    return String(employee?.status || "").trim().toLocaleLowerCase("pt-BR") === "ativo";
+    return AppData.isEmployeeActive(employee);
   }
 
   function normalizeName(value) {
@@ -335,6 +339,38 @@
             .join("")}
         </ul>
       </div>
+    `;
+  }
+
+  function collectAbsenceConflicts(data, employees, days) {
+    const conflicts = [];
+    employees.forEach((employee) => {
+      const employeeData = getScaleDataForEmployee(employee, data);
+      days.forEach((day) => {
+        const conflict = AppData.getScaleAbsenceConflict(employee, day, employeeData);
+        if (conflict) conflicts.push(conflict);
+      });
+    });
+    return conflicts;
+  }
+
+  function renderAbsenceConflictAlerts(conflicts) {
+    const list = Array.isArray(conflicts) ? conflicts : [];
+    if (!list.length) return "";
+
+    return `
+      <section id="scaleAbsenceConflictPanel" class="scale-coverage-alerts scale-absence-conflicts scale-coverage-has-alerts" role="region" aria-label="Conflitos ausência e escala manual">
+        <h3>Conflitos ausência × escala manual <span class="coverage-alert-count">${list.length} alerta${list.length === 1 ? "" : "s"}</span></h3>
+        <p class="help-text compact-help">Ausência cadastrada prevalece no VT. Remova o código manual ou ajuste a ausência para eliminar o conflito.</p>
+        <ul class="scale-coverage-list">
+          ${list
+            .map(
+              (item) =>
+                `<li>${esc(displayName(item.employeeName))} — ${esc(AppData.formatDateBR(item.date))}: ausência <strong>${esc(item.absenceCode)}</strong> (${esc(item.absenceType)}) conflita com manual <strong>${esc(displayCode(item.manualCode))}</strong>. VT usa a ausência.</li>`
+            )
+            .join("")}
+        </ul>
+      </section>
     `;
   }
 
@@ -520,10 +556,13 @@
                   .filter(Boolean)
                   .join(" ");
                 const linkedName = cell.linkedHolidayName;
-                const title = `${employee.name} - ${day}: ${code || "Trabalho normal"}${linkedName ? ` (${linkedName})` : ""}`;
+                const conflictNote = cell.absenceConflict
+                  ? " — conflito: ausência prevalece no VT"
+                  : "";
+                const title = `${employee.name} - ${day}: ${code || "Trabalho normal"}${linkedName ? ` (${linkedName})` : ""}${conflictNote}`;
 
                 return `
-                  <td class="scale-cell ${codeClass(code)} ${dayClasses} ${cell.isManual ? "manual-cell" : ""}" title="${esc(title)}">
+                  <td class="scale-cell ${codeClass(code)} ${dayClasses} ${cell.isManual ? "manual-cell" : ""} ${cell.absenceConflict ? "absence-conflict-cell" : ""}" title="${esc(title)}">
                     <select class="scale-select" data-employee="${employee.id}" data-date="${day}" data-scale-company="${esc(scaleCompany)}" aria-label="Escala de ${esc(employee.name)} em ${day}">
                       ${codeOptions(code, cell.isManual)}
                     </select>
@@ -724,7 +763,7 @@
   }
 
   function copyPreviousScale() {
-    const data = AppData.getCompanyData();
+    const data = AppData.getCompanyData(getViewCompany());
     const targetDays = AppData.getDaysInMonth(scaleState.yearMonth);
     const sourceDays = AppData.getDaysInMonth(previousMonth(scaleState.yearMonth));
     const sourceByDayNumber = new Map(sourceDays.map((day) => [day.slice(-2), day]));
@@ -749,7 +788,7 @@
   }
 
   function clearMonth() {
-    const data = AppData.getCompanyData();
+    const data = AppData.getCompanyData(getViewCompany());
     const days = new Set(AppData.getDaysInMonth(scaleState.yearMonth));
     let removed = 0;
 
@@ -815,7 +854,12 @@
 
   function bindEvents(container, employees, days, data) {
     window.CompanyUI?.bindToolbar?.(container, "escala", (nextCompany) => {
+      if (AppData.isPageCompanyAll(nextCompany)) return;
+      if (nextCompany === getViewCompany()) return;
       scaleLog("change company", nextCompany);
+      lastCompanySwitchAt = Date.now();
+      window.clearTimeout(container._scaleSearchTimer);
+      window.clearTimeout(syncRefreshTimer);
       setViewCompany(nextCompany);
       scaleState.department = "todos";
       scaleState.printSector = "";
@@ -1245,9 +1289,11 @@
       const days = AppData.getDaysInMonth(scaleState.yearMonth);
       const coverageAlerts = getAlertsForView();
       const alertLookups = buildAlertLookups(coverageAlerts);
+      const absenceConflicts = collectAbsenceConflicts(data, employees, days);
 
       container.innerHTML = `
         ${renderCoverageAlerts(coverageAlerts)}
+        ${renderAbsenceConflictAlerts(absenceConflicts)}
         <article class="card scale-card card-compact ${companyClass()}">
           <div class="card-header card-header-compact scale-card-header">
             <div>
@@ -1289,9 +1335,27 @@
   function softRefreshFromSync() {
     const container = document.getElementById("escala");
     if (!container) return;
-    scaleState.viewCompany = AppData.getPrimaryPageCompany("escala");
-    scaleLog("softRefreshFromSync", scaleState.viewCompany);
-    renderCurrent(container);
+    if (renderLock) {
+      pendingRender = true;
+      return;
+    }
+    if (Date.now() - lastCompanySwitchAt < 600) return;
+
+    window.clearTimeout(syncRefreshTimer);
+    syncRefreshTimer = window.setTimeout(() => {
+      if (renderLock) {
+        pendingRender = true;
+        return;
+      }
+      const nextCompany = AppData.getPrimaryPageCompany("escala");
+      if (nextCompany === scaleState.viewCompany && container.querySelector(".scale-table")) {
+        scaleLog("softRefreshFromSync skipped", nextCompany);
+        return;
+      }
+      scaleState.viewCompany = nextCompany;
+      scaleLog("softRefreshFromSync", scaleState.viewCompany);
+      renderCurrent(container);
+    }, 250);
   }
 
   window.EscalaModule = { render, softRefreshFromSync, getViewCompany };

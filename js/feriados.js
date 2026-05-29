@@ -20,9 +20,7 @@
   }
 
   function formatDateBR(isoDate) {
-    if (!isoDate) return "—";
-    const [year, month, day] = isoDate.split("-");
-    return `${day}/${month}/${year}`;
+    return AppData.formatDateBR(isoDate);
   }
 
   function alertLabel(daysLeft) {
@@ -84,7 +82,15 @@
   function progressBarWidth(line) {
     if (statusKey(line) === "compensado") return 100;
     if (line.daysLeft < 0) return 100;
-    return Math.max(0, Math.min(100, Math.round(((120 - line.daysLeft) / 120) * 100)));
+    return Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          ((AppData.HOLIDAY_COMPENSATION_DAYS - line.daysLeft) / AppData.HOLIDAY_COMPENSATION_DAYS) * 100
+        )
+      )
+    );
   }
 
   function progressBarHint(line) {
@@ -101,7 +107,7 @@
   function buildLines(data, companyKey) {
     const companyLabel = companyKey || AppData.getPrimaryPageCompany("feriados");
     return (data.holidays || []).flatMap((holiday) => {
-      const dueDate = AppData.addDays(holiday.date, 120);
+      const dueDate = AppData.getHolidayCompensationDueDate(holiday.date);
       const today = AppData.todayISO();
 
       if (!holiday.workedEmployees?.length) {
@@ -340,7 +346,7 @@
 
   function renderFilters(data) {
     const employees = data.employees
-      .filter((employee) => employee.status === "Ativo")
+      .filter((employee) => AppData.isEmployeeActive(employee))
       .map((employee) => ({ value: employee.id, label: employee.name }));
     const holidays = data.holidays.map((holiday) => ({ value: holiday.id, label: holiday.name }));
     const departments = [...new Set(data.employees.map((employee) => employee.department).filter(Boolean))]
@@ -483,8 +489,12 @@
     const workedEmployee = holiday.workedEmployees.find((item) => item.employeeId === employeeId);
     if (!workedEmployee) return { ok: true };
 
-    if (compensationDate && AppData.diffDays(holiday.date, compensationDate) > 120) {
-      window.App?.toast?.("Compensação agendada fora do prazo de 120 dias.", "warning", 5000);
+    if (compensationDate && !AppData.isCompensationWithinDeadline(holiday.date, compensationDate)) {
+      window.App?.toast?.(
+        `Compensação agendada fora do prazo de ${AppData.HOLIDAY_COMPENSATION_DAYS} dias.`,
+        "warning",
+        5000
+      );
     }
 
     workedEmployee.compensationDate = compensationDate;
@@ -755,8 +765,12 @@
       return false;
     }
 
-    if (compensationDate && AppData.diffDays(date, compensationDate) > 120) {
-      window.App?.toast?.("Compensação agendada fora do prazo de 120 dias.", "warning", 5000);
+    if (compensationDate && !AppData.isCompensationWithinDeadline(date, compensationDate)) {
+      window.App?.toast?.(
+        `Compensação agendada fora do prazo de ${AppData.HOLIDAY_COMPENSATION_DAYS} dias.`,
+        "warning",
+        5000
+      );
     }
 
     const workedEmployees = selectedEmployees.map((employeeId) => {
@@ -870,7 +884,7 @@
               <legend>Funcionários que trabalharam (${esc(AppData.getPrimaryPageCompany("feriados"))})</legend>
               ${employeeCheckboxes(employees)}
             </fieldset>
-            <p class="help-text compact-help">Prazo de 120 dias corridos. CO na escala vincula ao feriado pendente mais antigo.</p>
+            <p class="help-text compact-help">Prazo de ${AppData.HOLIDAY_COMPENSATION_DAYS} dias corridos. CO na escala vincula ao feriado pendente mais antigo.</p>
             <div class="popup-actions">
               <button class="secondary" type="button" data-close-holiday-popup>Cancelar</button>
               <button class="primary" type="submit">Salvar feriado</button>
@@ -957,7 +971,7 @@
     closeHolidayRegisterPopup();
     const company = AppData.getPrimaryPageCompany("feriados");
     const data = AppData.getCompanyData(company);
-    const employees = (data.employees || []).filter((employee) => employee.status === "Ativo");
+    const employees = (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee));
     const companyList = window.CompanyUI?.listCompanies?.() || AppData.COMPANIES;
     const calendarCompanyOptions = [
       `<option value="ambas">Todas as empresas</option>`,

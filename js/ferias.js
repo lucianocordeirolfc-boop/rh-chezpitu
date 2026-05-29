@@ -200,6 +200,8 @@
   }
 
   function bindEvents(container) {
+    const pageCompany = AppData.getPrimaryPageCompany("ferias");
+
     // ── Tab switching ──────────────────────────────────────────
     container.querySelectorAll(".ausencias-tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -221,14 +223,14 @@
           alert("A data final das férias não pode ser anterior à data inicial.");
           return;
         }
-        AppData.addVacation(vacation);
+        AppData.addVacation(vacation, pageCompany);
         window.App.renderCurrent();
       });
     }
 
     container.querySelectorAll("[data-remove-vacation]").forEach((button) => {
       button.addEventListener("click", () => {
-        AppData.removeVacation(button.dataset.removeVacation);
+        AppData.removeVacation(button.dataset.removeVacation, pageCompany);
         render(container);
       });
     });
@@ -267,14 +269,14 @@
           endDate: payload.absEndDate,
           cid: payload.absCid || "",
           note: payload.absNote || ""
-        });
+        }, pageCompany);
         window.App.renderCurrent();
       });
     }
 
     container.querySelectorAll("[data-remove-absence]").forEach((button) => {
       button.addEventListener("click", () => {
-        AppData.removeAbsence(button.dataset.removeAbsence);
+        AppData.removeAbsence(button.dataset.removeAbsence, pageCompany);
         render(container);
       });
     });
@@ -299,7 +301,7 @@
   function render(container) {
     const company = AppData.getPrimaryPageCompany("ferias");
     const data = AppData.getCompanyData(company);
-    const activeEmployees = data.employees.filter((employee) => employee.status === "Ativo");
+    const activeEmployees = data.employees.filter((employee) => AppData.isEmployeeActive(employee));
     const absences = data.absences || [];
 
     const employees = activeEmployees.map((employee) => ({ value: employee.id, label: employee.name }));
