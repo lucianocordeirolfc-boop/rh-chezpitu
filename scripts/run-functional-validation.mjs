@@ -394,6 +394,20 @@ function validateFeriados(AppData, chez) {
     .find(({ w, h }) => AppData.resolveWorkedHolidayStatus(w, h.date, today).key === "compensado");
   assert(area, Boolean(compensated), "Status compensado detectado corretamente", ["js/data.js"], "—");
 
+  const agendado = chez.holidays
+    .flatMap((h) => h.workedEmployees.map((w) => ({ h, w })))
+    .find(({ w, h }) => {
+      const futureCo = AppData.addDays(today, 10);
+      return (
+        AppData.resolveWorkedHolidayStatus(
+          { ...w, compensationDate: futureCo },
+          h.date,
+          today
+        ).key === "agendado"
+      );
+    });
+  assert(area, Boolean(agendado), "Status agendado detectado corretamente", ["js/data.js", "js/feriados.js"], "—");
+
   const vencido = chez.holidays
     .flatMap((h) => h.workedEmployees.map((w) => ({ h, w })))
     .find(({ w, h }) => AppData.resolveWorkedHolidayStatus(w, h.date, today).key === "vencido");
@@ -440,6 +454,320 @@ function validateDashboard(AppData, chez, peng) {
 
   const statsChez = AppData.getHolidayStats("Chez Pitu");
   assert(area, statsChez.pending >= 1, "Dashboard stats feriados: pendentes ≥ 1 (Chez Pitu)", ["js/dashboard.js"], "—");
+}
+
+function validatePadroeiraBuzios(AppData) {
+  const area = "Padroeira de Búzios";
+  const storage = createStorage();
+  const rawState = {
+    pageFilters: AppData.state.pageFilters,
+    escalaSelectedYearMonth: "2026-07",
+    valeTransporte: AppData.state.valeTransporte,
+    calendarHolidays: [
+      {
+        id: "cal-padroeira-wrong",
+        name: "Padroeira de Búzios",
+        date: "2026-05-21",
+        type: "municipal",
+        companies: ["ambas"]
+      }
+    ],
+    companies: {
+      "Chez Pitu": {
+        employees: [],
+        holidays: [
+          {
+            id: "h-padroeira-wrong",
+            name: "Padroeira de Búzios",
+            date: "2026-05-21",
+            workedEmployees: [{ employeeId: "chez-1", compensationDate: "", status: "Pendente" }]
+          }
+        ],
+        absences: [],
+        vacations: [],
+        manualScale: {},
+        contadorLancamentos: {}
+      },
+      Pengold: {
+        employees: [],
+        holidays: [
+          {
+            id: "h-padroeira-peng",
+            name: "Padroeira de Búzios",
+            date: "2026-07-26",
+            workedEmployees: [{ employeeId: "peng-1", compensationDate: "", status: "Pendente" }]
+          }
+        ],
+        absences: [],
+        vacations: [],
+        manualScale: {},
+        contadorLancamentos: {}
+      }
+    }
+  };
+  storage.setItem("chezPituPeopleSystem.v1", JSON.stringify(rawState));
+  const reloaded = loadCore(storage).AppData;
+
+  const cal = reloaded.state.calendarHolidays.find((h) => AppData.isPadroeiraBuziosName(h.name));
+  assert(
+    area,
+    cal && cal.date === "2026-07-26",
+    "Calendário: Padroeira de Búzios migrada de 21/05 para 26/07",
+    ["js/data.js"],
+    "migratePadroeiraBuziosHoliday em finalizeIncomingState"
+  );
+  assert(
+    area,
+    !reloaded.state.calendarHolidays.some(
+      (h) => AppData.isPadroeiraBuziosName(h.name) && h.date.endsWith("-05-21")
+    ),
+    "Nenhuma Padroeira de Búzios permanece em 21/05 no calendário",
+    ["js/data.js"],
+    "—"
+  );
+
+  const chezHolidays = reloaded.getCompanyData("Chez Pitu").holidays.filter((h) =>
+    AppData.isPadroeiraBuziosName(h.name)
+  );
+  assert(
+    area,
+    chezHolidays.length === 1 && chezHolidays[0].date === "2026-07-26",
+    "Empresa Chez Pitu: feriado Padroeira consolidado em 26/07",
+    ["js/data.js"],
+    "—"
+  );
+
+  AppData.syncCompanyHolidaysFromCalendarEntry(
+    { name: "Padroeira de Búzios", date: "2026-05-21", companies: ["ambas"] },
+    { save: false }
+  );
+  const afterSync = AppData.getCompanyData("Chez Pitu").holidays.filter((h) =>
+    AppData.isPadroeiraBuziosName(h.name)
+  );
+  assert(
+    area,
+    afterSync.every((h) => h.date.endsWith("-07-26")),
+    "Sync calendário→empresa força 26/07 mesmo se entrada vier com 21/05",
+    ["js/data.js", "js/feriados.js"],
+    "syncCompanyHolidaysFromCalendarEntry + correctPadroeiraBuziosDate"
+  );
+
+  const remoteWrong = JSON.parse(JSON.stringify(reloaded.state));
+  remoteWrong.calendarHolidays.push({
+    id: "cal-reinject",
+    name: "Padroeira de Búzios",
+    date: "2027-05-21",
+    companies: ["ambas"]
+  });
+  const merged = AppData.mergeRemoteIntoLocal(reloaded.state, remoteWrong);
+  assert(
+    area,
+    !(merged.calendarHolidays || []).some(
+      (h) => AppData.isPadroeiraBuziosName(h.name) && h.date.endsWith("-05-21")
+    ),
+    "Merge Firebase remoto não reintroduz Padroeira em 21/05",
+    ["js/data.js", "js/firebase-sync.js"],
+    "migratePadroeiraBuziosHoliday após mergeRemoteIntoLocal"
+  );
+}
+
+function validateCoModal(AppData, chez) {
+  const area = "Modal CO (Escala)";
+  const coDate = "2026-06-10";
+
+  chez.employees.push(
+    {
+      id: "raquel-1",
+      name: "Raquel R. da Costa",
+      status: "Ativo",
+      department: "Salão",
+      role: "Garçonete",
+      fixedDay: "Quarta-feira",
+      vtDaily: 12,
+      admissionDate: "2024-01-01"
+    },
+    {
+      id: "outro-1",
+      name: "Carlos Outro",
+      status: "Ativo",
+      department: "Cozinha",
+      role: "Auxiliar",
+      fixedDay: "Terça-feira",
+      vtDaily: 12,
+      admissionDate: "2024-01-01"
+    }
+  );
+
+  chez.holidays.push(
+    {
+      id: "h-raquel-pend",
+      name: "Feriado Raquel",
+      date: "2026-04-01",
+      workedEmployees: [{ employeeId: "raquel-1", compensationDate: "", status: "Pendente" }]
+    },
+    {
+      id: "h-outro-pend",
+      name: "Feriado Carlos",
+      date: "2026-03-15",
+      workedEmployees: [{ employeeId: "outro-1", compensationDate: "", status: "Pendente" }]
+    },
+    {
+      id: "h-raquel-comp",
+      name: "Feriado Raquel OK",
+      date: "2026-01-10",
+      workedEmployees: [
+        {
+          employeeId: "raquel-1",
+          compensationDate: "2026-02-01",
+          status: "Compensado",
+          linkedFromScale: true,
+          scaleCoDate: "2026-02-01"
+        }
+      ]
+    },
+    {
+      id: "h-raquel-linked-other",
+      name: "Feriado Raquel vinculado",
+      date: "2026-02-20",
+      workedEmployees: [
+        {
+          employeeId: "raquel-1",
+          compensationDate: "",
+          status: "Pendente",
+          linkedFromScale: true,
+          scaleCoDate: "2026-03-01"
+        }
+      ]
+    }
+  );
+
+  const raquelPending = AppData.getPendingCoHolidaysForEmployee("raquel-1", coDate, {
+    company: "Chez Pitu",
+    data: chez
+  });
+
+  assert(
+    area,
+    raquelPending.length === 1 && raquelPending[0].holiday.id === "h-raquel-pend",
+    "Raquel R. da Costa vê somente a pendência dela no modal CO",
+    ["js/data.js", "js/escala.js"],
+    "getPendingCoHolidaysForEmployee filtra por employeeId"
+  );
+  assert(
+    area,
+    raquelPending.every((entry) => entry.item.employeeId === "raquel-1"),
+    "Modal CO usa employeeId como vínculo principal",
+    ["js/data.js"],
+    "—"
+  );
+  assert(
+    area,
+    !raquelPending.some((entry) => entry.status.key === "compensado"),
+    "Feriados compensados não aparecem no modal CO",
+    ["js/data.js", "js/escala.js"],
+    "—"
+  );
+  assert(
+    area,
+    !raquelPending.some((entry) => entry.holiday.id === "h-outro-pend"),
+    "Pendências de outros funcionários não aparecem no modal CO",
+    ["js/data.js", "js/escala.js"],
+    "—"
+  );
+}
+
+function validateCrossModuleLinks(AppData, chez, peng, ym) {
+  const area = "Vínculos entre abas";
+  const modules = ["funcionarios", "escala", "ferias", "feriados", "vale-transporte", "contador", "dashboard"];
+
+  modules.forEach((moduleId) => {
+    AppData.setPageCompany(moduleId, "Chez Pitu", { save: false });
+    assert(
+      area,
+      AppData.getPrimaryPageCompany(moduleId) === "Chez Pitu",
+      `Troca empresa Chez Pitu em ${moduleId}`,
+      ["js/data.js"],
+      "pageFilters isolados por módulo"
+    );
+    AppData.setPageCompany(moduleId, "Pengold", { save: false });
+    assert(
+      area,
+      AppData.getPrimaryPageCompany(moduleId) === "Pengold",
+      `Troca empresa Pengold em ${moduleId}`,
+      ["js/data.js"],
+      "—"
+    );
+  });
+
+  AppData.setPageCompany("escala", "Chez Pitu", { save: false });
+  AppData.setEscalaSelectedYearMonth("2026-06", { save: false });
+  AppData.setVtSelectedYearMonth("2026-06", { save: false });
+  assert(
+    area,
+    AppData.getEscalaSelectedYearMonth() === "2026-06" && AppData.getVtSelectedYearMonth() === "2026-06",
+    "Troca mês/ano persiste nos seletores Escala e VT",
+    ["js/data.js"],
+    "—"
+  );
+
+  const emp = chez.employees[0];
+  const record = AppData.findEmployeeRecord("chez-1");
+  assert(
+    area,
+    record?.company === "Chez Pitu" && record?.employee?.department === "Cozinha",
+    "Cadastro é fonte oficial: empresa, setor e cargo via employeeId",
+    ["js/data.js"],
+    "findEmployeeRecord"
+  );
+
+  const coVt = AppData.VT_WORKED_CODES.has(AppData.getScaleCode(emp, "2026-05-14", chez));
+  const feriasVt = AppData.VT_WORKED_CODES.has(AppData.getScaleCode(emp, "2026-05-21", chez));
+  const absVt = AppData.VT_WORKED_CODES.has(AppData.getScaleCode(emp, "2026-05-12", chez));
+  assert(area, !coVt && !feriasVt && !absVt, "CO, férias e ausência abatem VT", ["js/data.js"], "—");
+
+  const beforeEmployees = chez.employees.length;
+  AppData.setPageCompany("dashboard", "Pengold", { save: false });
+  assert(
+    area,
+    chez.employees.length === beforeEmployees && peng.employees.length === 1,
+    "Troca de empresa/aba não apaga cadastro de funcionários",
+    ["js/data.js"],
+    "—"
+  );
+}
+
+function validatePersistence(AppData, chez, ym) {
+  const area = "Persistência localStorage";
+  const storage = createStorage();
+  const snapshot = JSON.parse(JSON.stringify(AppData.state));
+  snapshot.pageFilters.escala = "Pengold";
+  snapshot.companies["Chez Pitu"].contadorLancamentos[ym] = [
+    { employeeId: "chez-1", falta: 2, horaExtra: "02:00", vales: 80 }
+  ];
+  storage.setItem("chezPituPeopleSystem.v1", JSON.stringify(snapshot));
+
+  const reloaded = loadCore(storage).AppData;
+  assert(
+    area,
+    reloaded.getPrimaryPageCompany("escala") === "Pengold",
+    "Filtro de empresa persiste após reload (simula F5)",
+    ["js/data.js"],
+    "localStorage pageFilters"
+  );
+  assert(
+    area,
+    (reloaded.getCompanyData("Chez Pitu").contadorLancamentos[ym] || [])[0]?.falta === 2,
+    "Lançamentos Contador persistem após reload",
+    ["js/data.js", "js/contador.js"],
+    "—"
+  );
+  assert(
+    area,
+    reloaded.getCompanyData("Chez Pitu").absences.some((a) => a.employeeId === "chez-1"),
+    "Ausências persistem após reload",
+    ["js/data.js"],
+    "—"
+  );
 }
 
 function validateContador(AppData, chez, peng, ym) {
@@ -498,6 +826,10 @@ function main() {
   validateFeriados(AppData, chez);
   validateDashboard(AppData, chez, peng);
   validateContador(AppData, chez, peng, ym);
+  validatePadroeiraBuzios(AppData);
+  validateCoModal(AppData, chez);
+  validateCrossModuleLinks(AppData, chez, peng, ym);
+  validatePersistence(AppData, chez, ym);
 
   console.log("\n=== RELATÓRIO DE VALIDAÇÃO FUNCIONAL ===\n");
   console.log(`Aprovadas: ${results.approved.length}`);
@@ -527,7 +859,7 @@ function main() {
   }
 
   console.log("\n--- Validação automatizada concluída sem erros de regra de negócio ---");
-  console.log("Pendente confirmação visual no browser: troca de empresa Escala (5×), PDF Contador.\n");
+  console.log("Pendente confirmação visual no browser: modal CO (Raquel), PDF Contador, troca Escala 5×.\n");
 }
 
 main();

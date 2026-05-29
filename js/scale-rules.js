@@ -405,10 +405,13 @@
   function addCalendarHoliday(holiday) {
     const state = AppData.state;
     if (!state.calendarHolidays) state.calendarHolidays = [];
+    const name = String(holiday.name || "").trim();
+    let date = String(holiday.date || "").trim();
+    if (AppData.isPadroeiraBuziosName(name)) date = AppData.correctPadroeiraBuziosDate(date);
     state.calendarHolidays.push({
       id: `cal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-      date: holiday.date,
-      name: String(holiday.name || "").trim(),
+      date,
+      name,
       type: holiday.type || "nacional",
       companies: holiday.companies || []
     });

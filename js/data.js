@@ -469,6 +469,80 @@
     return ABSENCE_TYPE_SCALE_CODES[String(absenceType || "").trim()] || "FALTA";
   }
 
+  const PADROEIRA_BUZIOS_CORRECT_SUFFIX = "-07-26";
+
+  function isPadroeiraBuziosName(name) {
+    const normalized = normalizeSearchText(name);
+    return normalized.includes("padroeira") && normalized.includes("buzios");
+  }
+
+  function correctPadroeiraBuziosDate(isoDate) {
+    const trimmed = String(isoDate || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    return `${trimmed.slice(0, 4)}${PADROEIRA_BUZIOS_CORRECT_SUFFIX}`;
+  }
+
+  function migratePadroeiraBuziosInHolidayList(holidays) {
+    if (!Array.isArray(holidays) || !holidays.length) return false;
+
+    let changed = false;
+    const keep = [];
+    const mergedPadroeira = new Map();
+
+    holidays.forEach((holiday) => {
+      if (!holiday || typeof holiday !== "object") return;
+      if (!isPadroeiraBuziosName(holiday.name)) {
+        keep.push(holiday);
+        return;
+      }
+
+      const correctDate = correctPadroeiraBuziosDate(holiday.date);
+      if (holiday.date !== correctDate) changed = true;
+
+      const bucketKey = `${correctDate}|${normalizeSearchText(holiday.name)}`;
+      if (!mergedPadroeira.has(bucketKey)) {
+        mergedPadroeira.set(bucketKey, {
+          ...holiday,
+          date: correctDate,
+          workedEmployees: [...(holiday.workedEmployees || [])]
+        });
+        return;
+      }
+
+      const bucket = mergedPadroeira.get(bucketKey);
+      const employees = new Map();
+      [...(bucket.workedEmployees || []), ...(holiday.workedEmployees || [])].forEach((item) => {
+        if (!item?.employeeId) return;
+        employees.set(item.employeeId, { ...(employees.get(item.employeeId) || {}), ...item });
+      });
+      bucket.workedEmployees = [...employees.values()];
+      changed = true;
+    });
+
+    if (!mergedPadroeira.size) return changed;
+
+    holidays.length = 0;
+    holidays.push(...keep, ...mergedPadroeira.values());
+    return true;
+  }
+
+  function migratePadroeiraBuziosHoliday(targetState) {
+    if (!targetState) return false;
+    let changed = false;
+
+    if (!targetState.calendarHolidays) targetState.calendarHolidays = [];
+    if (migratePadroeiraBuziosInHolidayList(targetState.calendarHolidays)) changed = true;
+
+    companyKeysFromState(targetState).forEach((company) => {
+      const block = targetState.companies?.[company];
+      if (!block) return;
+      if (!block.holidays) block.holidays = [];
+      if (migratePadroeiraBuziosInHolidayList(block.holidays)) changed = true;
+    });
+
+    return changed;
+  }
+
   function companyKeysFromState(targetState) {
     return [...new Set([...COMPANIES, ...Object.keys(targetState?.companies || {})])];
   }
@@ -532,6 +606,7 @@
     };
     migratePageFilters(next, defaults);
     migrateVtStorage(next);
+    migratePadroeiraBuziosHoliday(next);
     delete next.selectedCompany;
     companyKeysFromState(next).forEach((company) => {
       if (!next.companies[company]) next.companies[company] = createCompanyData(company);
@@ -1206,8 +1281,9 @@
 
   function syncCompanyHolidaysFromCalendarEntry(entry, options = {}) {
     const name = String(entry?.name || "").trim();
-    const date = String(entry?.date || "").trim();
+    let date = String(entry?.date || "").trim();
     if (!name || !date) return false;
+    if (isPadroeiraBuziosName(name)) date = correctPadroeiraBuziosDate(date);
 
     const shouldSave = options.save !== false;
     let changed = false;
@@ -1368,26 +1444,65 @@
     return item.status === "Pendente" || item.status === "Agendado";
   }
 
+  function getPendingCoHolidaysForEmployee(employeeId, coDate, options = {}) {
+    if (!employeeId) return [];
+
+    const company =
+      options.company ||
+      findEmployeeRecord(employeeId)?.company ||
+      getPrimaryPageCompany("escala");
+    const data = options.data || getCompanyData(company);
+    const today = todayISO();
+    const currentEntry = getManualScaleEntry(employeeId, coDate, data);
+    const currentLinkedId =
+      currentEntry && typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
+
+    return (data.holidays || [])
+      .map((holiday) => {
+        const item = (holiday.workedEmployees || []).find((row) => row.employeeId === employeeId);
+        if (!item) return null;
+
+        syncWorkedEmployeeStatus(item, holiday.date);
+        const status = resolveWorkedHolidayStatus(item, holiday.date, today);
+        const isEditingThisCo =
+          holiday.id === currentLinkedId ||
+          (item.linkedFromScale && (item.scaleCoDate === coDate || item.compensationDate === coDate));
+
+        if (status.key === "compensado" && !isEditingThisCo) return null;
+
+        if (item.linkedFromScale && item.scaleCoDate && item.scaleCoDate !== coDate && !isEditingThisCo) {
+          return null;
+        }
+
+        if (
+          item.compensationDate &&
+          item.compensationDate !== coDate &&
+          status.key !== "pendente" &&
+          status.key !== "vencido" &&
+          !isEditingThisCo
+        ) {
+          return null;
+        }
+
+        if (status.key === "agendado" && !isEditingThisCo) return null;
+
+        if (status.key !== "pendente" && status.key !== "vencido" && !isEditingThisCo) return null;
+
+        return { holiday, item, status, company };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
+  }
+
   function findOldestLinkableHolidayWorked(data, employeeId, preferredHolidayId, coDate = "") {
+    const pending = getPendingCoHolidaysForEmployee(employeeId, coDate, { data });
+
     if (preferredHolidayId) {
-      const preferred = data.holidays.find((holiday) => holiday.id === preferredHolidayId);
-      const preferredItem = preferred?.workedEmployees?.find((item) => item.employeeId === employeeId);
-      if (preferred && preferredItem && canAutoLinkWorkedEmployee(preferredItem, coDate)) {
-        return { holiday: preferred, item: preferredItem };
-      }
+      const preferred = pending.find((entry) => entry.holiday.id === preferredHolidayId);
+      if (preferred) return preferred;
     }
 
-    const candidates = [];
-    (data.holidays || []).forEach((holiday) => {
-      (holiday.workedEmployees || []).forEach((item) => {
-        if (item.employeeId !== employeeId) return;
-        if (!canAutoLinkWorkedEmployee(item, coDate)) return;
-        candidates.push({ holiday, item });
-      });
-    });
-
-    candidates.sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
-    return candidates[0] || null;
+    return pending[0] || null;
   }
 
   function isCoDateAlreadyLinked(data, employeeId, coDate, excludeHolidayId = "") {
@@ -1867,8 +1982,12 @@
     getHolidayCompensationDueDate,
     isCompensationWithinDeadline,
     getAbsenceScaleCode,
+    isPadroeiraBuziosName,
+    correctPadroeiraBuziosDate,
+    migratePadroeiraBuziosHoliday,
     findAbsenceForDate,
     getScaleAbsenceConflict,
+    getPendingCoHolidaysForEmployee,
     finalizeIncomingState,
     migrateVtStorage,
     WEEK_DAYS,

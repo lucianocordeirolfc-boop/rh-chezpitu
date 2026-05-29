@@ -895,24 +895,13 @@
       document.getElementById("coHolidayPicker")?.remove();
 
       const data = AppData.getCompanyData(scaleCompany || getViewCompany());
-      const holidays = data.holidays || [];
       const currentEntry = AppData.getManualScaleEntry(employeeId, date, data);
       const currentLinkedId = typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
 
-      const eligible = holidays
-        .map((holiday) => {
-          const item = (holiday.workedEmployees || []).find((row) => row.employeeId === employeeId);
-          if (!item) return null;
-          // Regra: listar apenas feriados que o funcionário trabalhou e ainda não compensou.
-          // Se o feriado já está vinculado ao próprio CO desta data, mantém disponível para editar.
-          const isSameCo = item.linkedFromScale && (item.scaleCoDate === date || item.compensationDate === date);
-          const isAvailable = !item.compensationDate || isSameCo;
-          if (!isAvailable) return null;
-          const status = AppData.resolveWorkedHolidayStatus(item, holiday.date);
-          return { holiday, item, status };
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
+      const eligible = AppData.getPendingCoHolidaysForEmployee(employeeId, date, {
+        company: scaleCompany || getViewCompany(),
+        data
+      });
 
       const holidayOpts = eligible.length
         ? eligible

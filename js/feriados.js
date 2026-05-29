@@ -810,7 +810,8 @@
     const name = resolveCalendarHolidayName(formData);
     if (!name) return false;
     const scope = formData.get("companyScope");
-    const date = String(formData.get("date") || "").trim();
+    let date = String(formData.get("date") || "").trim();
+    if (AppData.isPadroeiraBuziosName(name)) date = AppData.correctPadroeiraBuziosDate(date);
     const companies = scope === "ambas" ? ["ambas"] : [scope];
     ScaleRules.addCalendarHoliday({
       name,
