@@ -692,7 +692,7 @@
               <div class="scale-print-brand">
                 <p class="scale-print-legal-name">${esc(companyInfo.legalName)}</p>
                 ${companyInfo.logoDataUrl
-                  ? `<img src="${companyInfo.logoDataUrl}" alt="Logo ${esc(companyInfo.legalName)}" class="scale-print-logo-img">`
+                  ? `<div class="scale-print-logo-frame"><img src="${companyInfo.logoDataUrl}" alt="Logo ${esc(companyInfo.legalName)}" class="scale-print-logo-img"></div>`
                   : `<div class="scale-print-logo-slot" aria-hidden="true">LOGO</div>`}
                 <p class="scale-print-cnpj">CNPJ: ${esc(companyInfo.cnpj || "—")}</p>
               </div>
@@ -714,11 +714,13 @@
               </div>
             </header>
 
+            <div class="scale-print-table-wrap">
             <table class="scale-print-table">
               ${renderPrintColgroup(days)}
               <thead><tr><th>Funcionários</th>${headerDays}</tr></thead>
               <tbody>${rows}</tbody>
             </table>
+            </div>
 
             <section class="scale-print-footer">
               <div class="scale-print-observations">

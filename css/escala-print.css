@@ -40,6 +40,10 @@
   margin-bottom: 5mm;
   padding-bottom: 4mm;
   border-bottom: 2px solid #c9edf6;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .scale-print-header-corporate {
@@ -53,21 +57,19 @@
   display: flex;
   flex-direction: column;
   gap: 1.5mm;
+  max-width: 52mm;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.scale-print-legal-name {
-  margin: 0;
-  color: #06364a;
-  font-size: 9.2pt;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.scale-print-cnpj {
-  margin: 0;
-  color: #47616b;
-  font-size: 8pt;
-  font-weight: 700;
+.scale-print-logo-frame {
+  display: flex;
+  width: 36mm;
+  height: 14mm;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .scale-print-logo-slot {
@@ -85,12 +87,30 @@
 }
 
 .scale-print-logo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
   max-width: 36mm;
   max-height: 14mm;
   object-fit: contain;
-  display: block;
+  object-position: left center;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+}
+
+.scale-print-legal-name {
+  margin: 0;
+  color: #06364a;
+  font-size: 9.2pt;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.scale-print-cnpj {
+  margin: 0;
+  color: #47616b;
+  font-size: 8pt;
+  font-weight: 700;
 }
 
 .scale-print-month-display {
@@ -138,6 +158,9 @@
   border: 1px solid #cfe3ea;
   border-radius: 3mm;
   background: #ffffff;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .scale-print-sign-block {
@@ -148,6 +171,9 @@
   width: 100%;
   max-width: 100%;
   text-align: center;
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
 }
 
 .scale-print-sign-line {
@@ -240,6 +266,11 @@
   font-size: 10pt;
   font-weight: 900;
   letter-spacing: 0.16em;
+}
+
+.scale-print-table-wrap {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .scale-print-table {
@@ -384,6 +415,10 @@
   grid-template-columns: 1.25fr 0.95fr;
   gap: 6mm;
   margin-top: 5mm;
+  position: relative;
+  z-index: 3;
+  isolation: isolate;
+  flex-shrink: 0;
 }
 
 .scale-print-observations,
@@ -393,6 +428,8 @@
   border: 1px solid #cfe3ea;
   border-radius: 3mm;
   background: #ffffff;
+  position: relative;
+  overflow: hidden;
 }
 
 .scale-print-observations,
@@ -668,14 +705,15 @@
   body.printing-scale #scalePrintContainer {
     position: fixed !important;
     top: 0 !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
+    left: 0 !important;
+    right: 0 !important;
     width: 297mm !important;
     height: 210mm !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     overflow: hidden !important;
     background: #ffffff !important;
+    transform: none !important;
   }
 
   body.printing-scale #scalePrintContainer .scale-print-area {
@@ -774,8 +812,27 @@
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     min-height: 20mm !important;
+    background: #ffffff !important;
+    isolation: isolate !important;
+  }
+
+  body.printing-scale .scale-print-sign-block {
+    background: #ffffff !important;
+  }
+
+  body.printing-scale .scale-print-brand,
+  body.printing-scale .scale-print-logo-frame {
+    overflow: hidden !important;
+  }
+
+  body.printing-scale .scale-print-logo-img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 36mm !important;
+    max-height: 14mm !important;
+    object-fit: contain !important;
   }
 
   body.printing-scale .scale-print-sign-line {

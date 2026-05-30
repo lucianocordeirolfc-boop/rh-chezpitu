@@ -1231,8 +1231,8 @@ function validateScalePrintLayout() {
   assert(
     area,
     !printCss.includes("width: 281mm") &&
-      escalaPrintCss.includes("scale-print-notes-print") &&
-      escalaPrintCss.includes("display: table-header-group"),
+    escalaPrintCss.includes("scale-print-logo-frame") &&
+      escalaPrintCss.includes("scale-print-table-wrap"),
     "Layout de impressão da escala centralizado em escala-print.css",
     ["css/escala-print.css", "css/print.css"],
     "—"
