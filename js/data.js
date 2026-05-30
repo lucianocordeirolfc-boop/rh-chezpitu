@@ -612,6 +612,12 @@
       normalizeCompanyBlock(next.companies[company]);
       normalizeCompanyHolidays(next.companies[company]);
     });
+    if (companyKeysFromState(next).some((company) => next.companies[company]?._vacationRepairPending)) {
+      companyKeysFromState(next).forEach((company) => {
+        delete next.companies[company]?._vacationRepairPending;
+      });
+      queueMicrotask(() => saveState());
+    }
     return next;
   }
 
@@ -836,6 +842,175 @@
     return result;
   }
 
+  function enumerateDates(startDate, endDate) {
+    if (!startDate || !endDate || endDate < startDate) return [];
+    const dates = [];
+    let cursor = startDate;
+    while (cursor <= endDate) {
+      dates.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+    return dates;
+  }
+
+  function resolveEmployeeIdInBlock(ref, companyBlock) {
+    const refStr = String(ref || "").trim();
+    if (!refStr) return null;
+    const employees = companyBlock?.employees || [];
+    if (employees.some((employee) => employee.id === refStr)) return refStr;
+    const targetName = normalizeEmployeeName(refStr);
+    const byName = employees.find((employee) => normalizeEmployeeName(employee.name) === targetName);
+    return byName?.id || null;
+  }
+
+  function remapManualScaleEmployeeIds(companyBlock) {
+    const next = {};
+    let changed = false;
+
+    Object.entries(companyBlock.manualScale || {}).forEach(([key, entry]) => {
+      const sep = key.indexOf("|");
+      if (sep < 0) {
+        next[key] = entry;
+        return;
+      }
+      const ref = key.slice(0, sep);
+      const date = key.slice(sep + 1);
+      const canonical = resolveEmployeeIdInBlock(ref, companyBlock) || ref;
+      const newKey = `${canonical}|${date}`;
+      if (newKey !== key) changed = true;
+      if (Object.prototype.hasOwnProperty.call(next, newKey)) return;
+      next[newKey] = entry;
+    });
+
+    if (changed) companyBlock.manualScale = next;
+    return changed;
+  }
+
+  function matchEmployeeIdByVacationNote(vacation, employees) {
+    const note = normalizeEmployeeName(vacation?.note);
+    if (!note || note === normalizeEmployeeName("Sincronizado da escala")) return null;
+
+    const exact = employees.filter((employee) => normalizeEmployeeName(employee.name) === note);
+    if (exact.length === 1) return exact[0].id;
+
+    const partial = employees.filter((employee) => {
+      const name = normalizeEmployeeName(employee.name);
+      return name.includes(note) || note.includes(name);
+    });
+    if (partial.length === 1) return partial[0].id;
+    return null;
+  }
+
+  function relinkOrphanVacations(companyBlock) {
+    const employees = companyBlock.employees || [];
+    const validIds = new Set(employees.map((employee) => employee.id));
+    let changed = false;
+
+    (companyBlock.vacations || []).forEach((vacation) => {
+      if (!vacation?.employeeId || validIds.has(vacation.employeeId)) return;
+
+      const byRef = resolveEmployeeIdInBlock(vacation.employeeId, companyBlock);
+      if (byRef) {
+        vacation.employeeId = byRef;
+        changed = true;
+        return;
+      }
+
+      const byNote = matchEmployeeIdByVacationNote(vacation, employees);
+      if (byNote) {
+        vacation.employeeId = byNote;
+        changed = true;
+        return;
+      }
+
+      const overlapDates = enumerateDates(vacation.startDate, vacation.endDate);
+      const matched = employees.filter((employee) =>
+        overlapDates.some((date) => manualScaleEntryCode(companyBlock.manualScale?.[`${employee.id}|${date}`]) === "FÉRIAS")
+      );
+
+      if (matched.length === 1) {
+        vacation.employeeId = matched[0].id;
+        changed = true;
+      }
+    });
+
+    return changed;
+  }
+
+  function repairVacationAndAbsenceIds(companyBlock) {
+    let changed = false;
+    (companyBlock.vacations || []).forEach((vacation) => {
+      const canonical = resolveEmployeeIdInBlock(vacation.employeeId, companyBlock);
+      if (canonical && canonical !== vacation.employeeId) {
+        vacation.employeeId = canonical;
+        changed = true;
+      }
+    });
+    (companyBlock.absences || []).forEach((absence) => {
+      const canonical = resolveEmployeeIdInBlock(absence.employeeId, companyBlock);
+      if (canonical && canonical !== absence.employeeId) {
+        absence.employeeId = canonical;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function migrateEmployeeRefs(companyBlock) {
+    if (!companyBlock) return false;
+    return (
+      remapManualScaleEmployeeIds(companyBlock) ||
+      relinkOrphanVacations(companyBlock) ||
+      repairVacationAndAbsenceIds(companyBlock)
+    );
+  }
+
+  function findVacationForDate(employeeId, date, data) {
+    const canonicalId = String(employeeId || "").trim();
+    if (!canonicalId) return null;
+
+    const direct = (data.vacations || []).find(
+      (item) => item.employeeId === canonicalId && isBetween(date, item.startDate, item.endDate)
+    );
+    if (direct) return direct;
+
+    const employee = (data.employees || []).find((item) => item.id === canonicalId);
+    if (employee) {
+      const byNote = (data.vacations || []).find((item) => {
+        if (!isBetween(date, item.startDate, item.endDate)) return false;
+        return matchEmployeeIdByVacationNote(item, [employee]) === canonicalId;
+      });
+      if (byNote) return byNote;
+    }
+
+    const resolvedId = resolveEmployeeIdInBlock(canonicalId, data);
+    if (resolvedId && resolvedId !== canonicalId) {
+      return (data.vacations || []).find(
+        (item) => item.employeeId === resolvedId && isBetween(date, item.startDate, item.endDate)
+      );
+    }
+
+    return null;
+  }
+
+  function syncManualFeriasPrefixesToVacations(companyBlock) {
+    const prefixes = new Set();
+    Object.entries(companyBlock.manualScale || {}).forEach(([key, entry]) => {
+      if (manualScaleEntryCode(entry) !== "FÉRIAS") return;
+      const sep = key.indexOf("|");
+      if (sep < 0) return;
+      prefixes.add(key.slice(0, sep));
+    });
+
+    prefixes.forEach((prefix) => {
+      const employeeId = resolveEmployeeIdInBlock(prefix, companyBlock);
+      if (!employeeId) return;
+      collectManualFeriasRanges(companyBlock, employeeId).forEach(({ startDate, endDate }) => {
+        upsertVacationRange(companyBlock, employeeId, startDate, endDate, "Sincronizado da escala");
+      });
+    });
+  }
+
   function manualScaleEntryCode(entry) {
     if (entry === undefined) return undefined;
     return typeof entry === "object" ? entry.code : entry;
@@ -909,16 +1084,24 @@
   }
 
   function normalizeVacations(companyBlock) {
-    if (!companyBlock) return;
+    if (!companyBlock) return false;
+    let changed = migrateEmployeeRefs(companyBlock);
     companyBlock.vacations = Array.isArray(companyBlock.vacations) ? companyBlock.vacations : [];
+
     (companyBlock.employees || []).forEach((employee) => {
       if (!employee?.id) return;
       collectManualFeriasRanges(companyBlock, employee.id).forEach(({ startDate, endDate }) => {
         upsertVacationRange(companyBlock, employee.id, startDate, endDate, "Sincronizado da escala");
+        changed = true;
       });
     });
+
+    syncManualFeriasPrefixesToVacations(companyBlock);
+
+    const validIds = new Set((companyBlock.employees || []).map((employee) => employee.id));
     companyBlock.vacations.forEach((vacation) => {
       if (!vacation?.employeeId || !vacation.startDate || !vacation.endDate) return;
+      if (!validIds.has(vacation.employeeId)) return;
       clearManualScaleCodeInRange(
         companyBlock,
         vacation.employeeId,
@@ -927,6 +1110,8 @@
         "FÉRIAS"
       );
     });
+
+    return changed;
   }
 
   function normalizeCompanyBlock(block) {
@@ -939,7 +1124,7 @@
     block.contadorLancamentos =
       block.contadorLancamentos && typeof block.contadorLancamentos === "object" ? block.contadorLancamentos : {};
     delete block.vtDeductions;
-    normalizeVacations(block);
+    if (normalizeVacations(block)) block._vacationRepairPending = true;
     return block;
   }
 
@@ -1514,12 +1699,13 @@
 
   function addVacation(vacation, company) {
     const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const employeeName = getEmployeeName(vacation.employeeId, data);
     upsertVacationRange(
       data,
       vacation.employeeId,
       vacation.startDate,
       vacation.endDate,
-      vacation.note || ""
+      String(vacation.note || "").trim() || employeeName
     );
     runScaleIntegrations(monthsTouchedByRange(vacation.startDate, vacation.endDate));
     saveState();
@@ -2071,7 +2257,7 @@
   }
 
   function getScaleCode(employee, date, data = getCompanyData()) {
-    const vacation = data.vacations.find((item) => item.employeeId === employee.id && isBetween(date, item.startDate, item.endDate));
+    const vacation = findVacationForDate(employee.id, date, data);
     if (vacation) return "FÉRIAS";
 
     const absence = findAbsenceForDate(employee.id, date, data);

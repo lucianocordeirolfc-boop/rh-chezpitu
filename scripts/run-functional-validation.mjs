@@ -1053,6 +1053,29 @@ function validateVacationSync(AppData, chez) {
     ["js/data.js"],
     "getScaleCode"
   );
+
+  chez.vacations.push({
+    id: "v-orphan",
+    employeeId: "func-legado-renan",
+    startDate: "2026-06-10",
+    endDate: "2026-06-12",
+    note: "Maria Chez"
+  });
+  AppData.normalizeVacations(chez);
+  assert(
+    area,
+    chez.vacations.some((item) => item.id === "v-orphan" && item.employeeId === "chez-1"),
+    "Férias órfãs são religadas ao funcionário pelo nome (note/cadastro)",
+    ["js/data.js"],
+    "relinkOrphanVacations"
+  );
+  assert(
+    area,
+    AppData.getScaleCode(emp, "2026-06-11", chez) === "FÉRIAS",
+    "Férias religadas refletem na escala",
+    ["js/data.js"],
+    "findVacationForDate"
+  );
 }
 
 function validateCoDirectLink(AppData, chez) {
