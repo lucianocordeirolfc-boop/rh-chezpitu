@@ -688,6 +688,47 @@ function validateCoModal(AppData, chez) {
     ["js/data.js", "js/escala.js"],
     "—"
   );
+
+  chez.holidays.push({
+    id: "h-legacy-name",
+    name: "Feriado legado",
+    date: "2026-02-01",
+    workedEmployees: [{ employeeId: "Raquel R. da Costa", compensationDate: "", status: "Pendente" }]
+  });
+  chez.holidays.push({
+    id: "h-empty-id",
+    name: "Feriado órfão",
+    date: "2026-02-02",
+    workedEmployees: [{ employeeId: "", compensationDate: "", status: "Pendente" }]
+  });
+  AppData.normalizeWorkedEmployeeRefs?.(chez);
+  const raquelWithLegacy = AppData.getPendingCoHolidaysForEmployee("raquel-1", coDate, {
+    company: "Chez Pitu",
+    data: chez
+  });
+  assert(
+    area,
+    raquelWithLegacy.some((entry) => entry.holiday.id === "h-legacy-name"),
+    "Vínculo legado por nome migra para employeeId e aparece só para Raquel",
+    ["js/data.js"],
+    "normalizeWorkedEmployeeRefs + resolveWorkedEmployeeEntry"
+  );
+  assert(
+    area,
+    !raquelWithLegacy.some((entry) => entry.holiday.id === "h-empty-id"),
+    "Registros sem employeeId não aparecem para todos no modal CO",
+    ["js/data.js"],
+    "—"
+  );
+
+  const coWithoutLink = AppData.setManualScale("raquel-1", "2026-06-15", "CO", null, "Chez Pitu");
+  assert(
+    area,
+    Boolean(coWithoutLink?.coWarning) && !chez.manualScale["raquel-1|2026-06-15"],
+    "CO sem feriado selecionado não vincula automaticamente",
+    ["js/data.js", "js/escala.js"],
+    "setManualScale exige linkedHolidayId"
+  );
 }
 
 function validateCrossModuleLinks(AppData, chez, peng, ym) {

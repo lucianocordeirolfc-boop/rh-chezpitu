@@ -894,13 +894,24 @@
     function showCoHolidayPicker(cell, employeeId, date, scaleCompany) {
       document.getElementById("coHolidayPicker")?.remove();
 
+      const resolvedEmployeeId = String(employeeId || "").trim();
+      if (!resolvedEmployeeId) {
+        window.App?.toast?.("Funcionário inválido para vincular CO.", "error");
+        return;
+      }
+
       const data = AppData.getCompanyData(scaleCompany || getViewCompany());
-      const employee = (data.employees || []).find((entry) => entry.id === employeeId);
-      const employeeLabel = employee?.name || employeeId;
-      const currentEntry = AppData.getManualScaleEntry(employeeId, date, data);
+      const employee = (data.employees || []).find((entry) => entry.id === resolvedEmployeeId);
+      if (!employee) {
+        window.App?.toast?.("Funcionário não encontrado no cadastro desta empresa.", "error");
+        return;
+      }
+
+      const employeeLabel = employee.name || resolvedEmployeeId;
+      const currentEntry = AppData.getManualScaleEntry(resolvedEmployeeId, date, data);
       const currentLinkedId = typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
 
-      const eligible = AppData.getPendingCoHolidaysForEmployee(employeeId, date, {
+      const eligible = AppData.getPendingCoHolidaysForEmployee(resolvedEmployeeId, date, {
         company: scaleCompany || getViewCompany(),
         data
       });
@@ -911,10 +922,14 @@
               ({ holiday, status }) =>
                 `<option value="${esc(holiday.id)}" ${holiday.id === currentLinkedId ? "selected" : ""}>${esc(
                   holiday.name || holiday.date
-                )} — ${esc(status.label)}</option>`
+                )} (${esc(AppData.formatDateBR(holiday.date))}) — ${esc(status.label)}</option>`
             )
             .join("")
-        : `<option value="" disabled>Nenhum feriado pendente para este funcionário</option>`;
+        : `<option value="" disabled selected>Nenhum feriado pendente para este funcionário</option>`;
+
+      const selectAttrs = eligible.length
+        ? 'required'
+        : 'disabled';
 
       const picker = document.createElement("div");
       picker.id = "coHolidayPicker";
@@ -922,15 +937,15 @@
       picker.innerHTML = `
         <p class="co-picker-title">Feriado trabalhado — CO</p>
         <p class="co-picker-hint">Funcionário: <strong>${esc(displayName(employeeLabel))}</strong></p>
-        <p class="co-picker-hint">Somente feriados pendentes deste funcionário:</p>
-        <select id="coHolidaySelect" class="co-picker-select">
-          <option value="">— Sem vínculo específico —</option>
+        <p class="co-picker-hint">Selecione um feriado pendente deste funcionário:</p>
+        <select id="coHolidaySelect" class="co-picker-select" ${selectAttrs}>
+          ${eligible.length ? `<option value="" disabled ${currentLinkedId ? "" : "selected"}>— Selecione o feriado —</option>` : ""}
           ${holidayOpts}
         </select>
         ${eligible.length ? "" : `<p class="co-picker-hint">Este funcionário não possui feriados trabalhados pendentes.</p>`}
         <div class="co-picker-actions">
           <button id="coPickerCancel" class="secondary btn-sm" type="button">Cancelar CO</button>
-          <button id="coPickerConfirm" class="primary btn-sm" type="button">Confirmar CO</button>
+          <button id="coPickerConfirm" class="primary btn-sm" type="button" ${eligible.length ? "" : "disabled"}>Confirmar CO</button>
         </div>
       `;
 
@@ -944,14 +959,26 @@
 
       picker.querySelector("#coPickerCancel").addEventListener("click", () => {
         backdrop.remove();
-        AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
+        AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
         renderCurrent(container);
       });
 
       picker.querySelector("#coPickerConfirm").addEventListener("click", () => {
+        if (!eligible.length) {
+          backdrop.remove();
+          AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
+          renderCurrent(container);
+          return;
+        }
+
         const linkedId = picker.querySelector("#coHolidaySelect").value || null;
+        if (!linkedId) {
+          window.App?.toast?.("Selecione o feriado pendente deste funcionário.", "warning");
+          return;
+        }
+
         backdrop.remove();
-        const result = AppData.setManualScale(employeeId, date, "CO", linkedId, scaleCompany);
+        const result = AppData.setManualScale(resolvedEmployeeId, date, "CO", linkedId, scaleCompany);
         if (result?.coWarning) window.App?.toast?.(result.coWarning, "warning", 5000);
         renderCurrent(container);
         window.App.renderCurrent();
@@ -962,9 +989,9 @@
           if (!wrapper.contains(e.target)) {
             backdrop.remove();
             document.removeEventListener("mousedown", outsideClick);
-            const entry = AppData.getManualScaleEntry(employeeId, date, data);
+            const entry = AppData.getManualScaleEntry(resolvedEmployeeId, date, data);
             if (typeof entry !== "object") {
-              AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
+              AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
               renderCurrent(container);
             }
           }
