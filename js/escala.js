@@ -957,7 +957,10 @@
       backdrop.appendChild(wrapper);
       document.body.appendChild(backdrop);
 
+      let detachOutsideClick = null;
+
       picker.querySelector("#coPickerCancel").addEventListener("click", () => {
+        detachOutsideClick?.();
         backdrop.remove();
         AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
         renderCurrent(container);
@@ -965,6 +968,7 @@
 
       picker.querySelector("#coPickerConfirm").addEventListener("click", () => {
         if (!eligible.length) {
+          detachOutsideClick?.();
           backdrop.remove();
           AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
           renderCurrent(container);
@@ -977,6 +981,7 @@
           return;
         }
 
+        detachOutsideClick?.();
         backdrop.remove();
         const result = AppData.setManualScale(resolvedEmployeeId, date, "CO", linkedId, scaleCompany);
         if (result?.coWarning) window.App?.toast?.(result.coWarning, "warning", 5000);
@@ -987,8 +992,7 @@
       setTimeout(() => {
         const outsideClick = (e) => {
           if (!wrapper.contains(e.target)) {
-            backdrop.remove();
-            document.removeEventListener("mousedown", outsideClick);
+            detachOutsideClick?.();
             const entry = AppData.getManualScaleEntry(resolvedEmployeeId, date, data);
             if (typeof entry !== "object") {
               AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
@@ -996,6 +1000,7 @@
             }
           }
         };
+        detachOutsideClick = () => document.removeEventListener("mousedown", outsideClick);
         document.addEventListener("mousedown", outsideClick);
       }, 0);
     }
@@ -1046,6 +1051,7 @@
       document.body.appendChild(backdrop);
 
       picker.querySelector("#rangePickerCancel").addEventListener("click", function () {
+        detachOutsideClick?.();
         backdrop.remove();
         AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
         renderCurrent(container);
@@ -1057,6 +1063,30 @@
         if (!startStr || !endStr) { alert("Preencha as duas datas."); return; }
         if (endStr < startStr) { alert("Data fim não pode ser anterior à data início."); return; }
 
+        detachOutsideClick?.();
+        backdrop.remove();
+
+        if (code === "FÉRIAS") {
+          AppData.addVacation(
+            { employeeId: employeeId, startDate: startStr, endDate: endStr, note: "" },
+            scaleCompany
+          );
+          renderCurrent(container);
+          window.App.renderCurrent();
+          if (window.App?.toast) {
+            window.App.toast(
+              "Férias registradas de " +
+                AppData.formatDateBR(startStr) +
+                " a " +
+                AppData.formatDateBR(endStr) +
+                ".",
+              "success",
+              3000
+            );
+          }
+          return;
+        }
+
         var cur = new Date(startStr + "T00:00:00");
         var end = new Date(endStr + "T00:00:00");
         var count = 0;
@@ -1066,20 +1096,22 @@
           cur.setDate(cur.getDate() + 1);
           count++;
         }
-        backdrop.remove();
         renderCurrent(container);
         window.App.renderCurrent();
         if (window.App?.toast) window.App.toast(label + " registrado(a) para " + count + " dia(s).", "success", 3000);
       });
 
+      var detachOutsideClick = null;
       setTimeout(function () {
         var outsideClick = function (e) {
           if (!wrapper.contains(e.target)) {
-            backdrop.remove();
-            document.removeEventListener("mousedown", outsideClick);
+            detachOutsideClick?.();
             AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
             renderCurrent(container);
           }
+        };
+        detachOutsideClick = function () {
+          document.removeEventListener("mousedown", outsideClick);
         };
         document.addEventListener("mousedown", outsideClick);
       }, 0);

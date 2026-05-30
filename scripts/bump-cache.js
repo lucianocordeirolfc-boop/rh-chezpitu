@@ -7,7 +7,7 @@ const path = require("path");
 const indexPath = path.join(__dirname, "..", "index.html");
 const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
 const html = fs.readFileSync(indexPath, "utf8");
-const updated = html.replace(/\?v=\d{8}/g, `?v=${stamp}`);
+const updated = html.replace(/\?v=\d{8}[a-z]?/g, `?v=${stamp}`);
 
 if (updated === html) {
   console.log(`[bump-cache] Nenhum ?v= encontrado em index.html (stamp ${stamp}).`);

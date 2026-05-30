@@ -1022,6 +1022,122 @@ function validatePersistence(AppData, chez, ym) {
   );
 }
 
+function validateVacationSync(AppData, chez) {
+  const area = "Férias × Escala";
+  chez.manualScale["chez-1|2026-06-01"] = "FÉRIAS";
+  chez.manualScale["chez-1|2026-06-02"] = "FÉRIAS";
+  chez.manualScale["chez-1|2026-06-03"] = "FÉRIAS";
+  AppData.normalizeVacations(chez);
+  const synced = chez.vacations.find(
+    (item) => item.employeeId === "chez-1" && item.startDate === "2026-06-01" && item.endDate === "2026-06-03"
+  );
+  assert(
+    area,
+    Boolean(synced),
+    "Férias manuais na escala viram registro em vacations[]",
+    ["js/data.js"],
+    "normalizeVacations / upsertVacationRange"
+  );
+  assert(
+    area,
+    !chez.manualScale["chez-1|2026-06-02"],
+    "Manual FÉRIAS removido após sincronizar com vacations[]",
+    ["js/data.js"],
+    "clearManualScaleCodeInRange"
+  );
+  const emp = chez.employees.find((item) => item.id === "chez-1");
+  assert(
+    area,
+    emp && AppData.getScaleCode(emp, "2026-06-02", chez) === "FÉRIAS",
+    "Férias sincronizadas aparecem na escala",
+    ["js/data.js"],
+    "getScaleCode"
+  );
+}
+
+function validateCoDirectLink(AppData, chez) {
+  const area = "CO persistente";
+  const coDate = "2026-06-09";
+  chez.employees.push({
+    id: "andre-1",
+    name: "André Teste",
+    status: "Ativo",
+    department: "Manutenção",
+    role: "Auxiliar",
+    fixedDay: "Segunda-feira",
+    vtDaily: 12,
+    admissionDate: "2024-01-01"
+  });
+  chez.holidays.push({
+    id: "h-andre-pend",
+    name: "Corpus Christi",
+    date: "2026-06-04",
+    workedEmployees: [{ employeeId: "andre-1", compensationDate: "", status: "Pendente" }]
+  });
+  const result = AppData.setManualScale("andre-1", coDate, "CO", "h-andre-pend", "Chez Pitu");
+  assert(
+    area,
+    !result?.coWarning && chez.manualScale[`andre-1|${coDate}`]?.code === "CO",
+    "CO com feriado selecionado persiste na escala (André)",
+    ["js/data.js", "js/escala.js"],
+    "linkScaleCoToHoliday com preferredHolidayId"
+  );
+  const worked = chez.holidays.find((item) => item.id === "h-andre-pend")?.workedEmployees?.[0];
+  assert(
+    area,
+    worked?.compensationDate === coDate && worked?.scaleCoDate === coDate,
+    "CO vincula compensationDate no Controle de Feriados",
+    ["js/data.js"],
+    "applyCoLinkToWorkedItem"
+  );
+}
+
+function validateCadastroSingleFilter() {
+  const area = "Cadastro UI";
+  const html = fs.readFileSync(path.join(root, "js/funcionarios.js"), "utf8");
+  assert(
+    area,
+    !html.includes('renderToolbar?.("funcionarios"') && !html.includes('bindToolbar?.(container, "funcionarios"'),
+    "Cadastro usa um único filtro de empresa (sem toolbar superior)",
+    ["js/funcionarios.js"],
+    "Remover CompanyUI.renderToolbar/bindToolbar do Cadastro"
+  );
+  assert(
+    area,
+    html.includes("return allEmployees;") && html.includes("applyPageCompanyToEmployeeList"),
+    "Lista de funcionários não depende de pageFilters.funcionarios",
+    ["js/funcionarios.js"],
+    "applyPageCompanyToEmployeeList"
+  );
+  assert(
+    area,
+    html.includes("AppData.formatDateBR(employee.admissionDate)"),
+    "Admissão exibida em DD/MM/AAAA",
+    ["js/funcionarios.js"],
+    "formatDateBR"
+  );
+}
+
+function validateDateFormatBR(AppData) {
+  const area = "Formato de data";
+  assert(
+    area,
+    AppData.formatDateBR("2026-05-19") === "19/05/2026",
+    "formatDateBR retorna DD/MM/AAAA",
+    ["js/data.js"],
+    "—"
+  );
+  const feriasHtml = fs.readFileSync(path.join(root, "js/ferias.js"), "utf8");
+  assert(
+    area,
+    feriasHtml.includes("AppData.formatDateBR(vacation.startDate)") &&
+      feriasHtml.includes("AppData.formatDateBR(absence.startDate)"),
+    "Tabelas de Ausências exibem datas em DD/MM/AAAA",
+    ["js/ferias.js"],
+    "formatDateBR nas colunas"
+  );
+}
+
 function validateContador(AppData, chez, peng, ym) {
   const area = "Informações Contador";
 
@@ -1083,6 +1199,10 @@ function main() {
   validateEmployeeCadastro(AppData, chez);
   validateCrossModuleLinks(AppData, chez, peng, ym);
   validatePersistence(AppData, chez, ym);
+  validateVacationSync(AppData, chez);
+  validateCoDirectLink(AppData, chez);
+  validateCadastroSingleFilter();
+  validateDateFormatBR(AppData);
 
   console.log("\n=== RELATÓRIO DE VALIDAÇÃO FUNCIONAL ===\n");
   console.log(`Aprovadas: ${results.approved.length}`);

@@ -836,6 +836,99 @@
     return result;
   }
 
+  function manualScaleEntryCode(entry) {
+    if (entry === undefined) return undefined;
+    return typeof entry === "object" ? entry.code : entry;
+  }
+
+  function clearManualScaleCodeInRange(data, employeeId, startDate, endDate, codeFilter) {
+    const prefix = `${employeeId}|`;
+    Object.keys(data.manualScale || {}).forEach((key) => {
+      if (!key.startsWith(prefix)) return;
+      const date = key.slice(prefix.length);
+      if (!isBetween(date, startDate, endDate)) return;
+      const code = manualScaleEntryCode(data.manualScale[key]);
+      if (codeFilter && code !== codeFilter) return;
+      delete data.manualScale[key];
+    });
+  }
+
+  function groupConsecutiveDates(sortedDates) {
+    if (!sortedDates.length) return [];
+    const ranges = [];
+    let start = sortedDates[0];
+    let end = sortedDates[0];
+    for (let index = 1; index < sortedDates.length; index += 1) {
+      const expected = addDays(end, 1);
+      if (sortedDates[index] === expected) {
+        end = sortedDates[index];
+      } else {
+        ranges.push({ startDate: start, endDate: end });
+        start = sortedDates[index];
+        end = sortedDates[index];
+      }
+    }
+    ranges.push({ startDate: start, endDate: end });
+    return ranges;
+  }
+
+  function collectManualFeriasRanges(data, employeeId) {
+    const prefix = `${employeeId}|`;
+    const dates = [];
+    Object.entries(data.manualScale || {}).forEach(([key, entry]) => {
+      if (!key.startsWith(prefix)) return;
+      if (manualScaleEntryCode(entry) !== "FÉRIAS") return;
+      dates.push(key.slice(prefix.length));
+    });
+    return groupConsecutiveDates([...new Set(dates)].sort());
+  }
+
+  function upsertVacationRange(data, employeeId, startDate, endDate, note = "") {
+    if (!employeeId || !startDate || !endDate || endDate < startDate) return null;
+    data.vacations = Array.isArray(data.vacations) ? data.vacations : [];
+    let target = data.vacations.find(
+      (item) =>
+        item.employeeId === employeeId && !(endDate < item.startDate || startDate > item.endDate)
+    );
+    if (target) {
+      if (target.startDate > startDate) target.startDate = startDate;
+      if (target.endDate < endDate) target.endDate = endDate;
+      if (note && !target.note) target.note = note;
+    } else {
+      target = {
+        id: uid("ferias"),
+        employeeId,
+        startDate,
+        endDate,
+        note: note || ""
+      };
+      data.vacations.push(target);
+    }
+    clearManualScaleCodeInRange(data, employeeId, target.startDate, target.endDate, "FÉRIAS");
+    return target;
+  }
+
+  function normalizeVacations(companyBlock) {
+    if (!companyBlock) return;
+    companyBlock.vacations = Array.isArray(companyBlock.vacations) ? companyBlock.vacations : [];
+    (companyBlock.employees || []).forEach((employee) => {
+      if (!employee?.id) return;
+      collectManualFeriasRanges(companyBlock, employee.id).forEach(({ startDate, endDate }) => {
+        upsertVacationRange(companyBlock, employee.id, startDate, endDate, "Sincronizado da escala");
+      });
+    });
+    companyBlock.vacations.forEach((vacation) => {
+      if (!vacation?.employeeId || !vacation.startDate || !vacation.endDate) return;
+      clearManualScaleCodeInRange(
+        companyBlock,
+        vacation.employeeId,
+        vacation.startDate,
+        vacation.endDate,
+        "FÉRIAS"
+      );
+    });
+  }
+
   function normalizeCompanyBlock(block) {
     if (!block) return null;
     block.employees = sortEmployeesByName(Array.isArray(block.employees) ? block.employees : []);
@@ -846,6 +939,7 @@
     block.contadorLancamentos =
       block.contadorLancamentos && typeof block.contadorLancamentos === "object" ? block.contadorLancamentos : {};
     delete block.vtDeductions;
+    normalizeVacations(block);
     return block;
   }
 
@@ -1420,13 +1514,13 @@
 
   function addVacation(vacation, company) {
     const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
-    data.vacations.push({
-      id: uid("ferias"),
-      employeeId: vacation.employeeId,
-      startDate: vacation.startDate,
-      endDate: vacation.endDate,
-      note: vacation.note || ""
-    });
+    upsertVacationRange(
+      data,
+      vacation.employeeId,
+      vacation.startDate,
+      vacation.endDate,
+      vacation.note || ""
+    );
     runScaleIntegrations(monthsTouchedByRange(vacation.startDate, vacation.endDate));
     saveState();
   }
@@ -1727,14 +1821,53 @@
     });
   }
 
+  function applyCoLinkToWorkedItem(holiday, item, coDate) {
+    item.compensationDate = coDate;
+    item.scheduledCoDate = coDate;
+    item.scaleCoDate = coDate;
+    item.linkedFromScale = true;
+    item.linkedHolidayId = holiday.id;
+    syncWorkedEmployeeStatus(item, holiday.date);
+    const warning = isCompensationWithinDeadline(holiday.date, coDate)
+      ? ""
+      : `Compensação agendada fora do prazo de ${HOLIDAY_COMPENSATION_DAYS} dias.`;
+    return {
+      linked: true,
+      holiday,
+      item,
+      warning,
+      status: item.status
+    };
+  }
+
   function linkScaleCoToHoliday(employeeId, coDate, options = {}) {
     const company =
       options.company ||
       findEmployeeRecord(employeeId)?.company ||
       getPrimaryPageCompany("escala");
     const data = getCompanyData(company);
-    const today = todayISO();
-    const target = findOldestLinkableHolidayWorked(data, employeeId, options.preferredHolidayId, coDate);
+    normalizeWorkedEmployeeRefs(data);
+
+    const preferredHolidayId = String(options.preferredHolidayId || "").trim();
+    if (preferredHolidayId) {
+      const holiday = (data.holidays || []).find((entry) => entry.id === preferredHolidayId);
+      const item = holiday ? resolveWorkedEmployeeEntry(data, employeeId, holiday) : null;
+      if (holiday && item) {
+        if (
+          item.linkedFromScale &&
+          item.scaleCoDate === coDate &&
+          item.linkedHolidayId === holiday.id
+        ) {
+          return applyCoLinkToWorkedItem(holiday, item, coDate);
+        }
+        if (isCoDateAlreadyLinked(data, employeeId, coDate, holiday.id)) {
+          return { linked: false, message: "Esta data de CO já está vinculada a outro feriado." };
+        }
+        return applyCoLinkToWorkedItem(holiday, item, coDate);
+      }
+    }
+
+    const target = findOldestLinkableHolidayWorked(data, employeeId, preferredHolidayId, coDate);
 
     if (!target) {
       return { linked: false, message: "Nenhum feriado trabalhado pendente encontrado para vincular ao CO." };
@@ -1744,25 +1877,7 @@
       return { linked: false, message: "Esta data de CO já está vinculada a outro feriado." };
     }
 
-    const { holiday, item } = target;
-    item.compensationDate = coDate;
-    item.scheduledCoDate = coDate;
-    item.scaleCoDate = coDate;
-    item.linkedFromScale = true;
-    item.linkedHolidayId = holiday.id;
-    syncWorkedEmployeeStatus(item, holiday.date);
-
-    const warning = isCompensationWithinDeadline(holiday.date, coDate)
-      ? ""
-      : `Compensação agendada fora do prazo de ${HOLIDAY_COMPENSATION_DAYS} dias.`;
-
-    return {
-      linked: true,
-      holiday,
-      item,
-      warning,
-      status: item.status
-    };
+    return applyCoLinkToWorkedItem(target.holiday, target.item, coDate);
   }
 
   function unlinkScaleCoFromHoliday(employeeId, coDate, options = {}) {
@@ -2213,6 +2328,7 @@
     resolveWorkedEmployeeEntry,
     isWorkedHolidayPendingInFeriadosControl,
     reconcileCoCompensationLinks,
+    normalizeVacations,
     buildScaleCoHolidayIndex,
     finalizeIncomingState,
     migrateVtStorage,

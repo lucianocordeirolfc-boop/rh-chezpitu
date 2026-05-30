@@ -127,21 +127,21 @@
           ${listItems(metrics.currentVacations, (vacation) => {
             const found = AppData.findEmployeeRecord(vacation.employeeId);
             const name = found?.employee?.name || vacation.employeeId;
-            return `<li><strong>${esc(name)}</strong><span>${vacation.startDate} – ${vacation.endDate}</span></li>`;
+            return `<li><strong>${esc(name)}</strong><span>${AppData.formatDateBR(vacation.startDate)} – ${AppData.formatDateBR(vacation.endDate)}</span></li>`;
           })}
         </article>
         <article class="card card-compact dash-panel">
           <h3>Compensações próximas</h3>
           ${listItems(
             metrics.nearDue.slice(0, 6),
-            (item) => `<li><strong>${esc(item.employee)}</strong><span>${esc(item.holiday)} · ${item.dueDate}</span></li>`
+            (item) => `<li><strong>${esc(item.employee)}</strong><span>${esc(item.holiday)} · ${AppData.formatDateBR(item.dueDate)}</span></li>`
           )}
         </article>
         <article class="card card-compact dash-panel">
           <h3>Feriados agendados (CO)</h3>
           ${listItems(
             metrics.agendadosPreview.slice(0, 6),
-            (item) => `<li><strong>${esc(item.employee)}</strong><span>${esc(item.holiday)} · CO em ${esc(item.date)}</span></li>`
+            (item) => `<li><strong>${esc(item.employee)}</strong><span>${esc(item.holiday)} · CO em ${AppData.formatDateBR(item.date)}</span></li>`
           )}
         </article>
         <article class="card card-compact dash-panel">

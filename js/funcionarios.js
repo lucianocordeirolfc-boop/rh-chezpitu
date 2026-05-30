@@ -143,7 +143,7 @@
     const search = normalizeSearch(listFilters.search);
     const searchDigits = normalizeSearchDigits(listFilters.search);
 
-    return employees.filter((employee) => {
+    const filtered = employees.filter((employee) => {
       const searchable = normalizeSearch(
         [employee.name, employee.cpf, employee.role, employee.department, employee.company, employee.ctps].join(" ")
       );
@@ -179,9 +179,11 @@
   }
 
   function applyPageCompanyToEmployeeList(allEmployees) {
-    const pageCo = AppData.getPageCompany("funcionarios");
-    if (AppData.isPageCompanyAll(pageCo)) return allEmployees;
-    return allEmployees.filter((employee) => employee.company === pageCo);
+    return allEmployees;
+  }
+
+  function companyFilterLabel() {
+    return listFilters.company === "todos" ? "Todas as empresas" : listFilters.company;
   }
 
   function renderTopbarFilters(employees) {
@@ -231,7 +233,7 @@
       <div class="func-list-toolbar">
         <div class="func-list-toolbar-meta">
           <span class="func-list-toolbar-eyebrow">Visualizando</span>
-          <strong class="func-list-toolbar-company">${esc(window.CompanyUI?.pageLabel?.("funcionarios") || AppData.getPageCompany("funcionarios"))}</strong>
+          <strong class="func-list-toolbar-company">${esc(companyFilterLabel())}</strong>
           <small id="employeeListCount" class="func-list-toolbar-count">${filteredCount} exibidos · ${companyCount} na empresa · ${totalCount} no grupo</small>
         </div>
         <div class="func-list-toolbar-controls">
@@ -824,7 +826,7 @@
         <td>${esc(employee.role)}</td>
         <td>${esc(employee.department)}</td>
         <td><span class="pill ${employee.status === "Ativo" ? "success" : "muted"}">${esc(employee.status)}</span></td>
-        <td>${esc(employee.admissionDate)}</td>
+        <td>${esc(AppData.formatDateBR(employee.admissionDate))}</td>
         <td>${esc(employee.fixedDay || "—")}</td>
         <td>${esc(employee.defaultShift || "—")}</td>
         <td>${esc(AppData.formatVtCurrency(employee.vtDaily))}</td>
@@ -845,10 +847,10 @@
     const countEl = container.querySelector("#employeeListCount");
     if (tbody) tbody.innerHTML = employeeRows(filtered);
     if (countEl) {
-      const pageCo = AppData.getPageCompany("funcionarios");
-      const companyTotal = AppData.isPageCompanyAll(pageCo)
-        ? allEmployees.length
-        : allEmployees.filter((item) => item.company === pageCo).length;
+      const companyTotal =
+        listFilters.company === "todos"
+          ? allEmployees.length
+          : allEmployees.filter((item) => item.company === listFilters.company).length;
       countEl.textContent = `${filtered.length} exibidos · ${companyTotal} na empresa · ${allEmployees.length} no grupo`;
     }
   }
@@ -1009,7 +1011,6 @@
     });
 
     bindListFilters(container);
-    window.CompanyUI?.bindToolbar?.(container, "funcionarios", () => window.App.renderCurrent());
   }
 
   function render(container) {
@@ -1042,7 +1043,6 @@
 
     container.innerHTML = `
       <div class="func-page">
-        ${window.CompanyUI?.renderToolbar?.("funcionarios", { allowAll: true }) || ""}
         <header class="func-page-intro">
           <div class="func-page-intro-head">
             <h2 class="func-module-title">Cadastro</h2>
@@ -1086,7 +1086,7 @@
           </div>
           ${renderListToolbar(allEmployees, filteredEmployees.length, companyCount, allEmployees.length)}
           <div class="table-wrap">
-            <table class="table-premium">
+            <table class="table-premium func-employees-table">
               <thead>
                 <tr>
                   <th>Origem</th>

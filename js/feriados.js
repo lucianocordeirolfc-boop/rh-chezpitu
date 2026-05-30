@@ -1203,7 +1203,7 @@
               .map(
                 (holiday) => `
               <tr>
-                <td>${esc(holiday.date)}</td>
+                <td>${formatDateBR(holiday.date)}</td>
                 <td>${esc(holiday.name)}</td>
                 <td>${esc(holiday.type || "nacional")}</td>
                 <td>${esc((holiday.companies || []).join(", ") || "Ambas")}</td>

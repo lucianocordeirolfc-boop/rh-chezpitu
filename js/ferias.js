@@ -81,16 +81,53 @@
       .join("");
   }
 
+  function vacationOverlapsFilter(vacation) {
+    const { year, month } = vacationFilterState;
+    if (year === "todos" && month === "todos") return true;
+    const startDate = vacation.startDate;
+    const endDate = vacation.endDate;
+    if (year !== "todos" && month !== "todos") {
+      const monthStart = `${year}-${month}-01`;
+      const monthEnd = AppData.getDaysInMonth(`${year}-${month}`).slice(-1)[0];
+      return startDate <= monthEnd && endDate >= monthStart;
+    }
+    if (year !== "todos") {
+      return startDate <= `${year}-12-31` && endDate >= `${year}-01-01`;
+    }
+    return (
+      startDate.slice(5, 7) === month ||
+      endDate.slice(5, 7) === month ||
+      (startDate.slice(5, 7) < month && endDate.slice(5, 7) > month)
+    );
+  }
+
+  function absenceOverlapsFilter(absence) {
+    const { year, month } = absenceFilterState;
+    if (year === "todos" && month === "todos") return true;
+    const startDate = absence.startDate;
+    const endDate = absence.endDate;
+    if (year !== "todos" && month !== "todos") {
+      const monthStart = `${year}-${month}-01`;
+      const monthEnd = AppData.getDaysInMonth(`${year}-${month}`).slice(-1)[0];
+      return startDate <= monthEnd && endDate >= monthStart;
+    }
+    if (year !== "todos") {
+      return startDate <= `${year}-12-31` && endDate >= `${year}-01-01`;
+    }
+    return (
+      startDate.slice(5, 7) === month ||
+      endDate.slice(5, 7) === month ||
+      (startDate.slice(5, 7) < month && endDate.slice(5, 7) > month)
+    );
+  }
+
   function applyVacationFilters(vacations, data) {
     return vacations.filter((vacation) => {
       const employee = getEmployee(vacation.employeeId, data);
       const status = vacationStatus(vacation);
-      const startMonth = vacation.startDate.slice(5, 7);
-      const startYear = vacation.startDate.slice(0, 4);
       if (vacationFilterState.employeeId !== "todos" && vacation.employeeId !== vacationFilterState.employeeId) return false;
       if (vacationFilterState.status !== "todos" && status !== vacationFilterState.status) return false;
-      if (vacationFilterState.month !== "todos" && startMonth !== vacationFilterState.month) return false;
-      if (vacationFilterState.year !== "todos" && startYear !== vacationFilterState.year) return false;
+      if (!vacationOverlapsFilter(vacation)) return false;
       if (vacationFilterState.department !== "todos" && employee?.department !== vacationFilterState.department) return false;
       return true;
     });
@@ -100,13 +137,10 @@
     return absences.filter((absence) => {
       const employee = getEmployee(absence.employeeId, data);
       const status = absenceStatus(absence);
-      const startMonth = absence.startDate.slice(5, 7);
-      const startYear = absence.startDate.slice(0, 4);
       if (absenceFilterState.employeeId !== "todos" && absence.employeeId !== absenceFilterState.employeeId) return false;
       if (absenceFilterState.type !== "todos" && absence.type !== absenceFilterState.type) return false;
       if (absenceFilterState.status !== "todos" && status !== absenceFilterState.status) return false;
-      if (absenceFilterState.month !== "todos" && startMonth !== absenceFilterState.month) return false;
-      if (absenceFilterState.year !== "todos" && startYear !== absenceFilterState.year) return false;
+      if (!absenceOverlapsFilter(absence)) return false;
       if (absenceFilterState.department !== "todos" && employee?.department !== absenceFilterState.department) return false;
       return true;
     });
@@ -121,12 +155,13 @@
         const employee = getEmployee(vacation.employeeId, data);
         const days = AppData.diffDays(vacation.startDate, vacation.endDate) + 1;
         const status = vacationStatus(vacation);
+        const employeeLabel = employee?.name || AppData.getEmployeeName(vacation.employeeId, data) || "Vínculo inválido";
         return `
           <tr>
-            <td>${esc(employee?.name || "—")}</td>
+            <td>${esc(employeeLabel)}</td>
             <td>${esc(employee?.department || "—")}</td>
-            <td>${esc(vacation.startDate)}</td>
-            <td>${esc(vacation.endDate)}</td>
+            <td>${esc(AppData.formatDateBR(vacation.startDate))}</td>
+            <td>${esc(AppData.formatDateBR(vacation.endDate))}</td>
             <td>${days}</td>
             <td><span class="pill ${status === "Em andamento" ? "warning" : "muted"}">${status}</span></td>
             <td class="actions"><button class="link-button danger" data-remove-vacation="${vacation.id}">Excluir</button></td>
@@ -151,8 +186,8 @@
             <td>${esc(employee?.name || "—")}</td>
             <td>${esc(employee?.department || "—")}</td>
             <td><span class="absence-type-badge">${esc(absence.type)}</span></td>
-            <td>${esc(absence.startDate)}</td>
-            <td>${esc(absence.endDate)}</td>
+            <td>${esc(AppData.formatDateBR(absence.startDate))}</td>
+            <td>${esc(AppData.formatDateBR(absence.endDate))}</td>
             <td>${days}</td>
             <td>${absence.cid ? `<code class="cid-code">${esc(absence.cid)}</code>` : "—"}</td>
             <td><span class="pill ${statusClass}">${status}</span></td>
