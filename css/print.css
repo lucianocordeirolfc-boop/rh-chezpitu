@@ -355,72 +355,6 @@
   padding-left: 18px;
 }
 
-.scale-print-area {
-  display: none;
-}
-
-.scale-print-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 8mm;
-  padding-bottom: 5mm;
-  border-bottom: 2px solid var(--sea-200);
-}
-
-.scale-print-header span {
-  display: block;
-  color: var(--sea-700);
-  font-size: 9pt;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.scale-print-header h2 {
-  margin: 1mm 0 0;
-  font-size: 18pt;
-}
-
-.scale-print-header strong {
-  color: var(--sea-700);
-  font-size: 11pt;
-}
-
-.scale-print-table {
-  width: 100%;
-  min-width: 0;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.scale-print-table th,
-.scale-print-table td {
-  padding: 2.2mm 1mm;
-  border: 1px solid #cfe3ea;
-  text-align: center;
-  font-size: 7.5pt;
-}
-
-.scale-print-table th:first-child,
-.scale-print-table td:first-child {
-  width: 34mm;
-  text-align: left;
-}
-
-.scale-print-table th {
-  color: var(--sea-900);
-  background: var(--sea-100);
-}
-
-.scale-print-table th small {
-  display: block;
-  color: var(--muted);
-  font-size: 6.5pt;
-  text-transform: none;
-}
-
 @media screen and (max-width: 980px) {
   .vt-preview-scroll {
     padding: 12px;
@@ -444,7 +378,7 @@
 
 @page scaleLandscape {
   size: A4 landscape;
-  margin: 5mm;
+  margin: 0;
 }
 
 @page contadorLandscape {
@@ -474,7 +408,7 @@
 
   .sidebar,
   .topbar,
-  .card:not(.vt-preview-card),
+  .card:not(.vt-preview-card):not(.scale-print-preview-card),
   .vt-preview-card > .card-header,
   .vt-preview-card > .help-text,
   .print-actions,
@@ -541,25 +475,7 @@
     display: none !important;
   }
 
-  body.printing-scale .scale-print-area {
-    display: block !important;
-    page: scaleLandscape;
-    width: 281mm !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    color: var(--ink) !important;
-    background: #ffffff !important;
-  }
-
-  body.printing-scale .scale-print-table {
-    break-inside: auto;
-    page-break-inside: auto;
-  }
-
-  body.printing-scale .scale-print-table tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+  /* Escala impressa: regras completas em escala-print.css */
 
   /* ── Impressão Resumo Contador ── */
   body.printing-contador {

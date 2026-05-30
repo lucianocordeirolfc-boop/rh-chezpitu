@@ -243,28 +243,44 @@
 .scale-print-table {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+}
+
+.scale-print-table col.print-col-name {
+  width: 38mm;
+}
+
+.scale-print-table col.print-col-day {
+  width: auto;
+}
+
+.scale-print-table thead {
+  display: table-header-group;
 }
 
 .scale-print-table th,
 .scale-print-table td {
   height: 5.8mm;
-  padding: 0.45mm 0.35mm;
+  padding: 0.45mm 0.25mm;
   border: 0.2mm solid #d6e7ec;
   text-align: center;
   vertical-align: middle;
   font-size: 6.2pt;
   font-weight: 800;
   line-height: 1.05;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .scale-print-table th:first-child,
-.scale-print-table td:first-child {
-  width: 44mm;
-  min-width: 44mm;
-  max-width: 44mm;
-  padding: 0.6mm 1.2mm;
+.scale-print-table td:first-child,
+.scale-print-table th.print-employee-name {
+  width: 38mm;
+  min-width: 38mm;
+  max-width: 38mm;
+  padding: 0.6mm 1mm;
   color: #06364a;
   text-align: left;
 }
@@ -397,6 +413,15 @@
   line-height: 1.35;
 }
 
+.scale-print-notes-print {
+  display: none;
+  min-height: 24mm;
+  white-space: pre-wrap;
+  color: #17313b;
+  font-size: 8.5pt;
+  line-height: 1.35;
+}
+
 .scale-print-manual-lines {
   display: none;
 }
@@ -436,6 +461,94 @@
   display: grid;
   gap: 1mm;
   background: #f7fbfc;
+}
+
+.scale-print-density-compact .scale-print-header {
+  margin-bottom: 3mm;
+  padding-bottom: 2.5mm;
+}
+
+.scale-print-density-compact .scale-print-table th,
+.scale-print-density-compact .scale-print-table td {
+  height: 5mm;
+  padding: 0.35mm 0.2mm;
+  font-size: 5.8pt;
+}
+
+.scale-print-density-compact .scale-print-table th:first-child,
+.scale-print-density-compact .scale-print-table td:first-child,
+.scale-print-density-compact .scale-print-table th.print-employee-name {
+  width: 34mm;
+  min-width: 34mm;
+  max-width: 34mm;
+}
+
+.scale-print-density-compact .scale-print-table col.print-col-name {
+  width: 34mm;
+}
+
+.scale-print-density-compact .scale-print-footer {
+  margin-top: 3.5mm;
+  gap: 4mm;
+}
+
+.scale-print-density-compact .scale-print-bottom {
+  margin-top: 3mm;
+}
+
+.scale-print-density-dense .scale-print-header {
+  margin-bottom: 2.5mm;
+  padding-bottom: 2mm;
+}
+
+.scale-print-density-dense .scale-print-title h2 {
+  font-size: 18pt;
+}
+
+.scale-print-density-dense .scale-print-table th,
+.scale-print-density-dense .scale-print-table td {
+  height: 4.5mm;
+  padding: 0.25mm 0.15mm;
+  font-size: 5.4pt;
+}
+
+.scale-print-density-dense .scale-print-table th:first-child,
+.scale-print-density-dense .scale-print-table td:first-child,
+.scale-print-density-dense .scale-print-table th.print-employee-name {
+  width: 30mm;
+  min-width: 30mm;
+  max-width: 30mm;
+  font-size: 5.2pt;
+}
+
+.scale-print-density-dense .scale-print-table col.print-col-name {
+  width: 30mm;
+}
+
+.scale-print-density-dense .scale-print-table .sector-divider-print {
+  padding: 1.4mm 1mm;
+  font-size: 7pt;
+}
+
+.scale-print-density-dense .scale-print-footer {
+  margin-top: 2.5mm;
+  gap: 3mm;
+}
+
+.scale-print-density-dense .scale-print-bottom {
+  margin-top: 2mm;
+  gap: 3mm;
+}
+
+.scale-print-density-dense .scale-print-legend,
+.scale-print-density-dense .scale-print-instructions {
+  padding: 2mm;
+  font-size: 6pt;
+}
+
+.scale-print-density-dense .scale-print-signature-simple {
+  min-height: 22mm;
+  padding: 2mm;
 }
 
 /* ═══════════════════ TEMA CHEZ PITU (impressão) ═══════════════════ */
@@ -538,11 +651,44 @@
 }
 
 @media print {
+  .scale-print-preview-scroll .scale-print-area {
+    transform: none !important;
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
   body.printing-scale,
   body.printing-scale html {
     width: 297mm !important;
     min-width: 297mm !important;
     background: #ffffff !important;
+  }
+
+  body.printing-scale .scale-print-header-corporate {
+    display: grid !important;
+    grid-template-columns: 1.2fr 1.35fr 0.75fr !important;
+  }
+
+  body.printing-scale .scale-print-area {
+    transform: none !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  body.printing-scale .scale-print-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  body.printing-scale .scale-print-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.printing-scale .scale-print-density-dense .scale-print-footer,
+  body.printing-scale .scale-print-density-dense .scale-print-bottom {
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
   body.printing-scale .sidebar,
@@ -601,21 +747,18 @@
   }
 
   body.printing-scale .scale-print-observations textarea {
-    min-height: 24mm;
-    color: #17313b !important;
-    line-height: 6mm;
+    display: none !important;
+  }
+
+  body.printing-scale .scale-print-notes-print {
+    display: block !important;
+    min-height: 22mm;
+    padding-top: 1mm;
+    border-top: 0.25mm solid #cfe3ea;
   }
 
   body.printing-scale .scale-print-manual-lines {
-    display: grid;
-    gap: 5mm;
-    margin-top: -20mm;
-    pointer-events: none;
-  }
-
-  body.printing-scale .scale-print-manual-lines span {
-    display: block;
-    border-bottom: 0.25mm solid #cfe3ea;
+    display: none !important;
   }
 
   body.printing-scale .scale-print-table tr,

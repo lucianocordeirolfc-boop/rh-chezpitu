@@ -73,6 +73,25 @@
     return code;
   }
 
+  function printCode(code) {
+    if (code === "FÉRIAS") return "FÉR";
+    if (code === "ATESTADO") return "AT";
+    if (code === "LICENÇA") return "LIC";
+    if (code === "SUSPENSAO" || code === "SUSPENSÃO") return "SUS";
+    return displayCode(code);
+  }
+
+  function getPrintDensityClass(employees) {
+    const count = Array.isArray(employees) ? employees.length : 0;
+    if (count >= 22) return "scale-print-density-dense";
+    if (count >= 14) return "scale-print-density-compact";
+    return "scale-print-density-normal";
+  }
+
+  function renderPrintColgroup(days) {
+    return `<colgroup><col class="print-col-name">${days.map(() => `<col class="print-col-day">`).join("")}</colgroup>`;
+  }
+
   function splitYearMonth(yearMonth) {
     const [year, month] = yearMonth.split("-").map(Number);
     return { year, month };
@@ -616,6 +635,7 @@
   function renderPrintArea(data, employees, days) {
     const holidayDates = getHolidayDates(data);
     const printClass = scaleState.previewVisible ? "is-visible" : "";
+    const densityClass = getPrintDensityClass(employees);
     const companyInfo = getPrintCompanyInfo(data);
     const sectorSubtitle = scaleState.printSector ? `<p class="scale-print-sector-sub">${esc(scaleState.printSector)}</p>` : "";
 
@@ -644,7 +664,7 @@
                 const code = AppData.getScaleCode(employee, day, data);
                 const isSunday = AppData.weekdayName(day) === "Domingo";
                 const isHoliday = holidayDates.has(day);
-                return `<td class="${codeClass(code)} ${isSunday ? "print-day-sunday" : ""} ${isHoliday ? "print-day-holiday" : ""}">${esc(displayCode(code))}</td>`;
+                return `<td class="${codeClass(code)} ${isSunday ? "print-day-sunday" : ""} ${isHoliday ? "print-day-holiday" : ""}">${esc(printCode(code))}</td>`;
               })
               .join("");
             return `<tr><th class="print-employee-name">
@@ -667,7 +687,7 @@
           <button id="closeScalePreview" class="secondary" type="button">Ocultar prévia</button>
         </div>
         <div class="scale-print-preview-scroll">
-          <section class="scale-print-area" aria-label="Pré-visualização da impressão da escala">
+          <section class="scale-print-area ${densityClass}" aria-label="Pré-visualização da impressão da escala">
                         <header class="scale-print-header scale-print-header-corporate">
               <div class="scale-print-brand">
                 <p class="scale-print-legal-name">${esc(companyInfo.legalName)}</p>
@@ -695,6 +715,7 @@
             </header>
 
             <table class="scale-print-table">
+              ${renderPrintColgroup(days)}
               <thead><tr><th>Funcionários</th>${headerDays}</tr></thead>
               <tbody>${rows}</tbody>
             </table>
@@ -702,8 +723,8 @@
             <section class="scale-print-footer">
               <div class="scale-print-observations">
                 <h3>OBSERVAÇÕES</h3>
-                <textarea class="scale-print-field" data-print-field="printNotes" rows="5" placeholder="Digite observações antes da impressão">${esc(scaleState.printNotes)}</textarea>
-                <div class="scale-print-manual-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+                <textarea class="scale-print-field no-print" data-print-field="printNotes" rows="5" placeholder="Digite observações antes da impressão">${esc(scaleState.printNotes)}</textarea>
+                <div class="scale-print-notes-print">${esc(scaleState.printNotes)}</div>
               </div>
 
               <div class="scale-print-signature scale-print-signature-simple">
@@ -736,7 +757,7 @@
                 <strong>Instruções</strong>
                 <span>Dias em branco = dia trabalhado normal.</span>
                 <span>Preencher a escala utilizando os códigos da legenda.</span>
-                <span>Domingos em vermelho e feriados em azul.</span>
+                <span>Domingos em vermelho e feriados em amarelo.</span>
                 <span>Imprimir em A4 horizontal para melhor leitura.</span>
               </div>
             </section>
@@ -831,11 +852,34 @@
     URL.revokeObjectURL(link.href);
   }
 
-  function printScale() {
+  function syncPrintStaticFields(container) {
+    if (!container) return;
+
+    const monthField = container.querySelector('[data-print-field="printMonthYear"]');
+    const monthDisplay = container.querySelector(".scale-print-month-display");
+    if (monthField && monthDisplay) monthDisplay.textContent = monthField.value;
+
+    const issueField = container.querySelector('[data-print-field="printIssueDate"]');
+    const issuePrint = container.querySelector(".scale-print-issue-print");
+    if (issueField && issuePrint) {
+      const parts = issueField.value.split("-");
+      issuePrint.textContent =
+        parts.length === 3 ? `Emissão: ${parts[2]}/${parts[1]}/${parts[0]}` : "Emissão: —";
+    }
+
+    const notesField = container.querySelector('[data-print-field="printNotes"]');
+    const notesPrint = container.querySelector(".scale-print-notes-print");
+    if (notesField && notesPrint) notesPrint.textContent = notesField.value || "";
+  }
+
+  function printScale(container) {
+    syncPrintStaticFields(container);
     const removePrintClass = () => document.body.classList.remove("printing-scale");
     document.body.classList.add("printing-scale");
     window.addEventListener("afterprint", removePrintClass, { once: true });
-    window.print();
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.print());
+    });
     window.setTimeout(removePrintClass, 1000);
   }
 
@@ -847,6 +891,14 @@
           container.querySelectorAll('[data-print-field="printIssueDate"]').forEach((dateField) => {
             if (dateField !== field) dateField.value = field.value;
           });
+        }
+        if (field.dataset.printField === "printNotes") {
+          const notesPrint = container.querySelector(".scale-print-notes-print");
+          if (notesPrint) notesPrint.textContent = field.value || "";
+        }
+        if (field.dataset.printField === "printMonthYear") {
+          const monthDisplay = container.querySelector(".scale-print-month-display");
+          if (monthDisplay) monthDisplay.textContent = field.value;
         }
       });
     });
@@ -1295,7 +1347,7 @@
     container.querySelector("#printScale").addEventListener("click", () => {
       scaleState.previewVisible = true;
       renderCurrent(container);
-      printScale();
+      printScale(container);
     });
 
     container.querySelector("#closeScalePreview")?.addEventListener("click", () => {

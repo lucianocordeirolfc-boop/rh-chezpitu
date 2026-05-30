@@ -1222,6 +1222,39 @@ function validateAusenciasEdit(AppData, chez) {
   );
 }
 
+function validateScalePrintLayout() {
+  const area = "Escala impressa";
+  const escalaPrintCss = fs.readFileSync(path.join(root, "css/escala-print.css"), "utf8");
+  const printCss = fs.readFileSync(path.join(root, "css/print.css"), "utf8");
+  const escalaJs = fs.readFileSync(path.join(root, "js/escala.js"), "utf8");
+
+  assert(
+    area,
+    !printCss.includes("width: 281mm") &&
+      escalaPrintCss.includes("scale-print-notes-print") &&
+      escalaPrintCss.includes("display: table-header-group"),
+    "Layout de impressão da escala centralizado em escala-print.css",
+    ["css/escala-print.css", "css/print.css"],
+    "—"
+  );
+  assert(
+    area,
+    escalaJs.includes("printCode") &&
+      escalaJs.includes("getPrintDensityClass") &&
+      escalaJs.includes("syncPrintStaticFields"),
+    "Escala ajusta códigos, densidade e campos estáticos antes de imprimir",
+    ["js/escala.js"],
+    "—"
+  );
+  assert(
+    area,
+    !escalaPrintCss.includes("margin-top: -20mm"),
+    "Observações da escala não usam margem negativa na impressão",
+    ["css/escala-print.css"],
+    "—"
+  );
+}
+
 function validateDateFormatBR(AppData) {
   const area = "Formato de data";
   assert(
@@ -1306,6 +1339,7 @@ function main() {
   validateVacationSync(AppData, chez);
   validateCoDirectLink(AppData, chez);
   validateAusenciasEdit(AppData, chez);
+  validateScalePrintLayout();
   validateCadastroSingleFilter();
   validateDateFormatBR(AppData);
 
