@@ -65,6 +65,180 @@
     return data.employees.find((employee) => employee.id === employeeId);
   }
 
+  function employeeOptionsWithSelected(employees, selectedId) {
+    if (!employees.length) return `<option value="">Cadastre um funcionário ativo</option>`;
+    return employees
+      .map(
+        (employee) =>
+          `<option value="${employee.id}" ${employee.id === selectedId ? "selected" : ""}>${esc(employee.name)}</option>`
+      )
+      .join("");
+  }
+
+  function closeAusenciasPopup() {
+    document.getElementById("ausenciasEditPopup")?.remove();
+  }
+
+  function openVacationEditPopup(container, vacation, activeEmployees, pageCompany) {
+    closeAusenciasPopup();
+    const days = AppData.diffDays(vacation.startDate, vacation.endDate) + 1;
+    const overlay = document.createElement("div");
+    overlay.id = "ausenciasEditPopup";
+    overlay.className = "popup-overlay";
+    overlay.innerHTML = `
+      <div class="popup-card popup-card-ausencias">
+        <div class="popup-header">
+          <h3>Editar férias</h3>
+          <button type="button" class="popup-close" id="ausenciasEditClose" aria-label="Fechar">✕</button>
+        </div>
+        <form id="vacationEditForm" class="popup-form form-grid form-grid-compact ferias-form">
+          <label class="full">Funcionário
+            <select name="employeeId" required>${employeeOptionsWithSelected(activeEmployees, vacation.employeeId)}</select>
+          </label>
+          <label>Início<input type="date" name="startDate" required value="${esc(vacation.startDate)}"></label>
+          <label>Fim<input type="date" name="endDate" required value="${esc(vacation.endDate)}"></label>
+          <label>Dias corridos<input type="number" name="consecutiveDays" min="1" step="1" value="${days}"></label>
+          <label class="full">Observação<textarea name="note" rows="2">${esc(vacation.note || "")}</textarea></label>
+          <div class="popup-actions">
+            <button type="button" class="btn btn-cancel" id="ausenciasEditCancel">Cancelar</button>
+            <button type="submit" class="primary btn-sm">Salvar alterações</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector("#vacationEditForm");
+    bindDaySync(form, "startDate", "endDate", "consecutiveDays");
+
+    overlay.querySelector("#ausenciasEditClose")?.addEventListener("click", closeAusenciasPopup);
+    overlay.querySelector("#ausenciasEditCancel")?.addEventListener("click", closeAusenciasPopup);
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) closeAusenciasPopup();
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(form).entries());
+      if (payload.endDate < payload.startDate) {
+        alert("A data final das férias não pode ser anterior à data inicial.");
+        return;
+      }
+      const ok = AppData.updateVacation(vacation.id, payload, pageCompany);
+      if (!ok) {
+        alert("Não foi possível atualizar este registro de férias.");
+        return;
+      }
+      closeAusenciasPopup();
+      window.App.renderCurrent();
+    });
+  }
+
+  function openAbsenceEditPopup(container, absence, activeEmployees, pageCompany) {
+    closeAusenciasPopup();
+    const days = AppData.diffDays(absence.startDate, absence.endDate) + 1;
+    const typeOptions = ABSENCE_TYPES.map(
+      (type) =>
+        `<option value="${esc(type)}" ${type === absence.type ? "selected" : ""}>${esc(type)}</option>`
+    ).join("");
+
+    const overlay = document.createElement("div");
+    overlay.id = "ausenciasEditPopup";
+    overlay.className = "popup-overlay";
+    overlay.innerHTML = `
+      <div class="popup-card popup-card-ausencias">
+        <div class="popup-header">
+          <h3>Editar ausência</h3>
+          <button type="button" class="popup-close" id="ausenciasEditClose" aria-label="Fechar">✕</button>
+        </div>
+        <form id="absenceEditForm" class="popup-form form-grid form-grid-compact ferias-form">
+          <label class="full">Funcionário
+            <select name="absEmployeeId" required>${employeeOptionsWithSelected(activeEmployees, absence.employeeId)}</select>
+          </label>
+          <label class="full">Tipo de ausência
+            <select name="absType" required>${typeOptions}</select>
+          </label>
+          <label>Início<input type="date" name="absStartDate" required value="${esc(absence.startDate)}"></label>
+          <label>Fim<input type="date" name="absEndDate" required value="${esc(absence.endDate)}"></label>
+          <label>Dias<input type="number" name="absDays" min="1" step="1" value="${days}"></label>
+          <label>CID <small class="field-hint">Opcional</small>
+            <input name="absCid" value="${esc(absence.cid || "")}" placeholder="Ex.: Z00.0" autocomplete="off">
+          </label>
+          <label class="full">Observação<textarea name="absNote" rows="2">${esc(absence.note || "")}</textarea></label>
+          <div class="popup-actions">
+            <button type="button" class="btn btn-cancel" id="ausenciasEditCancel">Cancelar</button>
+            <button type="submit" class="primary btn-sm">Salvar alterações</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector("#absenceEditForm");
+    bindDaySync(form, "absStartDate", "absEndDate", "absDays");
+
+    overlay.querySelector("#ausenciasEditClose")?.addEventListener("click", closeAusenciasPopup);
+    overlay.querySelector("#ausenciasEditCancel")?.addEventListener("click", closeAusenciasPopup);
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) closeAusenciasPopup();
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(form).entries());
+      if (payload.absEndDate < payload.absStartDate) {
+        alert("A data final não pode ser anterior à data inicial.");
+        return;
+      }
+      const ok = AppData.updateAbsence(
+        absence.id,
+        {
+          employeeId: payload.absEmployeeId,
+          type: payload.absType,
+          startDate: payload.absStartDate,
+          endDate: payload.absEndDate,
+          cid: payload.absCid || "",
+          note: payload.absNote || ""
+        },
+        pageCompany
+      );
+      if (!ok) {
+        alert("Não foi possível atualizar este registro.");
+        return;
+      }
+      closeAusenciasPopup();
+      window.App.renderCurrent();
+    });
+  }
+
+  function bindAusenciasRowActions(container) {
+    if (container.dataset.ausenciasActionsBound === "1") return;
+    container.dataset.ausenciasActionsBound = "1";
+
+    container.addEventListener("click", (event) => {
+      const pageCompany = AppData.getPrimaryPageCompany("ferias");
+      const data = AppData.getCompanyData(pageCompany);
+      const activeEmployees = AppData.sortEmployeesByName(
+        data.employees.filter((employee) => AppData.isEmployeeActive(employee))
+      );
+
+      const editVacationBtn = event.target.closest("[data-edit-vacation]");
+      if (editVacationBtn) {
+        event.preventDefault();
+        const vacation = data.vacations.find((item) => item.id === editVacationBtn.dataset.editVacation);
+        if (vacation) openVacationEditPopup(container, vacation, activeEmployees, pageCompany);
+        return;
+      }
+
+      const editAbsenceBtn = event.target.closest("[data-edit-absence]");
+      if (editAbsenceBtn) {
+        event.preventDefault();
+        const absence = (data.absences || []).find((item) => item.id === editAbsenceBtn.dataset.editAbsence);
+        if (absence) openAbsenceEditPopup(container, absence, activeEmployees, pageCompany);
+      }
+    });
+  }
+
   function employeeOptions(employees) {
     if (!employees.length) return `<option value="">Cadastre um funcionário ativo</option>`;
     return employees.map((employee) => `<option value="${employee.id}">${esc(employee.name)}</option>`).join("");
@@ -164,7 +338,10 @@
             <td>${esc(AppData.formatDateBR(vacation.endDate))}</td>
             <td>${days}</td>
             <td><span class="pill ${status === "Em andamento" ? "warning" : "muted"}">${status}</span></td>
-            <td class="actions"><button class="link-button danger" data-remove-vacation="${vacation.id}">Excluir</button></td>
+            <td class="actions">
+              <button class="link-button" type="button" data-edit-vacation="${vacation.id}">Editar</button>
+              <button class="link-button danger" type="button" data-remove-vacation="${vacation.id}">Excluir</button>
+            </td>
           </tr>
         `;
       })
@@ -191,7 +368,10 @@
             <td>${days}</td>
             <td>${absence.cid ? `<code class="cid-code">${esc(absence.cid)}</code>` : "—"}</td>
             <td><span class="pill ${statusClass}">${status}</span></td>
-            <td class="actions"><button class="link-button danger" data-remove-absence="${absence.id}">Excluir</button></td>
+            <td class="actions">
+              <button class="link-button" type="button" data-edit-absence="${absence.id}">Editar</button>
+              <button class="link-button danger" type="button" data-remove-absence="${absence.id}">Excluir</button>
+            </td>
           </tr>
         `;
       })
@@ -519,6 +699,7 @@
     `;
 
     bindEvents(container);
+    bindAusenciasRowActions(container);
     window.CompanyUI?.bindToolbar?.(container, "ferias", () => render(container));
   }
 

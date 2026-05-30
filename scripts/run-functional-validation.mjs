@@ -1141,6 +1141,87 @@ function validateCadastroSingleFilter() {
   );
 }
 
+function validateAusenciasEdit(AppData, chez) {
+  const area = "Ausências — Editar";
+  const emp = chez.employees.find((item) => item.id === "chez-1");
+  const vacation = chez.vacations.find((item) => item.id === "v1");
+  assert(area, Boolean(vacation), "Registro base de férias disponível para edição", ["js/data.js"], "—");
+
+  const okVacation = AppData.updateVacation(
+    "v1",
+    {
+      employeeId: "chez-1",
+      startDate: "2026-05-19",
+      endDate: "2026-05-21",
+      note: "Férias ajustadas"
+    },
+    "Chez Pitu"
+  );
+  assert(area, okVacation, "updateVacation retorna true ao salvar", ["js/data.js"], "updateVacation");
+  assert(
+    area,
+    vacation.startDate === "2026-05-19" && vacation.endDate === "2026-05-21",
+    "updateVacation altera intervalo do registro",
+    ["js/data.js"],
+    "—"
+  );
+  assert(
+    area,
+    emp && AppData.getScaleCode(emp, "2026-05-19", chez) === "FÉRIAS" && AppData.getScaleCode(emp, "2026-05-22", chez) !== "FÉRIAS",
+    "updateVacation atualiza reflexo na escala",
+    ["js/data.js"],
+    "runScaleIntegrations"
+  );
+  assert(area, AppData.updateVacation("inexistente", vacation, "Chez Pitu") === false, "updateVacation retorna false se id não existe", ["js/data.js"], "—");
+
+  AppData.addAbsence(
+    { employeeId: "chez-1", type: "Atestado médico", startDate: "2026-05-08", endDate: "2026-05-09", cid: "A00", note: "Teste" },
+    "Chez Pitu"
+  );
+  const absence = (chez.absences || []).find((item) => item.startDate === "2026-05-08");
+  assert(area, Boolean(absence), "Registro base de ausência disponível para edição", ["js/data.js"], "addAbsence");
+
+  const okAbsence = AppData.updateAbsence(
+    absence.id,
+    {
+      employeeId: "chez-1",
+      type: "Licença não remunerada",
+      startDate: "2026-05-08",
+      endDate: "2026-05-10",
+      cid: "",
+      note: "Ajuste"
+    },
+    "Chez Pitu"
+  );
+  assert(area, okAbsence, "updateAbsence retorna true ao salvar", ["js/data.js"], "updateAbsence");
+  assert(
+    area,
+    absence.type === "Licença não remunerada" && absence.endDate === "2026-05-10",
+    "updateAbsence altera tipo e intervalo",
+    ["js/data.js"],
+    "—"
+  );
+  assert(
+    area,
+    emp && AppData.getScaleCode(emp, "2026-05-10", chez) === "LICENÇA",
+    "updateAbsence atualiza reflexo na escala",
+    ["js/data.js"],
+    "runScaleIntegrations"
+  );
+
+  const feriasHtml = fs.readFileSync(path.join(root, "js/ferias.js"), "utf8");
+  assert(
+    area,
+    feriasHtml.includes("data-edit-vacation") &&
+      feriasHtml.includes("data-edit-absence") &&
+      feriasHtml.includes("AppData.updateVacation") &&
+      feriasHtml.includes("AppData.updateAbsence"),
+    "Tabelas de Férias e Atestados exibem botão Editar com popup",
+    ["js/ferias.js"],
+    "openVacationEditPopup / openAbsenceEditPopup"
+  );
+}
+
 function validateDateFormatBR(AppData) {
   const area = "Formato de data";
   assert(
@@ -1224,6 +1305,7 @@ function main() {
   validatePersistence(AppData, chez, ym);
   validateVacationSync(AppData, chez);
   validateCoDirectLink(AppData, chez);
+  validateAusenciasEdit(AppData, chez);
   validateCadastroSingleFilter();
   validateDateFormatBR(AppData);
 

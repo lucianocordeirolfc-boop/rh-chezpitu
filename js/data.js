@@ -1719,6 +1719,31 @@
     saveState();
   }
 
+  function updateVacation(id, vacation, company) {
+    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const existing = data.vacations.find((item) => item.id === id);
+    if (!existing) return false;
+
+    const oldStart = existing.startDate;
+    const oldEnd = existing.endDate;
+    const employeeName = getEmployeeName(vacation.employeeId, data);
+
+    existing.employeeId = vacation.employeeId;
+    existing.startDate = vacation.startDate;
+    existing.endDate = vacation.endDate;
+    existing.note = String(vacation.note || "").trim() || employeeName;
+
+    clearManualScaleCodeInRange(data, existing.employeeId, existing.startDate, existing.endDate, "FÉRIAS");
+
+    const months = new Set([
+      ...monthsTouchedByRange(oldStart, oldEnd),
+      ...monthsTouchedByRange(vacation.startDate, vacation.endDate)
+    ]);
+    runScaleIntegrations([...months]);
+    saveState();
+    return true;
+  }
+
   function addAbsence(absence, company) {
     const resolved = company || getPrimaryPageCompany("ferias");
     const data = getCompanyData(resolved);
@@ -1742,6 +1767,30 @@
     data.absences = (data.absences || []).filter((item) => item.id !== id);
     if (absence) runScaleIntegrations(monthsTouchedByRange(absence.startDate, absence.endDate));
     saveState();
+  }
+
+  function updateAbsence(id, absence, company) {
+    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const existing = (data.absences || []).find((item) => item.id === id);
+    if (!existing) return false;
+
+    const oldStart = existing.startDate;
+    const oldEnd = existing.endDate;
+
+    existing.employeeId = absence.employeeId;
+    existing.type = absence.type || existing.type;
+    existing.startDate = absence.startDate;
+    existing.endDate = absence.endDate;
+    existing.cid = absence.cid || "";
+    existing.note = absence.note || "";
+
+    const months = new Set([
+      ...monthsTouchedByRange(oldStart, oldEnd),
+      ...monthsTouchedByRange(absence.startDate, absence.endDate)
+    ]);
+    runScaleIntegrations([...months]);
+    saveState();
+    return true;
   }
 
   function addHoliday(holiday, options = {}) {
@@ -2576,7 +2625,9 @@
     parseDiscountAmount,
     upsertEmployee,
     addVacation,
+    updateVacation,
     addAbsence,
+    updateAbsence,
     removeAbsence,
     addHoliday,
     syncCompanyHolidaysFromCalendarEntry,
