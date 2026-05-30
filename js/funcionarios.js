@@ -186,49 +186,6 @@
     return listFilters.company === "todos" ? "Todas as empresas" : listFilters.company;
   }
 
-  function tableScrollShell(tableMarkup) {
-    return `
-      <div class="func-table-scroll-host">
-        <div class="table-wrap func-table-scroll-panel">${tableMarkup}</div>
-        <div class="func-table-scroll-bar" tabindex="0" aria-label="Rolagem horizontal da tabela">
-          <div class="func-table-scroll-inner"></div>
-        </div>
-      </div>
-    `;
-  }
-
-  function syncCadastroTableScroll(container) {
-    container.querySelectorAll(".func-table-scroll-host").forEach((host) => {
-      const panel = host.querySelector(".func-table-scroll-panel");
-      const bar = host.querySelector(".func-table-scroll-bar");
-      const inner = host.querySelector(".func-table-scroll-inner");
-      const table = panel?.querySelector("table");
-      if (!panel || !bar || !inner || !table) return;
-
-      const applyWidth = () => {
-        inner.style.width = `${Math.max(table.scrollWidth, panel.clientWidth + 1)}px`;
-      };
-
-      if (host.dataset.scrollBound !== "1") {
-        host.dataset.scrollBound = "1";
-        panel.addEventListener("scroll", () => {
-          if (bar.scrollLeft !== panel.scrollLeft) bar.scrollLeft = panel.scrollLeft;
-        });
-        bar.addEventListener("scroll", () => {
-          if (panel.scrollLeft !== bar.scrollLeft) panel.scrollLeft = bar.scrollLeft;
-        });
-        if (typeof ResizeObserver !== "undefined") {
-          new ResizeObserver(applyWidth).observe(table);
-        } else {
-          window.addEventListener("resize", applyWidth);
-        }
-      }
-
-      applyWidth();
-      bar.scrollLeft = panel.scrollLeft;
-    });
-  }
-
   function renderTopbarFilters(employees) {
     const departments = uniqueSorted(employees.map((item) => item.department));
     const roles = uniqueSorted(employees.map((item) => item.role));
@@ -889,7 +846,6 @@
     const tbody = container.querySelector("#employeeListBody");
     const countEl = container.querySelector("#employeeListCount");
     if (tbody) tbody.innerHTML = employeeRows(filtered);
-    syncCadastroTableScroll(container);
     if (countEl) {
       const companyTotal =
         listFilters.company === "todos"
@@ -1103,7 +1059,7 @@
             </div>
             <button type="button" class="primary btn-sm" id="btnNewCompany">+ Nova empresa</button>
           </div>
-          ${tableScrollShell(`
+          <div class="table-wrap">
             <table class="table-premium func-companies-table">
               <thead>
                 <tr>
@@ -1117,7 +1073,7 @@
               </thead>
               <tbody>${companyRows()}</tbody>
             </table>
-          `)}
+          </div>
         </article>
 
         <article class="card func-table-card">
@@ -1129,7 +1085,7 @@
             <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo funcionário</button>
           </div>
           ${renderListToolbar(allEmployees, filteredEmployees.length, companyCount, allEmployees.length)}
-          ${tableScrollShell(`
+          <div class="table-wrap">
             <table class="table-premium func-employees-table">
               <thead>
                 <tr>
@@ -1150,7 +1106,7 @@
               </thead>
               <tbody id="employeeListBody">${employeeRows(filteredEmployees)}</tbody>
             </table>
-          `)}
+          </div>
         </article>
 
         <div class="page-footer-actions">
@@ -1172,7 +1128,6 @@
 
     try {
       bindEvents(container);
-      syncCadastroTableScroll(container);
     } catch (error) {
       console.error("[Cadastro] Falha ao vincular eventos:", error);
     }

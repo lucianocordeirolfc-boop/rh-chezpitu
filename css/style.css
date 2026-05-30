@@ -464,6 +464,9 @@ textarea {
 .module.active {
   display: grid;
   gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   animation: moduleFadeIn 0.2s ease-out;
 }
 

@@ -4,6 +4,9 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Topo: título + resumo */
@@ -156,6 +159,9 @@
 
 .func-companies-card {
   padding: 14px 18px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .func-companies-table .func-company-row-active td {
@@ -299,86 +305,31 @@
 
 .func-table-card {
   padding: 12px 14px 14px;
-}
-
-/* Host: tabela + barra horizontal inferior */
-.func-table-scroll-host {
-  display: flex;
-  flex-direction: column;
   min-width: 0;
   max-width: 100%;
-}
-
-.func-table-scroll-panel {
-  overflow-x: scroll;
-  overflow-y: auto;
-  border-radius: 12px 12px 0 0;
-  border-bottom: none;
-}
-
-.func-table-scroll-panel::-webkit-scrollbar {
-  width: 14px;
-  height: 0;
-}
-
-.func-table-scroll-bar {
-  overflow-x: scroll;
-  overflow-y: hidden;
-  width: 100%;
-  height: 20px;
-  border: 1px solid var(--line);
-  border-top: 1px solid var(--sea-200);
-  border-radius: 0 0 12px 12px;
-  background: linear-gradient(180deg, #eef7fa 0%, #e6f3f7 100%);
-  scrollbar-width: auto;
-  scrollbar-color: var(--sea-600) #dceef4;
-  -webkit-overflow-scrolling: touch;
-}
-
-.func-table-scroll-bar::-webkit-scrollbar {
-  height: 18px;
-}
-
-.func-table-scroll-bar::-webkit-scrollbar-track {
-  background: #dceef4;
-  border-radius: 0 0 10px 10px;
-}
-
-.func-table-scroll-bar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--sea-400) 0%, var(--sea-700) 100%);
-  border: 2px solid #dceef4;
-  border-radius: 10px;
-  min-width: 48px;
-}
-
-.func-table-scroll-bar::-webkit-scrollbar-thumb:hover {
-  background: var(--sea-800);
-}
-
-.func-table-scroll-inner {
-  height: 1px;
-  pointer-events: none;
+  overflow: hidden;
 }
 
 .func-table-card .table-wrap,
 .func-companies-card .table-wrap {
   position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
-  overflow-x: scroll;
+  overflow-x: auto;
   overflow-y: auto;
   max-height: min(52vh, 480px);
-  max-width: 100%;
-  isolation: isolate;
-  scrollbar-width: auto;
-  scrollbar-color: var(--sea-500) #e6f3f7;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: auto;
+  scrollbar-color: var(--sea-600) #e6f3f7;
 }
 
 .func-table-card .table-wrap::-webkit-scrollbar,
 .func-companies-card .table-wrap::-webkit-scrollbar {
   width: 14px;
-  height: 14px;
+  height: 16px;
 }
 
 .func-table-card .table-wrap::-webkit-scrollbar-track,
@@ -392,8 +343,8 @@
   background: linear-gradient(180deg, var(--sea-400) 0%, var(--sea-600) 100%);
   border: 2px solid #e6f3f7;
   border-radius: 8px;
-  min-height: 40px;
-  min-width: 40px;
+  min-height: 36px;
+  min-width: 48px;
 }
 
 .func-table-card .table-wrap::-webkit-scrollbar-thumb:hover,
@@ -407,11 +358,8 @@
 }
 
 .table-premium.func-employees-table {
-  min-width: 1280px;
-}
-
-.table-premium.func-companies-table {
-  min-width: 960px;
+  width: max-content;
+  min-width: 100%;
 }
 
 .table-premium {
