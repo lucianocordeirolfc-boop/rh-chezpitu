@@ -776,43 +776,87 @@ function validateCoModal(AppData, chez) {
     "resolveWorkedHolidayStatus reconhece status tirado/compensado"
   );
 
+  chez.employees.push({
+    id: "edna-1",
+    name: "Edna Maria Silva",
+    status: "Ativo",
+    department: "Salão",
+    role: "Garçonete",
+    fixedDay: "Quinta-feira",
+    vtDaily: 12,
+    admissionDate: "2024-01-01"
+  });
   chez.holidays.push({
-    id: "h-auto-no-scale",
-    name: "Carnaval auto",
-    date: "2026-02-17",
+    id: "h-edna-pend",
+    name: "Corpus Christi",
+    date: "2026-06-04",
     workedEmployees: [
       {
-        employeeId: "raquel-1",
+        employeeId: "edna-1",
         compensationDate: "",
+        status: "Pendente",
         autoCreated: true,
         origin: "Automático pela escala"
       }
     ]
   });
   chez.holidays.push({
-    id: "h-manual-pend",
-    name: "Feriado manual pendente",
-    date: "2026-03-10",
-    workedEmployees: [{ employeeId: "raquel-1", compensationDate: "", status: "Pendente" }]
+    id: "h-edna-venc",
+    name: "Finados 2025",
+    date: "2025-11-02",
+    workedEmployees: [
+      {
+        employeeId: "edna-1",
+        compensationDate: "",
+        status: "Pendente",
+        autoCreated: true,
+        origin: "Automático pela escala"
+      }
+    ]
   });
-  chez.manualScale["raquel-1|2026-02-17"] = "FOLGA";
-  const afterAutoFilter = AppData.getPendingCoHolidaysForEmployee("raquel-1", coDate, {
+  chez.holidays.push({
+    id: "h-edna-comp",
+    name: "Natal Edna",
+    date: "2025-12-25",
+    workedEmployees: [
+      {
+        employeeId: "edna-1",
+        compensationDate: "2026-01-10",
+        status: "Compensado"
+      }
+    ]
+  });
+  const ednaPending = AppData.getPendingCoHolidaysForEmployee("edna-1", coDate, {
     company: "Chez Pitu",
     data: chez
   });
   assert(
     area,
-    !afterAutoFilter.some((entry) => entry.holiday.id === "h-auto-no-scale"),
-    "Auto-criados sem trabalho explícito na escala não aparecem no modal CO",
-    ["js/data.js", "js/scale-rules.js"],
-    "isWorkedExplicitlyOnHolidayDate"
+    ednaPending.some((entry) => entry.holiday.id === "h-edna-pend"),
+    "Edna: feriado Pendente do Controle de Feriados aparece no modal CO",
+    ["js/data.js", "js/escala.js"],
+    "isWorkedHolidayPendingInFeriadosControl alinhado ao Controle de Feriados"
   );
   assert(
     area,
-    afterAutoFilter.some((entry) => entry.holiday.id === "h-manual-pend"),
-    "Feriados cadastrados manualmente continuam disponíveis no modal CO",
+    ednaPending.some((entry) => entry.holiday.id === "h-edna-venc"),
+    "Edna: feriado Vencido do Controle de Feriados aparece no modal CO",
     ["js/data.js"],
     "—"
+  );
+  assert(
+    area,
+    !ednaPending.some((entry) => entry.holiday.id === "h-edna-comp"),
+    "Edna: feriados compensados não aparecem no modal CO",
+    ["js/data.js"],
+    "—"
+  );
+  assert(
+    area,
+    !ednaPending.some((entry) => entry.item.employeeId !== "edna-1"),
+    "Modal CO da Edna lista somente vínculos dela",
+    ["js/data.js"],
+    "resolveWorkedEmployeeEntry"
   );
 }
 

@@ -992,24 +992,32 @@
     return linked;
   }
 
-  function isWorkedExplicitlyOnHolidayDate(employeeId, holidayDate, data) {
-    const manualCode = getManualScaleCodeValue(employeeId, holidayDate, data);
-    if (manualCode === undefined) return false;
-    if (window.ScaleRules?.isScaleCodeWorked) {
-      return window.ScaleRules.isScaleCodeWorked(manualCode, state);
+  /** Status exibidos como pendência no Controle de Feriados (abas Pendentes e Vencidos). */
+  const FERIADOS_CO_PICKER_STATUSES = new Set(["pendente", "vencido"]);
+
+  function isWorkedHolidayPendingInFeriadosControl(item, holiday, employeeId, data, today, options = {}) {
+    const employee = (data?.employees || []).find((entry) => entry.id === employeeId);
+    if (employee?.admissionDate && holiday.date < employee.admissionDate) return false;
+
+    syncWorkedEmployeeStatus(item, holiday.date);
+    const status = resolveWorkedHolidayStatus(item, holiday.date, today);
+    const isEditingThisCo = Boolean(options.isEditingThisCo);
+    const coDate = options.coDate || "";
+
+    if (status.key === "compensado" && !isEditingThisCo) return false;
+    if (status.key === "agendado" && !isEditingThisCo) return false;
+    if (!isEditingThisCo && options.scaleCoLinks?.has(holiday.id)) return false;
+
+    if (item.linkedFromScale && item.scaleCoDate && item.scaleCoDate !== coDate && !isEditingThisCo) {
+      return false;
     }
-    const NOT_WORKED = new Set([
-      "FOLGA",
-      "DOM",
-      "FÉRIAS",
-      "CO",
-      "ATESTADO",
-      "FALTA",
-      "SUSPENSÃO",
-      "LICENÇA"
-    ]);
-    if (NOT_WORKED.has(manualCode)) return false;
-    return Boolean(String(manualCode).trim());
+
+    if (item.compensationDate && item.compensationDate !== coDate) {
+      if (status.key === "agendado" || status.key === "compensado") return isEditingThisCo;
+    }
+
+    if (isEditingThisCo) return true;
+    return FERIADOS_CO_PICKER_STATUSES.has(status.key);
   }
 
   function reconcileCoCompensationLinks(companyBlock) {
@@ -1121,36 +1129,11 @@
   }
 
   function isPendingCoCandidate(item, holiday, coDate, today, isEditingThisCo, context = {}) {
-    syncWorkedEmployeeStatus(item, holiday.date);
-    const status = resolveWorkedHolidayStatus(item, holiday.date, today);
-
-    if (status.key === "compensado" && !isEditingThisCo) return false;
-
-    if (!isEditingThisCo && context.scaleCoLinks?.has(holiday.id)) return false;
-
-    if (item.linkedFromScale && item.scaleCoDate && item.scaleCoDate !== coDate && !isEditingThisCo) {
-      return false;
-    }
-
-    if (item.compensationDate && item.compensationDate !== coDate) {
-      if (status.key === "agendado" || status.key === "compensado") return isEditingThisCo;
-    }
-
-    if (status.key === "agendado" && !isEditingThisCo) return false;
-
-    if (
-      !isEditingThisCo &&
-      item.autoCreated &&
-      !item.compensationDate &&
-      !item.linkedFromScale &&
-      context.data &&
-      context.employeeId &&
-      !isWorkedExplicitlyOnHolidayDate(context.employeeId, holiday.date, context.data)
-    ) {
-      return false;
-    }
-
-    return status.key === "pendente" || status.key === "vencido" || isEditingThisCo;
+    return isWorkedHolidayPendingInFeriadosControl(item, holiday, context.employeeId, context.data, today, {
+      coDate,
+      isEditingThisCo,
+      scaleCoLinks: context.scaleCoLinks
+    });
   }
 
   // Persiste estado já mesclado (merge ocorre apenas em mergeRemoteIntoLocal).
@@ -2196,6 +2179,7 @@
     getScaleAbsenceConflict,
     getPendingCoHolidaysForEmployee,
     resolveWorkedEmployeeEntry,
+    isWorkedHolidayPendingInFeriadosControl,
     reconcileCoCompensationLinks,
     buildScaleCoHolidayIndex,
     finalizeIncomingState,

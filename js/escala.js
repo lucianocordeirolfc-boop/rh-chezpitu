@@ -937,7 +937,7 @@
       picker.innerHTML = `
         <p class="co-picker-title">Feriado trabalhado — CO</p>
         <p class="co-picker-hint">Funcionário: <strong>${esc(displayName(employeeLabel))}</strong></p>
-        <p class="co-picker-hint">Selecione um feriado pendente deste funcionário:</p>
+        <p class="co-picker-hint">Selecione um feriado pendente ou vencido deste funcionário (Controle de Feriados):</p>
         <select id="coHolidaySelect" class="co-picker-select" ${selectAttrs}>
           ${eligible.length ? `<option value="" disabled ${currentLinkedId ? "" : "selected"}>— Selecione o feriado —</option>` : ""}
           ${holidayOpts}
