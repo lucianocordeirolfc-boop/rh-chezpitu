@@ -1,0 +1,15 @@
+Leia integralmente:
+
+- AGENT_START.md
+- CLAUDE.md
+- PROJECT_RULES.md
+- PROJECT_HISTORY.md
+- TEST_CHECKLIST.md
+- BUGS_CONHECIDOS.md
+- .cursor/rules/karpathy-general.mdc
+
+Confirme entendimento das regras.
+
+Identifique impacto da alteração.
+
+Apresente plano antes de modificar qualquer arquivo.
