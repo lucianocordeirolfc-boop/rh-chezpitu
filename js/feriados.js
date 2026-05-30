@@ -486,7 +486,7 @@
     const holiday = data.holidays.find((item) => item.id === holidayId);
     if (!holiday) return { ok: true };
 
-    const workedEmployee = holiday.workedEmployees.find((item) => item.employeeId === employeeId);
+    const workedEmployee = AppData.resolveWorkedEmployeeEntry(data, employeeId, holiday);
     if (!workedEmployee) return { ok: true };
 
     if (compensationDate && !AppData.isCompensationWithinDeadline(holiday.date, compensationDate)) {

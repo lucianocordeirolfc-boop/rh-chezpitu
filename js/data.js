@@ -974,6 +974,85 @@
     if (!companyBlock) return;
     companyBlock.holidays = mergeHolidayLists([], companyBlock.holidays || []);
     normalizeWorkedEmployeeRefs(companyBlock);
+    reconcileCoCompensationLinks(companyBlock);
+  }
+
+  function buildScaleCoHolidayIndex(data, employeeId) {
+    const linked = new Map();
+    const prefix = `${employeeId}|`;
+    Object.entries(data?.manualScale || {}).forEach(([key, entry]) => {
+      if (!key.startsWith(prefix)) return;
+      const coDate = key.slice(prefix.length);
+      const code = typeof entry === "object" ? entry?.code : entry;
+      if (code !== "CO") return;
+      const linkedHolidayId =
+        typeof entry === "object" ? String(entry.linkedHolidayId || "").trim() : "";
+      if (linkedHolidayId) linked.set(linkedHolidayId, coDate);
+    });
+    return linked;
+  }
+
+  function isWorkedExplicitlyOnHolidayDate(employeeId, holidayDate, data) {
+    const manualCode = getManualScaleCodeValue(employeeId, holidayDate, data);
+    if (manualCode === undefined) return false;
+    if (window.ScaleRules?.isScaleCodeWorked) {
+      return window.ScaleRules.isScaleCodeWorked(manualCode, state);
+    }
+    const NOT_WORKED = new Set([
+      "FOLGA",
+      "DOM",
+      "FÉRIAS",
+      "CO",
+      "ATESTADO",
+      "FALTA",
+      "SUSPENSÃO",
+      "LICENÇA"
+    ]);
+    if (NOT_WORKED.has(manualCode)) return false;
+    return Boolean(String(manualCode).trim());
+  }
+
+  function reconcileCoCompensationLinks(companyBlock) {
+    if (!companyBlock) return false;
+    let changed = false;
+
+    Object.entries(companyBlock.manualScale || {}).forEach(([key, entry]) => {
+      const sep = key.indexOf("|");
+      if (sep < 0) return;
+      const employeeId = key.slice(0, sep);
+      const coDate = key.slice(sep + 1);
+      if (!employeeId || !coDate) return;
+
+      const code = typeof entry === "object" ? entry?.code : entry;
+      if (code !== "CO") return;
+
+      const linkedHolidayId =
+        typeof entry === "object" ? String(entry.linkedHolidayId || "").trim() : "";
+      if (!linkedHolidayId) return;
+
+      const holiday = (companyBlock.holidays || []).find((item) => item.id === linkedHolidayId);
+      if (!holiday) return;
+
+      const item = resolveWorkedEmployeeEntry(companyBlock, employeeId, holiday);
+      if (!item) return;
+
+      if (
+        item.compensationDate !== coDate ||
+        item.scaleCoDate !== coDate ||
+        !item.linkedFromScale ||
+        item.linkedHolidayId !== linkedHolidayId
+      ) {
+        item.compensationDate = coDate;
+        item.scheduledCoDate = coDate;
+        item.scaleCoDate = coDate;
+        item.linkedFromScale = true;
+        item.linkedHolidayId = linkedHolidayId;
+        syncWorkedEmployeeStatus(item, holiday.date);
+        changed = true;
+      }
+    });
+
+    return changed;
   }
 
   function resolveWorkedEmployeeEntry(data, employeeId, holiday) {
@@ -1041,11 +1120,13 @@
     });
   }
 
-  function isPendingCoCandidate(item, holiday, coDate, today, isEditingThisCo) {
+  function isPendingCoCandidate(item, holiday, coDate, today, isEditingThisCo, context = {}) {
     syncWorkedEmployeeStatus(item, holiday.date);
     const status = resolveWorkedHolidayStatus(item, holiday.date, today);
 
     if (status.key === "compensado" && !isEditingThisCo) return false;
+
+    if (!isEditingThisCo && context.scaleCoLinks?.has(holiday.id)) return false;
 
     if (item.linkedFromScale && item.scaleCoDate && item.scaleCoDate !== coDate && !isEditingThisCo) {
       return false;
@@ -1056,6 +1137,18 @@
     }
 
     if (status.key === "agendado" && !isEditingThisCo) return false;
+
+    if (
+      !isEditingThisCo &&
+      item.autoCreated &&
+      !item.compensationDate &&
+      !item.linkedFromScale &&
+      context.data &&
+      context.employeeId &&
+      !isWorkedExplicitlyOnHolidayDate(context.employeeId, holiday.date, context.data)
+    ) {
+      return false;
+    }
 
     return status.key === "pendente" || status.key === "vencido" || isEditingThisCo;
   }
@@ -1525,9 +1618,20 @@
   function resolveWorkedHolidayStatus(item, holidayDate, today = todayISO()) {
     const dueDate = getHolidayCompensationDueDate(holidayDate);
     const daysLeft = diffDays(today, dueDate);
+    const effectiveCompDate = String(
+      item.compensationDate || item.scheduledCoDate || item.scaleCoDate || ""
+    ).trim();
+    const statusNorm = normalizeSearchText(item.status);
 
-    if (item.compensationDate) {
-      if (item.compensationDate > today) return { key: "agendado", label: "Agendado", daysLeft };
+    if (
+      !effectiveCompDate &&
+      (statusNorm.includes("compens") || statusNorm.includes("tirad"))
+    ) {
+      return { key: "compensado", label: "Compensado", daysLeft };
+    }
+
+    if (effectiveCompDate) {
+      if (effectiveCompDate > today) return { key: "agendado", label: "Agendado", daysLeft };
       return { key: "compensado", label: "Compensado", daysLeft };
     }
 
@@ -1560,6 +1664,7 @@
       getPrimaryPageCompany("escala");
     const data = options.data || getCompanyData(company);
     normalizeWorkedEmployeeRefs(data);
+    reconcileCoCompensationLinks(data);
 
     if (!data.employees.some((entry) => entry.id === canonicalId)) return [];
 
@@ -1567,6 +1672,8 @@
     const currentEntry = getManualScaleEntry(canonicalId, coDate, data);
     const currentLinkedId =
       currentEntry && typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
+    const scaleCoLinks = buildScaleCoHolidayIndex(data, canonicalId);
+    const context = { data, employeeId: canonicalId, scaleCoLinks };
 
     return (data.holidays || [])
       .map((holiday) => {
@@ -1577,7 +1684,7 @@
           holiday.id === currentLinkedId ||
           (item.linkedFromScale && (item.scaleCoDate === coDate || item.compensationDate === coDate));
 
-        if (!isPendingCoCandidate(item, holiday, coDate, today, isEditingThisCo)) return null;
+        if (!isPendingCoCandidate(item, holiday, coDate, today, isEditingThisCo, context)) return null;
 
         return { holiday, item, status: resolveWorkedHolidayStatus(item, holiday.date, today), company };
       })
@@ -2089,6 +2196,8 @@
     getScaleAbsenceConflict,
     getPendingCoHolidaysForEmployee,
     resolveWorkedEmployeeEntry,
+    reconcileCoCompensationLinks,
+    buildScaleCoHolidayIndex,
     finalizeIncomingState,
     migrateVtStorage,
     WEEK_DAYS,

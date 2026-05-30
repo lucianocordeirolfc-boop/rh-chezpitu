@@ -729,6 +729,91 @@ function validateCoModal(AppData, chez) {
     ["js/data.js", "js/escala.js"],
     "setManualScale exige linkedHolidayId"
   );
+
+  chez.holidays.push({
+    id: "h-scale-linked",
+    name: "Natal 2025",
+    date: "2025-12-25",
+    workedEmployees: [
+      {
+        employeeId: "raquel-1",
+        compensationDate: "",
+        status: "Pendente",
+        autoCreated: true,
+        origin: "Automático pela escala"
+      }
+    ]
+  });
+  chez.manualScale["raquel-1|2026-01-05"] = { code: "CO", linkedHolidayId: "h-scale-linked" };
+  AppData.reconcileCoCompensationLinks(chez);
+  const afterScaleLink = AppData.getPendingCoHolidaysForEmployee("raquel-1", coDate, {
+    company: "Chez Pitu",
+    data: chez
+  });
+  assert(
+    area,
+    !afterScaleLink.some((entry) => entry.holiday.id === "h-scale-linked"),
+    "Feriado com CO na escala vinculado não aparece como pendente",
+    ["js/data.js"],
+    "reconcileCoCompensationLinks + buildScaleCoHolidayIndex"
+  );
+
+  chez.holidays.push({
+    id: "h-status-comp",
+    name: "Feriado status compensado",
+    date: "2025-11-15",
+    workedEmployees: [{ employeeId: "raquel-1", compensationDate: "", status: "Compensado" }]
+  });
+  const afterStatus = AppData.getPendingCoHolidaysForEmployee("raquel-1", coDate, {
+    company: "Chez Pitu",
+    data: chez
+  });
+  assert(
+    area,
+    !afterStatus.some((entry) => entry.holiday.id === "h-status-comp"),
+    "Status Compensado legado sem data exclui feriado do modal CO",
+    ["js/data.js"],
+    "resolveWorkedHolidayStatus reconhece status tirado/compensado"
+  );
+
+  chez.holidays.push({
+    id: "h-auto-no-scale",
+    name: "Carnaval auto",
+    date: "2026-02-17",
+    workedEmployees: [
+      {
+        employeeId: "raquel-1",
+        compensationDate: "",
+        autoCreated: true,
+        origin: "Automático pela escala"
+      }
+    ]
+  });
+  chez.holidays.push({
+    id: "h-manual-pend",
+    name: "Feriado manual pendente",
+    date: "2026-03-10",
+    workedEmployees: [{ employeeId: "raquel-1", compensationDate: "", status: "Pendente" }]
+  });
+  chez.manualScale["raquel-1|2026-02-17"] = "FOLGA";
+  const afterAutoFilter = AppData.getPendingCoHolidaysForEmployee("raquel-1", coDate, {
+    company: "Chez Pitu",
+    data: chez
+  });
+  assert(
+    area,
+    !afterAutoFilter.some((entry) => entry.holiday.id === "h-auto-no-scale"),
+    "Auto-criados sem trabalho explícito na escala não aparecem no modal CO",
+    ["js/data.js", "js/scale-rules.js"],
+    "isWorkedExplicitlyOnHolidayDate"
+  );
+  assert(
+    area,
+    afterAutoFilter.some((entry) => entry.holiday.id === "h-manual-pend"),
+    "Feriados cadastrados manualmente continuam disponíveis no modal CO",
+    ["js/data.js"],
+    "—"
+  );
 }
 
 function validateCrossModuleLinks(AppData, chez, peng, ym) {
