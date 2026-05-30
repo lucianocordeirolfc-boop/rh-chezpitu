@@ -186,6 +186,61 @@
     return listFilters.company === "todos" ? "Todas as empresas" : listFilters.company;
   }
 
+  function tableXScrollWrap(tableMarkup) {
+    return `
+      <div class="func-table-x-scroll">
+        <div class="table-wrap func-table-x-panel">${tableMarkup}</div>
+        <div class="func-table-x-bar" tabindex="0" aria-label="Rolagem horizontal da tabela">
+          <div class="func-table-x-spacer" aria-hidden="true"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindCadastroTableXScroll(container) {
+    container.querySelectorAll(".func-table-x-scroll").forEach((host) => {
+      const panel = host.querySelector(".func-table-x-panel");
+      const bar = host.querySelector(".func-table-x-bar");
+      const spacer = host.querySelector(".func-table-x-spacer");
+      const table = panel?.querySelector("table");
+      if (!panel || !bar || !spacer || !table) return;
+
+      let syncing = false;
+
+      const refresh = () => {
+        spacer.style.width = `${table.scrollWidth}px`;
+        const overflow = table.scrollWidth > panel.clientWidth + 1;
+        bar.hidden = !overflow;
+        if (overflow && bar.scrollLeft !== panel.scrollLeft) {
+          bar.scrollLeft = panel.scrollLeft;
+        }
+      };
+
+      if (host.dataset.xScrollBound !== "1") {
+        host.dataset.xScrollBound = "1";
+        panel.addEventListener("scroll", () => {
+          if (syncing) return;
+          syncing = true;
+          bar.scrollLeft = panel.scrollLeft;
+          syncing = false;
+        });
+        bar.addEventListener("scroll", () => {
+          if (syncing) return;
+          syncing = true;
+          panel.scrollLeft = bar.scrollLeft;
+          syncing = false;
+        });
+        if (typeof ResizeObserver !== "undefined") {
+          new ResizeObserver(refresh).observe(table);
+          new ResizeObserver(refresh).observe(panel);
+        }
+        window.addEventListener("resize", refresh);
+      }
+
+      refresh();
+    });
+  }
+
   function renderTopbarFilters(employees) {
     const departments = uniqueSorted(employees.map((item) => item.department));
     const roles = uniqueSorted(employees.map((item) => item.role));
@@ -846,6 +901,7 @@
     const tbody = container.querySelector("#employeeListBody");
     const countEl = container.querySelector("#employeeListCount");
     if (tbody) tbody.innerHTML = employeeRows(filtered);
+    bindCadastroTableXScroll(container);
     if (countEl) {
       const companyTotal =
         listFilters.company === "todos"
@@ -1059,7 +1115,7 @@
             </div>
             <button type="button" class="primary btn-sm" id="btnNewCompany">+ Nova empresa</button>
           </div>
-          <div class="table-wrap">
+          ${tableXScrollWrap(`
             <table class="table-premium func-companies-table">
               <thead>
                 <tr>
@@ -1073,7 +1129,7 @@
               </thead>
               <tbody>${companyRows()}</tbody>
             </table>
-          </div>
+          `)}
         </article>
 
         <article class="card func-table-card">
@@ -1085,7 +1141,7 @@
             <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo funcionário</button>
           </div>
           ${renderListToolbar(allEmployees, filteredEmployees.length, companyCount, allEmployees.length)}
-          <div class="table-wrap">
+          ${tableXScrollWrap(`
             <table class="table-premium func-employees-table">
               <thead>
                 <tr>
@@ -1106,7 +1162,7 @@
               </thead>
               <tbody id="employeeListBody">${employeeRows(filteredEmployees)}</tbody>
             </table>
-          </div>
+          `)}
         </article>
 
         <div class="page-footer-actions">
@@ -1128,6 +1184,7 @@
 
     try {
       bindEvents(container);
+      bindCadastroTableXScroll(container);
     } catch (error) {
       console.error("[Cadastro] Falha ao vincular eventos:", error);
     }

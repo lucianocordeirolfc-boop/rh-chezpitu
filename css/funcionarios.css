@@ -310,8 +310,86 @@
   overflow: hidden;
 }
 
-.func-table-card .table-wrap,
-.func-companies-card .table-wrap {
+/* Tabela + barra horizontal inferior (contida — não estica a página) */
+.func-table-x-scroll {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.func-table-x-scroll .func-table-x-panel {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: min(52vh, 480px);
+  border: 1px solid var(--line);
+  border-radius: 12px 12px 0 0;
+  border-bottom: none;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sea-500) #e6f3f7;
+}
+
+.func-table-x-scroll .func-table-x-panel::-webkit-scrollbar {
+  width: 14px;
+  height: 0;
+}
+
+.func-table-x-scroll .func-table-x-bar {
+  box-sizing: border-box;
+  contain: inline-size;
+  width: 100%;
+  max-width: 100%;
+  height: 22px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  border: 1px solid var(--line);
+  border-top: 1px solid var(--sea-200);
+  border-radius: 0 0 12px 12px;
+  background: linear-gradient(180deg, #eef7fa 0%, #dceef4 100%);
+  scrollbar-width: auto;
+  scrollbar-color: var(--sea-700) #dceef4;
+  -webkit-overflow-scrolling: touch;
+}
+
+.func-table-x-scroll .func-table-x-bar[hidden] {
+  display: none;
+}
+
+.func-table-x-scroll .func-table-x-bar::-webkit-scrollbar {
+  height: 18px;
+}
+
+.func-table-x-scroll .func-table-x-bar::-webkit-scrollbar-track {
+  background: #dceef4;
+  border-radius: 0 0 10px 10px;
+}
+
+.func-table-x-scroll .func-table-x-bar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--sea-400) 0%, var(--sea-700) 100%);
+  border: 2px solid #dceef4;
+  border-radius: 10px;
+  min-width: 56px;
+}
+
+.func-table-x-scroll .func-table-x-bar::-webkit-scrollbar-thumb:hover {
+  background: var(--sea-800);
+}
+
+.func-table-x-scroll .func-table-x-spacer {
+  display: block;
+  height: 1px;
+  width: 0;
+  pointer-events: none;
+}
+
+.func-table-card .table-wrap:not(.func-table-x-panel),
+.func-companies-card .table-wrap:not(.func-table-x-panel) {
   position: relative;
   box-sizing: border-box;
   width: 100%;
