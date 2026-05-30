@@ -585,7 +585,7 @@
       button.addEventListener("click", () => {
         const holidayId = button.dataset.removeHoliday;
         if (!confirmDeleteHoliday(holidayId)) return;
-        AppData.removeHoliday(holidayId);
+        AppData.removeHoliday(holidayId, { company: AppData.getPrimaryPageCompany("feriados") });
         window.App.renderCurrent();
       });
     });

@@ -1340,10 +1340,6 @@
         return;
       }
       const nextCompany = AppData.getPrimaryPageCompany("escala");
-      if (nextCompany === scaleState.viewCompany && container.querySelector(".scale-table")) {
-        scaleLog("softRefreshFromSync skipped", nextCompany);
-        return;
-      }
       scaleState.viewCompany = nextCompany;
       scaleLog("softRefreshFromSync", scaleState.viewCompany);
       renderCurrent(container);

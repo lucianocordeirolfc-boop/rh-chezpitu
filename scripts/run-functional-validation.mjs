@@ -429,6 +429,20 @@ function validateFeriados(AppData, chez) {
     ["js/data.js", "js/feriados.js"],
     "—"
   );
+
+  AppData.setPageCompany("feriados", "Pengold", { save: false });
+  const peng = AppData.getCompanyData("Pengold");
+  const pengOnlyId = "h-peng-only-test";
+  peng.holidays.push({ id: pengOnlyId, name: "Feriado Pengold", date: "2026-08-15", workedEmployees: [] });
+  AppData.removeHoliday(pengOnlyId, { company: "Pengold", save: false });
+  assert(
+    area,
+    !peng.holidays.some((h) => h.id === pengOnlyId) && chez.holidays.length > 0,
+    "removeHoliday respeita empresa do filtro Feriados (não apaga bloco errado)",
+    ["js/data.js", "js/feriados.js"],
+    "removeHoliday(id, { company })"
+  );
+  AppData.setPageCompany("feriados", "Chez Pitu", { save: false });
 }
 
 function validateDashboard(AppData, chez, peng) {

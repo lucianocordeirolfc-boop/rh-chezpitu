@@ -261,7 +261,6 @@
         ...(parsed.companies[company].companyInfo || {})
       };
       parsed.companies[company].employees = parsed.companies[company].employees || [];
-      parsed.companies[company].holidays = mergeHolidayLists([], parsed.companies[company].holidays || []);
       parsed.companies[company].manualScale = parsed.companies[company].manualScale || {};
       normalizeCompanyHolidays(parsed.companies[company]);
       parsed.companies[company].vacations = parsed.companies[company].vacations || [];
@@ -1333,8 +1332,9 @@
     return changed;
   }
 
-  function removeHoliday(id) {
-    const data = getCompanyData();
+  function removeHoliday(id, options = {}) {
+    const company = options.company || getPrimaryPageCompany("feriados");
+    const data = getCompanyData(company);
     data.holidays = data.holidays.filter((holiday) => holiday.id !== id);
     saveState();
   }
