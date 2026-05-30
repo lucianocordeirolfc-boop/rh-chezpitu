@@ -1239,17 +1239,17 @@ function validateScalePrintLayout() {
   );
   assert(
     area,
-    escalaJs.includes("printCode") &&
-      escalaJs.includes("getPrintDensityClass") &&
-      escalaJs.includes("syncPrintStaticFields"),
-    "Escala ajusta códigos, densidade e campos estáticos antes de imprimir",
+    escalaJs.includes("scalePrintContainer") &&
+      escalaJs.includes("size: A4 landscape") &&
+      escalaJs.includes("getPrintDensityClass"),
+    "Escala imprime via container dedicado em A4 horizontal",
     ["js/escala.js"],
-    "—"
+    "printScale"
   );
   assert(
     area,
-    !escalaPrintCss.includes("margin-top: -20mm"),
-    "Observações da escala não usam margem negativa na impressão",
+    !escalaPrintCss.includes("box-shadow: inset 0 0 0 999px"),
+    "Cores de domingo/feriado não usam box-shadow pesado na impressão",
     ["css/escala-print.css"],
     "—"
   );

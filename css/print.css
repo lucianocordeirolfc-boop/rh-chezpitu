@@ -395,14 +395,14 @@
     background: #ffffff !important;
   }
 
-  body * {
+  body:not(.printing-scale):not(.printing-contador) * {
     visibility: hidden !important;
   }
 
   body:not(.printing-contador):not(.printing-scale) .vt-print-area,
   body:not(.printing-contador):not(.printing-scale) .vt-print-area *,
-  body.printing-scale .scale-print-area,
-  body.printing-scale .scale-print-area * {
+  body.printing-scale #scalePrintContainer,
+  body.printing-scale #scalePrintContainer * {
     visibility: visible !important;
   }
 
@@ -467,7 +467,24 @@
   }
 
   body.printing-scale {
-    width: auto !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.printing-scale > *:not(#scalePrintContainer) {
+    display: none !important;
+  }
+
+  body.printing-scale #scalePrintContainer {
+    display: block !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
 
   body.printing-scale .vt-print-area,

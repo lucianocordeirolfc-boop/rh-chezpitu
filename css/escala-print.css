@@ -21,9 +21,11 @@
 .scale-print-area {
   display: block;
   width: 297mm;
+  height: 210mm;
   min-height: 210mm;
   margin: 0 auto;
-  padding: 5mm 6mm;
+  padding: 4mm 5mm;
+  box-sizing: border-box;
   color: #17313b;
   border: 1px solid #bfdbe4;
   background: #ffffff;
@@ -331,7 +333,7 @@
 .scale-print-table th.print-day-sunday,
 .scale-print-table td.print-day-sunday {
   color: #b42318 !important;
-  box-shadow: inset 0 0 0 999px rgba(220, 38, 38, 0.18) !important;
+  background-color: rgba(220, 38, 38, 0.14) !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -339,7 +341,7 @@
 .scale-print-table th.print-day-holiday,
 .scale-print-table td.print-day-holiday {
   color: #92400e !important;
-  box-shadow: inset 0 0 0 999px rgba(234, 179, 8, 0.28) !important;
+  background-color: rgba(234, 179, 8, 0.22) !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -651,17 +653,50 @@
 }
 
 @media print {
-  .scale-print-preview-scroll .scale-print-area {
-    transform: none !important;
-    margin-right: 0 !important;
-    margin-bottom: 0 !important;
-  }
-
   body.printing-scale,
   body.printing-scale html {
     width: 297mm !important;
+    height: 210mm !important;
     min-width: 297mm !important;
+    min-height: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #ffffff !important;
+    overflow: hidden !important;
+  }
+
+  body.printing-scale #scalePrintContainer {
+    position: fixed !important;
+    top: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+  }
+
+  body.printing-scale #scalePrintContainer .scale-print-area {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    margin: 0 !important;
+    padding: 3.5mm 4mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   body.printing-scale .scale-print-header-corporate {
@@ -669,13 +704,9 @@
     grid-template-columns: 1.2fr 1.35fr 0.75fr !important;
   }
 
-  body.printing-scale .scale-print-area {
-    transform: none !important;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-
   body.printing-scale .scale-print-table {
+    width: 100% !important;
+    height: 100% !important;
     break-inside: auto;
     page-break-inside: auto;
   }
@@ -689,43 +720,6 @@
   body.printing-scale .scale-print-density-dense .scale-print-bottom {
     break-inside: auto;
     page-break-inside: auto;
-  }
-
-  body.printing-scale .sidebar,
-  body.printing-scale .topbar,
-  body.printing-scale .scale-card,
-  body.printing-scale .no-print,
-  body.printing-scale button {
-    display: none !important;
-  }
-
-  body.printing-scale .app-shell,
-  body.printing-scale .module.active,
-  body.printing-scale .card.scale-print-preview-card,
-  body.printing-scale .scale-print-preview-scroll {
-    display: block !important;
-    width: 297mm !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-    overflow: visible !important;
-  }
-
-  body.printing-scale .scale-print-area {
-    display: block !important;
-    page: scaleLandscape;
-    width: 297mm !important;
-    min-height: 210mm !important;
-    margin: 0 !important;
-    padding: 5mm 6mm !important;
-    border: 0 !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-    break-after: auto;
-    page-break-after: auto;
   }
 
   body.printing-scale .no-print {
@@ -752,13 +746,21 @@
 
   body.printing-scale .scale-print-notes-print {
     display: block !important;
-    min-height: 22mm;
+    min-height: 16mm;
+    max-height: 20mm;
+    overflow: hidden;
     padding-top: 1mm;
     border-top: 0.25mm solid #cfe3ea;
   }
 
-  body.printing-scale .scale-print-manual-lines {
-    display: none !important;
+  body.printing-scale .scale-print-footer {
+    margin-top: 2mm !important;
+    gap: 4mm !important;
+  }
+
+  body.printing-scale .scale-print-bottom {
+    margin-top: 2mm !important;
+    gap: 3mm !important;
   }
 
   body.printing-scale .scale-print-table tr,
@@ -773,6 +775,7 @@
     align-items: center !important;
     justify-content: center !important;
     overflow: visible !important;
+    min-height: 20mm !important;
   }
 
   body.printing-scale .scale-print-sign-line {
@@ -787,12 +790,10 @@
     print-color-adjust: exact;
   }
 
-  /* Domingo e feriado — forçar cores na impressão */
   body.printing-scale .scale-print-table th.print-day-sunday,
   body.printing-scale .scale-print-table td.print-day-sunday {
     color: #b42318 !important;
-    background-color: rgba(220, 38, 38, 0.12) !important;
-    box-shadow: inset 0 0 0 999px rgba(220, 38, 38, 0.18) !important;
+    background-color: rgba(220, 38, 38, 0.14) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -800,13 +801,11 @@
   body.printing-scale .scale-print-table th.print-day-holiday,
   body.printing-scale .scale-print-table td.print-day-holiday {
     color: #92400e !important;
-    background-color: rgba(234, 179, 8, 0.20) !important;
-    box-shadow: inset 0 0 0 999px rgba(234, 179, 8, 0.28) !important;
+    background-color: rgba(234, 179, 8, 0.22) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Tema Pengold — impressão */
   body.printing-scale .scale-company-pengold .scale-print-table thead th {
     background: linear-gradient(180deg, #d4f0e0, #b8e4cc) !important;
     color: #0e2b1e !important;

@@ -687,7 +687,7 @@
           <button id="closeScalePreview" class="secondary" type="button">Ocultar prévia</button>
         </div>
         <div class="scale-print-preview-scroll">
-          <section class="scale-print-area ${densityClass}" aria-label="Pré-visualização da impressão da escala">
+          <section class="scale-print-area ${companyClass()} ${densityClass}" aria-label="Pré-visualização da impressão da escala">
                         <header class="scale-print-header scale-print-header-corporate">
               <div class="scale-print-brand">
                 <p class="scale-print-legal-name">${esc(companyInfo.legalName)}</p>
@@ -874,13 +874,41 @@
 
   function printScale(container) {
     syncPrintStaticFields(container);
-    const removePrintClass = () => document.body.classList.remove("printing-scale");
+
+    const source = container?.querySelector(".scale-print-area");
+    if (!source) {
+      alert("Não foi possível gerar a impressão da escala. Tente abrir a pré-visualização e imprimir novamente.");
+      return;
+    }
+
+    document.getElementById("scalePrintContainer")?.remove();
+    document.getElementById("scale-print-page-override")?.remove();
+
+    const printContainer = document.createElement("div");
+    printContainer.id = "scalePrintContainer";
+    printContainer.innerHTML = source.outerHTML;
+    document.body.appendChild(printContainer);
+
+    const pageStyle = document.createElement("style");
+    pageStyle.id = "scale-print-page-override";
+    pageStyle.textContent = "@page { size: A4 landscape; margin: 0; }";
+    document.head.appendChild(pageStyle);
+
     document.body.classList.add("printing-scale");
-    window.addEventListener("afterprint", removePrintClass, { once: true });
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => window.print());
-    });
-    window.setTimeout(removePrintClass, 1000);
+
+    function cleanupPrint() {
+      document.body.classList.remove("printing-scale");
+      document.getElementById("scalePrintContainer")?.remove();
+      document.getElementById("scale-print-page-override")?.remove();
+      window.removeEventListener("afterprint", cleanupPrint);
+    }
+
+    window.addEventListener("afterprint", cleanupPrint);
+
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(cleanupPrint, 500);
+    }, 200);
   }
 
   function bindPrintFields(container) {
