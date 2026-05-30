@@ -301,7 +301,9 @@
   function render(container) {
     const company = AppData.getPrimaryPageCompany("ferias");
     const data = AppData.getCompanyData(company);
-    const activeEmployees = data.employees.filter((employee) => AppData.isEmployeeActive(employee));
+    const activeEmployees = AppData.sortEmployeesByName(
+      data.employees.filter((employee) => AppData.isEmployeeActive(employee))
+    );
     const absences = data.absences || [];
 
     const employees = activeEmployees.map((employee) => ({ value: employee.id, label: employee.name }));

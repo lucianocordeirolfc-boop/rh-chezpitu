@@ -228,7 +228,7 @@
       rows.push(employee);
     });
 
-    return rows.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
+    return AppData.sortEmployeesByName(rows);
   }
 
   function ensureValidDepartment(data) {

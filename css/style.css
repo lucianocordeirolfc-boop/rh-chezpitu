@@ -48,6 +48,7 @@ button {
 .sidebar {
   position: fixed;
   inset: 0 auto 0 0;
+  z-index: 300;
   width: 260px;
   padding: 20px 14px;
   color: #ffffff;
@@ -250,8 +251,12 @@ body[data-sidebar="collapsed"] .app-shell {
 /* ═══════════════════ SHELL PRINCIPAL ═══════════════════ */
 
 .app-shell {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
   margin-left: 260px;
   padding: 24px 28px;
+  overflow-x: hidden;
   transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

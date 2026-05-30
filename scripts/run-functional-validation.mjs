@@ -860,6 +860,74 @@ function validateCoModal(AppData, chez) {
   );
 }
 
+function validateEmployeeCadastro(AppData, chez) {
+  const area = "Cadastro de funcionários";
+  const sorted = AppData.sortEmployeesByName([
+    { name: "Zélia" },
+    { name: "Ana" },
+    { name: "Bruno" }
+  ]);
+  assert(
+    area,
+    sorted.map((item) => item.name).join(",") === "Ana,Bruno,Zélia",
+    "Funcionários ordenados alfabeticamente (pt-BR)",
+    ["js/data.js", "js/funcionarios.js"],
+    "sortEmployeesByName / compareEmployeeName"
+  );
+
+  const holidaysBefore = JSON.stringify(chez.holidays);
+  const scaleBefore = JSON.stringify(chez.manualScale);
+  const vacationsBefore = JSON.stringify(chez.vacations);
+  const absencesBefore = JSON.stringify(chez.absences);
+
+  AppData.upsertEmployee(
+    {
+      name: "Novo Vínculo Teste",
+      cpf: "52998224725",
+      role: "Auxiliar",
+      department: "Salão",
+      status: "Ativo",
+      admissionDate: "2026-05-29",
+      vtDaily: 12
+    },
+    "Chez Pitu",
+    { save: false }
+  );
+
+  assert(
+    area,
+    JSON.stringify(chez.holidays) === holidaysBefore,
+    "Novo funcionário não altera feriados de outros colaboradores",
+    ["js/data.js"],
+    "upsertEmployee isola cadastro"
+  );
+  assert(
+    area,
+    JSON.stringify(chez.manualScale) === scaleBefore,
+    "Novo funcionário não altera escala manual existente",
+    ["js/data.js"],
+    "—"
+  );
+  assert(
+    area,
+    JSON.stringify(chez.vacations) === vacationsBefore &&
+      JSON.stringify(chez.absences) === absencesBefore,
+    "Novo funcionário não altera férias ou ausências existentes",
+    ["js/data.js"],
+    "—"
+  );
+
+  const names = chez.employees.map((item) => item.name);
+  const expectedOrder = [...names].sort((a, b) => AppData.compareEmployeeName({ name: a }, { name: b }));
+  assert(
+    area,
+    names.join("|") === expectedOrder.join("|"),
+    "Após inclusão, lista da empresa permanece em ordem alfabética",
+    ["js/data.js", "js/funcionarios.js"],
+    "sortEmployeesByName em upsertEmployee"
+  );
+}
+
 function validateCrossModuleLinks(AppData, chez, peng, ym) {
   const area = "Vínculos entre abas";
   const modules = ["funcionarios", "escala", "ferias", "feriados", "vale-transporte", "contador", "dashboard"];
@@ -894,7 +962,7 @@ function validateCrossModuleLinks(AppData, chez, peng, ym) {
     "—"
   );
 
-  const emp = chez.employees[0];
+  const emp = chez.employees.find((item) => item.id === "chez-1");
   const record = AppData.findEmployeeRecord("chez-1");
   assert(
     area,
@@ -1012,6 +1080,7 @@ function main() {
   validateContador(AppData, chez, peng, ym);
   validatePadroeiraBuzios(AppData);
   validateCoModal(AppData, chez);
+  validateEmployeeCadastro(AppData, chez);
   validateCrossModuleLinks(AppData, chez, peng, ym);
   validatePersistence(AppData, chez, ym);
 

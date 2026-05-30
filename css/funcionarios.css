@@ -301,11 +301,16 @@
   padding: 12px 14px 14px;
 }
 
-.func-table-card .table-wrap {
+.func-table-card .table-wrap,
+.func-companies-card .table-wrap {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: auto;
   max-height: min(52vh, 480px);
+  max-width: 100%;
+  isolation: isolate;
+  contain: layout paint;
 }
 
 .table-premium {
@@ -317,11 +322,12 @@
 .table-premium thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 1;
   padding: 8px 8px;
   border-bottom: 2px solid var(--sea-200);
   color: var(--sea-800);
   background: #f4fafc;
+  box-shadow: inset 0 -1px 0 var(--sea-200);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.04em;

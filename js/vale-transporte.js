@@ -250,7 +250,9 @@
   }
 
   function buildReceipts(yearMonth, data, company) {
-    const activeEmployees = (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee));
+    const activeEmployees = AppData.sortEmployeesByName(
+      (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee))
+    );
     return activeEmployees.map((employee) => calculateReceipt(employee, yearMonth, data, company));
   }
 
@@ -462,7 +464,14 @@
         </div>
         <p class="vt-deduct-hint">Informe os dias de VT não utilizados no mês anterior (atestados, faltas) que devem ser abatidos do total a receber nesta competência. Na planilha de descontos, informe valores em reais quando aplicável.</p>
         <div class="vt-deduct-list" data-vt-deduct-list>
-          ${deductionRows((data.employees || []).filter((employee) => AppData.isEmployeeActive(employee)), resolvedMonth, company, data)}
+          ${deductionRows(
+            AppData.sortEmployeesByName(
+              (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee))
+            ),
+            resolvedMonth,
+            company,
+            data
+          )}
         </div>
       </article>
 
@@ -500,7 +509,9 @@
     if (!list) return;
     const company = AppData.getPrimaryPageCompany("vale-transporte");
     const data = AppData.getCompanyData(company);
-    const employees = (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee));
+    const employees = AppData.sortEmployeesByName(
+      (data.employees || []).filter((employee) => AppData.isEmployeeActive(employee))
+    );
     list.innerHTML = deductionRows(employees, yearMonth, company, data);
     bindDeductionInputs(container, yearMonth);
   }

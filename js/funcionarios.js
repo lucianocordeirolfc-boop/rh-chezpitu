@@ -124,7 +124,7 @@
         flat.push({ ...employee, company });
       });
     });
-    if (flat.length) return flat;
+    if (flat.length) return AppData.sortEmployeesByName(flat);
     Object.keys(AppData.state?.companies || {}).forEach((company) => {
       (AppData.state.companies[company]?.employees || []).forEach((employee) => {
         if (!employee?.id || seen.has(employee.id)) return;
@@ -132,7 +132,7 @@
         flat.push({ ...employee, company });
       });
     });
-    return flat;
+    return AppData.sortEmployeesByName(flat);
   }
 
   function uniqueSorted(values) {
@@ -160,6 +160,7 @@
       if (listFilters.source !== "todos" && (employee.source || "manual") !== listFilters.source) return false;
       return true;
     });
+    return AppData.sortEmployeesByName(filtered);
   }
 
   function renderEmployeeStats() {

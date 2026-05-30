@@ -838,7 +838,7 @@
 
   function normalizeCompanyBlock(block) {
     if (!block) return null;
-    block.employees = Array.isArray(block.employees) ? block.employees : [];
+    block.employees = sortEmployeesByName(Array.isArray(block.employees) ? block.employees : []);
     block.vacations = Array.isArray(block.vacations) ? block.vacations : [];
     block.absences = Array.isArray(block.absences) ? block.absences : [];
     block.holidays = Array.isArray(block.holidays) ? block.holidays : [];
@@ -1213,6 +1213,32 @@
     return String(value || "").trim().toLocaleLowerCase("pt-BR");
   }
 
+  function compareEmployeeName(a, b) {
+    return String(a?.name || "").localeCompare(String(b?.name || ""), "pt-BR", {
+      sensitivity: "base",
+      numeric: true
+    });
+  }
+
+  function sortEmployeesByName(employees) {
+    if (!Array.isArray(employees)) return [];
+    return [...employees].sort(compareEmployeeName);
+  }
+
+  function findEmployeeIdInOtherCompany(employeeId, company) {
+    const targetId = String(employeeId || "").trim();
+    if (!targetId) return null;
+    return (
+      companyKeysFromState(state)
+        .map((co) => {
+          if (co === company) return null;
+          const match = getCompanyData(co).employees.find((item) => item.id === targetId);
+          return match ? { company: co, employee: match } : null;
+        })
+        .find(Boolean) || null
+    );
+  }
+
   function getTotalEmployeeCount() {
     return getCompanies().reduce(
       (total, company) => total + (state.companies[company]?.employees?.length || 0),
@@ -1345,12 +1371,18 @@
       normalized.fixedDayHistory = scheduled.fixedDayHistory;
     }
 
+    const idClash = findEmployeeIdInOtherCompany(normalized.id, resolved);
+    if (idClash && (!existing || existing.id !== normalized.id)) {
+      throw new Error(`ID interno já utilizado em ${idClash.company}.`);
+    }
+
     const index = data.employees.findIndex((item) => item.id === normalized.id);
     if (index >= 0) {
       data.employees[index] = normalized;
     } else {
       data.employees.push(normalized);
     }
+    data.employees = sortEmployeesByName(data.employees);
 
     if (options.save !== false) saveState();
     return normalized;
@@ -2198,6 +2230,8 @@
     ensureCompanyDataShape,
     getDaysInMonth,
     getEmployeeName,
+    compareEmployeeName,
+    sortEmployeesByName,
     getScaleCode,
     exportCurrentDataJSON,
     findEmployeeByCpf,
