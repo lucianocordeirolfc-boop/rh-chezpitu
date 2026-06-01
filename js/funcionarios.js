@@ -164,22 +164,20 @@
   }
 
   function renderEmployeeStats() {
-    const counts = AppData.getEmployeeCounts();
-    return counts.byCompany
-      .map(
-        (item) => `
-        <article class="stat-chip">
-          <span>${esc(item.company)}</span>
-          <strong>${item.total}</strong>
-        </article>
-      `
-      )
-      .concat(`<article class="stat-chip highlight"><span>Total</span><strong>${counts.total}</strong></article>`)
-      .join("");
+    // Fase 2 — estatísticas da empresa da aba ativa.
+    const active = AppData.getActiveCompany();
+    const employees = AppData.getCompanyData(active).employees || [];
+    const ativos = employees.filter((employee) => AppData.isEmployeeActive(employee)).length;
+    return (
+      `<article class="stat-chip"><span>Ativos</span><strong>${ativos}</strong></article>` +
+      `<article class="stat-chip highlight"><span>Total ${esc(active)}</span><strong>${employees.length}</strong></article>`
+    );
   }
 
   function applyPageCompanyToEmployeeList(allEmployees) {
-    return allEmployees;
+    // Fase 2 — Cadastro mostra apenas a empresa da aba ativa (sem filtro interno).
+    const active = AppData.getActiveCompany();
+    return allEmployees.filter((employee) => employee.company === active);
   }
 
   function companyFilterLabel() {
@@ -244,12 +242,6 @@
   function renderTopbarFilters(employees) {
     const departments = uniqueSorted(employees.map((item) => item.department));
     const roles = uniqueSorted(employees.map((item) => item.role));
-    const companyOptions = [`<option value="todos">Todas</option>`].concat(
-      listCompanies().map(
-        (company) =>
-          `<option value="${esc(company)}" ${listFilters.company === company ? "selected" : ""}>${esc(company)}</option>`
-      )
-    );
     const departmentOptions = [`<option value="todos">Todos</option>`].concat(
       departments.map(
         (department) =>
@@ -265,7 +257,6 @@
         <input id="employeeListSearch" type="search" value="${esc(listFilters.search)}" placeholder="Nome, CPF, cargo, setor ou empresa">
       </label>
       <div class="func-list-toolbar-filters">
-        <label>Empresa<select id="employeeFilterCompany">${companyOptions.join("")}</select></label>
         <label>Setor<select id="employeeFilterDepartment">${departmentOptions.join("")}</select></label>
         <label>Cargo<select id="employeeFilterRole">${roleOptions.join("")}</select></label>
         <label>Status<select id="employeeFilterStatus">
@@ -287,9 +278,7 @@
     return `
       <div class="func-list-toolbar">
         <div class="func-list-toolbar-meta">
-          <span class="func-list-toolbar-eyebrow">Visualizando</span>
-          <strong class="func-list-toolbar-company">${esc(companyFilterLabel())}</strong>
-          <small id="employeeListCount" class="func-list-toolbar-count">${filteredCount} exibidos · ${companyCount} na empresa · ${totalCount} no grupo</small>
+          <small id="employeeListCount" class="func-list-toolbar-count">${filteredCount} funcionário(s)</small>
         </div>
         <div class="func-list-toolbar-controls">
           ${renderTopbarFilters(allEmployees)}
@@ -458,7 +447,10 @@
   }
 
   function companyRows() {
+    // Fase 2 — mostra apenas a empresa da aba ativa.
+    const active = AppData.getActiveCompany();
     return listCompanies()
+      .filter((companyKey) => companyKey === active)
       .map((companyKey) => {
         const block = AppData.getCompanyData(companyKey);
         const info = block?.companyInfo || {};
@@ -591,7 +583,6 @@
       <div class="func-form-row cols-vt">
         <label>Valor diário VT<input name="vtDaily" inputmode="decimal" placeholder="17,30" autocomplete="off"></label>
         <label>Origem<span id="employeeOriginDisplay" class="func-origin-readonly">Manual</span></label>
-        <label>Empresa<select name="employeeCompany">${companyFormOptions(AppData.getPrimaryPageCompany("funcionarios"))}</select></label>
       </div>
       <div class="func-form-row">
         <label class="full">Observações<textarea name="notes" rows="2"></textarea></label>
@@ -800,12 +791,28 @@
         payload.department = newDept;
       }
 
-      const targetCompany = payload.employeeCompany || AppData.getPrimaryPageCompany("funcionarios");
+      // Fase 2 — empresa definida pela aba ativa; nunca por seletor do pop-up.
       delete payload.employeeCompany;
+      const targetCompany = AppData.getActiveCompany();
       const existing = AppData.getCompanyData(targetCompany).employees.find((item) => item.id === payload.id);
       const previousFixedDay = existing?.fixedDay || "";
       payload.source = existing?.source === "imported" ? "imported" : "manual";
       payload.vtDaily = AppData.parseVtDaily(payload.vtDaily);
+
+      // Fase 3A — Confirmação obrigatória ao inativar funcionário
+      if (existing && existing.status === "Ativo" && payload.status === "Inativo") {
+        const employeeName = esc(existing.name || "Funcionário");
+        const isConfirmed = window.confirm(
+          `Tem certeza que deseja INATIVAR ${employeeName}?\n\n` +
+          "O funcionário não aparecerá mais em listas e cálculos,\n" +
+          "mas os dados históricos serão preservados.\n\n" +
+          "Esta ação não pode ser desfeita facilmente."
+        );
+        if (!isConfirmed) {
+          return; // Cancelou, não salva
+        }
+      }
+
       try {
         AppData.upsertEmployee(payload, targetCompany);
         if (existing && String(previousFixedDay).trim() !== String(payload.fixedDay || "").trim()) {
@@ -903,11 +910,7 @@
     if (tbody) tbody.innerHTML = employeeRows(filtered);
     bindCadastroTableXScroll(container);
     if (countEl) {
-      const companyTotal =
-        listFilters.company === "todos"
-          ? allEmployees.length
-          : allEmployees.filter((item) => item.company === listFilters.company).length;
-      countEl.textContent = `${filtered.length} exibidos · ${companyTotal} na empresa · ${allEmployees.length} no grupo`;
+      countEl.textContent = `${filtered.length} funcionário(s)`;
     }
   }
 
@@ -1110,10 +1113,9 @@
         <article class="card func-companies-card">
           <div class="card-header card-header-compact func-table-card-header">
             <div>
-              <p class="eyebrow">Empresas pagadoras</p>
-              <h2>Cadastro de empresa</h2>
+              <p class="eyebrow">Empresa pagadora</p>
+              <h2>Dados da empresa</h2>
             </div>
-            <button type="button" class="primary btn-sm" id="btnNewCompany">+ Nova empresa</button>
           </div>
           ${tableXScrollWrap(`
             <table class="table-premium func-companies-table">

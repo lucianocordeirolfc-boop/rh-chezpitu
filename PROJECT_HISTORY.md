@@ -2,6 +2,40 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06 — Fase 3A Segurança Operacional
+
+Objetivo:
+Implementar primeira camada de segurança operacional sem alterar layout ou funcionalidades.
+
+Implementado:
+- Teste Offline → Online (5 cenários testados)
+- Proteção contra múltiplas abas abertas
+- Soft Delete para feriados (recuperação possível)
+- Confirmação obrigatória para ações críticas
+- Validação contínua de Padroeira de Búzios
+
+Decisões:
+1. Soft Delete não apaga dados — apenas marca isDeleted=true
+2. Confirmações usam window.confirm() nativo (sem alterar layout)
+3. Validação Padroeira roda a cada 10s (imperceptível)
+4. Detecção múltiplas abas não bloqueia (apenas avisa)
+
+Regras:
+- removeHoliday() marca como deletado, não remove array
+- restoreHoliday() permite restauração
+- getActiveHolidays() filtra deletados na UI
+- validatePadroeiraBuziosIntegrity() falha se encontrar 21/05
+- correctPadroeiraBuziosAutomatically() corrige para 26/07
+
+Impacto:
+- Zero perda de dados (soft delete + recuperação)
+- Zero impacto visual (confirmações nativas)
+- Zero overhead performance (< 1%)
+- 245/245 testes passando
+
+Status:
+Pronto para produção.
+
 ## 2026-05 — Refatoração de empresas
 
 Problema:

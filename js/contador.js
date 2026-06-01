@@ -144,10 +144,6 @@
         return '<option value="' + e.id + '"' + sel + '>' + App.formatDisplayName(e.name) + '</option>';
       }).join("");
 
-    var companyOptions = AppData.COMPANIES.map(function (c) {
-      return '<option value="' + c + '"' + (c === company ? " selected" : "") + '>' + c + '</option>';
-    }).join("");
-
     var fieldsHTML = LANCAMENTO_FIELDS.map(function (f) {
       var val = lancamento ? (lancamento[f.key] || "") : "";
       if (f.type === "time") {
@@ -168,9 +164,6 @@
           '<button class="popup-close" id="popupClose" type="button">✕</button>' +
         '</div>' +
         '<form id="lancamentoForm" class="popup-form">' +
-          '<label class="popup-field">Empresa' +
-            '<select id="popupCompany" name="company">' + companyOptions + '</select>' +
-          '</label>' +
           '<label class="popup-field">Funcionário' +
             '<select id="popupEmployee" name="employeeId" required>' + empOptions + '</select>' +
           '</label>' +
@@ -192,7 +185,6 @@
 
     var popup = document.getElementById("lancamentoPopup");
     var form = document.getElementById("lancamentoForm");
-    var companySelect = document.getElementById("popupCompany");
     var employeeSelect = document.getElementById("popupEmployee");
 
     function closePopup() { popup.remove(); }
@@ -201,15 +193,6 @@
     document.getElementById("popupCancel").addEventListener("click", closePopup);
     popup.addEventListener("click", function (e) {
       if (e.target === popup) closePopup();
-    });
-
-    companySelect.addEventListener("change", function () {
-      var newCompany = companySelect.value;
-      var emps = getEmployeesForCompany(newCompany);
-      employeeSelect.innerHTML = '<option value="">— Selecione —</option>' +
-        emps.map(function (e) {
-          return '<option value="' + e.id + '">' + App.formatDisplayName(e.name) + '</option>';
-        }).join("");
     });
 
     form.addEventListener("submit", function (e) {
@@ -230,7 +213,8 @@
         }
       });
 
-      var targetCompany = companySelect.value;
+      // Fase 2 — empresa definida pela aba ativa, nunca por seletor do pop-up.
+      var targetCompany = AppData.getActiveCompany();
       saveLancamento(targetCompany, yearMonth, record);
       App.toast("Lançamento salvo.", "success");
 
@@ -431,17 +415,6 @@
     });
   }
 
-  function renderCompanySelector(selectedCompany) {
-    var companies = window.CompanyUI && CompanyUI.listCompanies ? CompanyUI.listCompanies() : AppData.COMPANIES;
-    var options = companies.map(function (c) {
-      var sel = c === selectedCompany ? " selected" : "";
-      return '<option value="' + App.escapeHTML(c) + '"' + sel + '>' + App.escapeHTML(c) + '</option>';
-    }).join("");
-    return '<label class="contador-company-label">Empresa ' +
-      '<select id="contadorPageCompany" class="field-select field-select-compact module-company-select" data-page-module="contador">' +
-      options +
-      '</select></label>';
-  }
 
   function renderContent(container, yearMonth) {
     var company = AppData.getPrimaryPageCompany("contador");
@@ -464,7 +437,6 @@
       '</div>' +
       '<div class="contador-toolbar">' +
         renderMonthSelector(yearMonth) +
-        renderCompanySelector(company) +
         toolbarRight +
       '</div>' +
       '<div id="contadorTabContent">' +
@@ -473,12 +445,6 @@
 
     container.innerHTML = html;
     container._contadorYearMonth = yearMonth;
-
-    if (window.CompanyUI && CompanyUI.bindToolbar) {
-      CompanyUI.bindToolbar(container, "contador", function () {
-        renderContent(container, yearMonth);
-      });
-    }
 
     if (activeTab === "resumo") {
       bindResumoEvents(container, yearMonth);

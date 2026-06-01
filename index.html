@@ -7,11 +7,11 @@
   <title>Sistema de Gestão de Pessoal — Grupo Chez Pitu</title>
 
   <!-- CSS -->
-  <link rel="stylesheet" href="css/style.css?v=20260531i" />
-  <link rel="stylesheet" href="css/funcionarios.css?v=20260531i" />
-  <link rel="stylesheet" href="css/ausencias.css?v=20260531i" />
-  <link rel="stylesheet" href="css/print.css?v=20260531i" />
-  <link rel="stylesheet" href="css/escala-print.css?v=20260531i" />
+  <link rel="stylesheet" href="css/style.css?v=20260601e" />
+  <link rel="stylesheet" href="css/funcionarios.css?v=20260601e" />
+  <link rel="stylesheet" href="css/ausencias.css?v=20260601e" />
+  <link rel="stylesheet" href="css/print.css?v=20260601e" />
+  <link rel="stylesheet" href="css/escala-print.css?v=20260601e" />
 </head>
 
 <body>
@@ -40,114 +40,58 @@
     </div>
   </div>
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar" style="display:none">
+  <!-- APLICAÇÃO -->
+  <div class="app-shell" style="display:none">
 
-    <div class="brand">
-      <span class="brand-mark">CP</span>
-
-      <div class="brand-text">
-        <strong>Grupo Chez Pitu</strong>
-        <small>Gestão de Pessoal</small>
-      </div>
-    </div>
-
-    <nav class="menu" aria-label="Módulos">
-
-      <button class="menu-item active" data-module="dashboard" type="button">
-        <span class="menu-icon">◉</span>
-        <span class="menu-label">Dashboard</span>
-      </button>
-
-      <button class="menu-item" data-module="funcionarios" type="button">
-        <span class="menu-icon">◎</span>
-        <span class="menu-label">Cadastro</span>
-      </button>
-
-      <button class="menu-item" data-module="escala" type="button">
-        <span class="menu-icon">▦</span>
-        <span class="menu-label">Escala de Folga</span>
-      </button>
-
-      <button class="menu-item" data-module="ferias" type="button">
-        <span class="menu-icon">◇</span>
-        <span class="menu-label">Ausências</span>
-      </button>
-
-      <button class="menu-item" data-module="vale-transporte" type="button">
-        <span class="menu-icon">▤</span>
-        <span class="menu-label">Recibo de Vale-transporte</span>
-      </button>
-
-      <button class="menu-item" data-module="feriados" type="button">
-        <span class="menu-icon">★</span>
-        <span class="menu-label">Controle de Feriados</span>
-      </button>
-
-      <button class="menu-item" data-module="contador" type="button">
-        <span class="menu-icon">▧</span>
-        <span class="menu-label">Informações Contador</span>
-      </button>
-
-    </nav>
-
-    <button
-      id="sidebarToggle"
-      class="sidebar-toggle"
-      type="button"
-      aria-label="Recolher menu"
-    >
-      <span class="sidebar-toggle-icon">‹</span>
-    </button>
-
-  </aside>
-
-  <!-- CONTEÚDO -->
-  <main class="app-shell" style="display:none">
-
-    <!-- TOPO -->
+    <!-- TOPO: marca + abas de empresa + ações -->
     <header class="topbar">
 
-      <div>
-        <p class="eyebrow">Sistema unificado</p>
-        <h1 id="pageTitle">Dashboard</h1>
+      <div class="brand">
+        <span class="brand-mark">CP</span>
+        <div class="brand-text">
+          <strong>Grupo Chez Pitu</strong>
+          <small>Gestão de Pessoal</small>
+        </div>
+      </div>
+
+      <div class="company-tabs" role="tablist" aria-label="Empresa ativa">
+        <button class="company-tab active" data-company="Chez Pitu" type="button" role="tab">Chez Pitu</button>
+        <button class="company-tab" data-company="Pengold" type="button" role="tab">Pengold</button>
       </div>
 
       <div class="topbar-actions">
-
-        <span
-          id="syncStatus"
-          class="sync-status"
-          data-status="syncing"
-          title="Sincronização"
-        >
-          Sincronizando...
-        </span>
-
+        <span id="syncStatus" class="sync-status" data-status="syncing" title="Sincronização">Sincronizando...</span>
         <span id="loggedUserLabel" class="logged-user-label"></span>
-
         <button id="logoutButton" class="logout-btn" type="button" title="Sair do sistema">Sair</button>
-
       </div>
 
     </header>
 
-    <!-- MÓDULOS -->
-    <section id="dashboard" class="module active"></section>
+    <!-- MENU HORIZONTAL (estilo planilha) -->
+    <nav class="module-ribbon" aria-label="Módulos">
+      <button class="ribbon-item" data-module="empresa" type="button">Dados da Empresa</button>
+      <button class="ribbon-item active" data-module="dashboard" type="button">Dashboard</button>
+      <button class="ribbon-item" data-module="funcionarios" type="button">Cadastro de Funcionários</button>
+      <button class="ribbon-item" data-module="escala" type="button">Escala de Folga</button>
+      <button class="ribbon-item" data-module="ferias" type="button">Ausências</button>
+      <button class="ribbon-item" data-module="vale-transporte" type="button">Recibo de Vale Transporte</button>
+      <button class="ribbon-item" data-module="feriados" type="button">Controle de Feriados</button>
+      <button class="ribbon-item" data-module="contador" type="button">Informações do Contador</button>
+    </nav>
 
-    <section id="funcionarios" class="module"></section>
+    <!-- CONTEÚDO DOS MÓDULOS -->
+    <main class="app-content">
+      <section id="empresa" class="module"></section>
+      <section id="dashboard" class="module active"></section>
+      <section id="funcionarios" class="module"></section>
+      <section id="escala" class="module"></section>
+      <section id="ferias" class="module"></section>
+      <section id="vale-transporte" class="module"></section>
+      <section id="feriados" class="module"></section>
+      <section id="contador" class="module"></section>
+    </main>
 
-    <section id="escala" class="module"></section>
-
-    <section id="ferias" class="module"></section>
-
-    <section id="vale-transporte" class="module"></section>
-
-    <section id="feriados" class="module"></section>
-
-    <section id="contador" class="module"></section>
-
-  </main>
+  </div>
 
   <!-- TOAST -->
   <div id="toastContainer" aria-live="polite"></div>
@@ -173,33 +117,37 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
   <!-- JS -->
-  <script src="js/auth.js?v=20260531i"></script>
+  <script src="js/auth.js?v=20260601e"></script>
 
-  <script src="js/firebase-sync.js?v=20260531i"></script>
+  <script src="js/security-operations.js?v=20260601e"></script>
 
-  <script src="js/import-utils.js?v=20260531i"></script>
+  <script src="js/firebase-sync.js?v=20260601e"></script>
 
-  <script src="js/data.js?v=20260531i"></script>
+  <script src="js/import-utils.js?v=20260601e"></script>
 
-  <script src="js/company-ui.js?v=20260531i"></script>
+  <script src="js/data.js?v=20260601e"></script>
 
-  <script src="js/dashboard.js?v=20260531i"></script>
+  <script src="js/company-ui.js?v=20260601e"></script>
 
-  <script src="js/funcionarios.js?v=20260531i"></script>
+  <script src="js/empresa.js?v=20260601e"></script>
 
-  <script src="js/scale-rules.js?v=20260531i"></script>
+  <script src="js/dashboard.js?v=20260601e"></script>
 
-  <script src="js/escala.js?v=20260531i"></script>
+  <script src="js/funcionarios.js?v=20260601e"></script>
 
-  <script src="js/ferias.js?v=20260531i"></script>
+  <script src="js/scale-rules.js?v=20260601e"></script>
 
-  <script src="js/feriados.js?v=20260531i"></script>
+  <script src="js/escala.js?v=20260601e"></script>
 
-  <script src="js/vale-transporte.js?v=20260531i"></script>
+  <script src="js/ferias.js?v=20260601e"></script>
 
-  <script src="js/contador.js?v=20260531i"></script>
+  <script src="js/feriados.js?v=20260601e"></script>
 
-  <script src="js/app.js?v=20260531i"></script>
+  <script src="js/vale-transporte.js?v=20260601e"></script>
+
+  <script src="js/contador.js?v=20260601e"></script>
+
+  <script src="js/app.js?v=20260601e"></script>
 
 </body>
 </html>

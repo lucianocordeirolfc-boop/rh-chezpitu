@@ -63,6 +63,21 @@
 
   const VT_WORKED_CODES = new Set(["", "MM", "TM", "NM", "MN", "TN", "NO", "MR", "TR", "NR"]);
 
+  /**
+   * Códigos que NUNCA contam como dia trabalhado (folga, ausência e compensação).
+   * Fonte única de verdade compartilhada por VT, Escala, Feriados e Dashboard.
+   */
+  const NOT_WORKED_SCALE_CODES = new Set([
+    "FOLGA",
+    "DOM",
+    "FÉRIAS",
+    "CO",
+    "ATESTADO",
+    "FALTA",
+    "SUSPENSÃO",
+    "LICENÇA"
+  ]);
+
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
   }
@@ -198,14 +213,156 @@
     return dateISO >= startISO && dateISO <= endISO;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // PROTEÇÃO DOS DADOS DA EMPRESA (dados críticos — nunca apagar automaticamente)
+  // ─────────────────────────────────────────────────────────────────────────
+  const COMPANY_CRITICAL_FIELDS = [
+    { key: "legalName", label: "Razão Social" },
+    { key: "tradeName", label: "Nome Fantasia" },
+    { key: "cnpj", label: "CNPJ" },
+    { key: "responsibleName", label: "Responsável" },
+    { key: "address", label: "Endereço" },
+    { key: "phones", label: "Telefones" },
+    { key: "email", label: "E-mail" },
+    { key: "bankInfo", label: "Dados Bancários" },
+    { key: "logoDataUrl", label: "Logo" },
+    { key: "contadorInfo", label: "Informações do Contador" },
+    { key: "vtInfo", label: "Informações do Vale Transporte" }
+  ];
+  const COMPANY_INFO_HISTORY_LIMIT = 15;
+  /** CNPJ pode estar salvo sob qualquer um destes nomes de campo. */
+  const COMPANY_CNPJ_FIELDS = ["cnpj", "CNPJ", "document", "taxId", "companyCnpj"];
+
+  function emptyCompanyInfo(companyName = "") {
+    const info = {};
+    COMPANY_CRITICAL_FIELDS.forEach((field) => {
+      info[field.key] = "";
+    });
+    info.legalName = companyName;
+    info.updatedAt = 0;
+    return info;
+  }
+
+  function resolveCompanyCnpj(info) {
+    if (!info || typeof info !== "object") return "";
+    for (const field of COMPANY_CNPJ_FIELDS) {
+      const value = info[field];
+      if (value != null && String(value).trim()) return String(value).trim();
+    }
+    return "";
+  }
+
+  /** Um registro é "significativo" (válido) se tiver CNPJ OU Razão Social. */
+  function isMeaningfulCompanyInfo(info) {
+    if (!info || typeof info !== "object") return false;
+    const cnpj = resolveCompanyCnpj(info);
+    const legal = String(info.legalName || "").trim();
+    return Boolean(cnpj || legal);
+  }
+
+  function valueIsFilled(value) {
+    return value !== null && value !== undefined && String(value).trim() !== "";
+  }
+
+  /**
+   * Merge campo a campo que NUNCA substitui um valor preenchido por vazio/null/undefined.
+   * Só sobrescreve quando o valor de entrada está realmente preenchido.
+   */
+  function mergeCompanyInfoPreserving(existing = {}, incoming = {}) {
+    const result = { ...(existing || {}) };
+    Object.keys(incoming || {}).forEach((key) => {
+      if (valueIsFilled(incoming[key])) result[key] = incoming[key];
+    });
+    return result;
+  }
+
+  function normalizeCompanyInfoShape(info, companyName = "") {
+    const base = emptyCompanyInfo(companyName);
+    const merged = { ...base, ...(info || {}) };
+    // Consolida CNPJ vindo de campos variantes para o campo canônico `cnpj`.
+    const cnpj = resolveCompanyCnpj(merged);
+    if (cnpj && !valueIsFilled(merged.cnpj)) merged.cnpj = cnpj;
+    return merged;
+  }
+
+  function ensureCompanyInfoBackupStores(targetState) {
+    if (!targetState.companyInfoBackup || typeof targetState.companyInfoBackup !== "object") {
+      targetState.companyInfoBackup = {};
+    }
+    if (!targetState.companyInfoHistory || typeof targetState.companyInfoHistory !== "object") {
+      targetState.companyInfoHistory = {};
+    }
+  }
+
+  /** Guarda backup + histórico de uma versão válida dos dados da empresa. */
+  function backupCompanyInfoInState(targetState, company, info) {
+    if (!isMeaningfulCompanyInfo(info)) return;
+    ensureCompanyInfoBackupStores(targetState);
+    const snapshot = { ...info };
+    const prev = targetState.companyInfoBackup[company];
+    targetState.companyInfoBackup[company] = snapshot;
+    // Só registra no histórico se mudou de fato.
+    if (!prev || JSON.stringify(prev) !== JSON.stringify(snapshot)) {
+      const hist = Array.isArray(targetState.companyInfoHistory[company])
+        ? targetState.companyInfoHistory[company]
+        : [];
+      hist.unshift({ info: snapshot, at: snapshot.updatedAt || Date.now() });
+      targetState.companyInfoHistory[company] = hist.slice(0, COMPANY_INFO_HISTORY_LIMIT);
+    }
+  }
+
+  function getCompanyInfoBackup(targetState, company) {
+    const direct = targetState.companyInfoBackup?.[company];
+    if (isMeaningfulCompanyInfo(direct)) return direct;
+    const fromHistory = targetState.companyInfoHistory?.[company]?.find((entry) =>
+      isMeaningfulCompanyInfo(entry?.info)
+    );
+    return fromHistory?.info || null;
+  }
+
+  /**
+   * Recuperação automática: se a empresa estiver sem CNPJ e sem Razão Social
+   * (vazia/resetada) mas existir backup válido, restaura. Caso contrário,
+   * mantém o que existe e atualiza o backup com a versão válida atual.
+   */
+  function recoverCompanyInfoForState(targetState) {
+    ensureCompanyInfoBackupStores(targetState);
+    let recovered = false;
+    companyKeysFromState(targetState).forEach((company) => {
+      const block = targetState.companies?.[company];
+      if (!block) return;
+      const info = normalizeCompanyInfoShape(block.companyInfo, company);
+      const backup = getCompanyInfoBackup(targetState, company);
+
+      // Recuperação campo a campo: preenche QUALQUER campo crítico vazio a partir do
+      // backup válido — nunca apaga o que já existe. Cobre "sem CNPJ", "sem Razão
+      // Social" e "empresa vazia".
+      if (backup) {
+        let filled = false;
+        COMPANY_CRITICAL_FIELDS.forEach((field) => {
+          if (!valueIsFilled(info[field.key]) && valueIsFilled(backup[field.key])) {
+            info[field.key] = backup[field.key];
+            filled = true;
+          }
+        });
+        if (filled) {
+          recovered = true;
+          console.warn(`[AppData] Dados da empresa "${company}" recuperados do backup.`);
+        }
+      }
+
+      // Garante uma Razão Social mínima (nome da empresa) só para exibição.
+      if (!valueIsFilled(info.legalName)) info.legalName = company;
+
+      block.companyInfo = info;
+      if (isMeaningfulCompanyInfo(info)) backupCompanyInfoInState(targetState, company, info);
+    });
+    return recovered;
+  }
+
   function createCompanyData(companyName = "") {
     return {
-      companyInfo: {
-        legalName: companyName,
-        cnpj: "",
-        responsibleName: "",
-        logoDataUrl: ""
-      },
+      companyInfo: emptyCompanyInfo(companyName),
       employees: [],
       vacations: [],
       absences: [],
@@ -376,8 +533,11 @@
 
     return {
       pageFilters: createDefaultPageFilters(),
+      activeCompany: COMPANIES[0],
       escalaSelectedYearMonth: monthKey(),
       companies,
+      companyInfoBackup: {},
+      companyInfoHistory: {},
       calendarHolidays: [],
       coverageAlerts: [],
       coveragePrincipalBindings: {},
@@ -388,6 +548,34 @@
         deductionDays: {}
       }
     };
+  }
+
+  /**
+   * Fase 2 — empresa ativa (aba superior). É o contexto único de todo o sistema.
+   * Substitui os filtros de empresa internos: cada módulo lê getPrimaryPageCompany
+   * (que segue pageFilters), e setActiveCompany propaga a empresa para todos os
+   * pageFilters de uma vez. Nunca apaga dados — apenas troca o contexto de exibição.
+   */
+  function getActiveCompany() {
+    const raw = String(state?.activeCompany || "").trim();
+    if (raw && (state?.companies?.[raw] || COMPANIES.includes(raw))) return raw;
+    const fromEscala = state?.pageFilters?.escala;
+    if (fromEscala && fromEscala !== PAGE_COMPANY_ALL && (state?.companies?.[fromEscala] || COMPANIES.includes(fromEscala))) {
+      return fromEscala;
+    }
+    return getCompanies()[0] || COMPANIES[0];
+  }
+
+  function setActiveCompany(company, options = {}) {
+    const normalized = normalizePageFilterValue(company, COMPANIES[0]);
+    const resolved = isPageCompanyAll(normalized) ? getCompanies()[0] || COMPANIES[0] : normalized;
+    state.activeCompany = resolved;
+    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters();
+    PAGE_MODULE_IDS.forEach((moduleId) => {
+      state.pageFilters[moduleId] = resolved;
+    });
+    if (options.save !== false) saveState();
+    return resolved;
   }
 
   /** Dados locais prevalecem sobre remoto vazio/desatualizado (evita apagar descontos VT no sync). */
@@ -412,6 +600,35 @@
 
   function resolveVtCompany(company) {
     return company || getPrimaryPageCompany("vale-transporte");
+  }
+
+  /** Alerta não-bloqueante (console + toast quando a UI existir). */
+  function emitDataAlert(message, type = "warning") {
+    console.warn(`[AppData] ${message}`);
+    try {
+      window.App?.toast?.(message, type, 6000);
+    } catch (_) {
+      /* ambiente sem UI (testes) */
+    }
+  }
+
+  /**
+   * Resolve a empresa de destino de uma GRAVAÇÃO sem depender do filtro de página.
+   * Ordem: (1) empresa real do funcionário (employeeId) → (2) bloco de empresa
+   * explícito → (3) fallback seguro + alerta. Nunca usa o filtro como verdade.
+   */
+  function resolveCompanyForEmployeeWrite(employeeId, explicitCompany, moduleId = "escala") {
+    const id = String(employeeId || "").trim();
+    const record = id ? findEmployeeRecord(id) : null;
+    if (record?.company) return record.company;
+
+    if (explicitCompany && state?.companies?.[explicitCompany]) return explicitCompany;
+
+    const fallback = explicitCompany || getPrimaryPageCompany(moduleId);
+    emitDataAlert(
+      `Funcionário "${id || "?"}" não localizado pelo employeeId; gravando em "${fallback}" como destino seguro. Verifique o cadastro.`
+    );
+    return fallback;
   }
 
   function mergeDiscountValuesByCompany(localVt = {}, remoteVt = {}) {
@@ -520,6 +737,10 @@
 
     if (!mergedPadroeira.size) return changed;
 
+    // Idempotência: só reescreve o array quando houve correção/deduplicação real.
+    // Já estando tudo em 26/07 e sem duplicatas, não muta nem sinaliza mudança.
+    if (!changed) return false;
+
     holidays.length = 0;
     holidays.push(...keep, ...mergedPadroeira.values());
     return true;
@@ -607,11 +828,25 @@
     migrateVtStorage(next);
     migratePadroeiraBuziosHoliday(next);
     delete next.selectedCompany;
+
+    // Fase 2 — empresa ativa (aba). Migra de pageFilters.escala quando ausente; nunca apaga dados.
+    const activeRaw = String(next.activeCompany || "").trim();
+    if (!activeRaw || !(next.companies[activeRaw] || COMPANIES.includes(activeRaw))) {
+      const legacy = next.pageFilters?.escala;
+      next.activeCompany =
+        legacy && legacy !== PAGE_COMPANY_ALL && (next.companies[legacy] || COMPANIES.includes(legacy))
+          ? legacy
+          : COMPANIES[0];
+    }
     companyKeysFromState(next).forEach((company) => {
       if (!next.companies[company]) next.companies[company] = createCompanyData(company);
       normalizeCompanyBlock(next.companies[company]);
       normalizeCompanyHolidays(next.companies[company]);
     });
+
+    // Proteção dos dados da empresa: restaura do backup se vazio; atualiza backup se válido.
+    recoverCompanyInfoForState(next);
+
     if (companyKeysFromState(next).some((company) => next.companies[company]?._vacationRepairPending)) {
       companyKeysFromState(next).forEach((company) => {
         delete next.companies[company]?._vacationRepairPending;
@@ -688,11 +923,11 @@
         ...defaultBlock,
         ...remoteCo,
         ...localCo,
-        companyInfo: {
-          ...defaultBlock.companyInfo,
-          ...(remoteCo.companyInfo || {}),
-          ...(localCo.companyInfo || {})
-        },
+        // Dados da empresa: merge campo a campo que NUNCA apaga valor preenchido.
+        companyInfo: mergeCompanyInfoPreserving(
+          mergeCompanyInfoPreserving(defaultBlock.companyInfo, remoteCo.companyInfo),
+          localCo.companyInfo
+        ),
         employees: mergeEmployeesById(localCo.employees, remoteCo.employees),
         manualScale: mergeRecordMapsPreferLocal(remoteCo.manualScale || {}, localCo.manualScale || {}),
         holidays: mergeHolidayLists(localCo.holidays, remoteCo.holidays),
@@ -704,6 +939,31 @@
         )
       };
       delete merged.companies[company].vtDeductions;
+    });
+
+    // Preserva backups/histórico dos dados da empresa através da sincronização Firebase.
+    merged.companyInfoBackup = {};
+    merged.companyInfoHistory = {};
+    companyKeys.forEach((company) => {
+      const backupCandidate =
+        [local.companyInfoBackup?.[company], remote.companyInfoBackup?.[company]].find(isMeaningfulCompanyInfo) ||
+        null;
+      if (backupCandidate) merged.companyInfoBackup[company] = backupCandidate;
+
+      const histLocal = Array.isArray(local.companyInfoHistory?.[company]) ? local.companyInfoHistory[company] : [];
+      const histRemote = Array.isArray(remote.companyInfoHistory?.[company]) ? remote.companyInfoHistory[company] : [];
+      const seen = new Set();
+      const histMerged = [...histLocal, ...histRemote]
+        .filter((entry) => entry && isMeaningfulCompanyInfo(entry.info))
+        .sort((a, b) => (b.at || 0) - (a.at || 0))
+        .filter((entry) => {
+          const key = JSON.stringify(entry.info);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, COMPANY_INFO_HISTORY_LIMIT);
+      if (histMerged.length) merged.companyInfoHistory[company] = histMerged;
     });
 
     return finalizeIncomingState(merged);
@@ -1430,28 +1690,110 @@
     return normalizeCompanyBlock(state.companies[resolved]);
   }
 
-  function updateCompanyInfo(companyInfo, company) {
-    const resolved = company || getPrimaryPageCompany("funcionarios");
-    const data = getCompanyData(resolved);
-    if (!data) return;
-    data.companyInfo = {
-      ...(data.companyInfo || {}),
-      legalName: String(companyInfo.legalName || "").trim(),
-      cnpj: String(companyInfo.cnpj || "").trim(),
-      responsibleName: String(companyInfo.responsibleName ?? data.companyInfo?.responsibleName ?? "").trim()
-    };
-    saveState();
+  function buildIncomingCompanyInfo(companyInfo) {
+    const incoming = {};
+    COMPANY_CRITICAL_FIELDS.forEach((field) => {
+      if (field.key === "logoDataUrl") return; // logo tratado em updateCompanyLogo
+      if (Object.prototype.hasOwnProperty.call(companyInfo || {}, field.key)) {
+        const raw = companyInfo[field.key];
+        incoming[field.key] = raw == null ? "" : String(raw).trim();
+      }
+    });
+    return incoming;
   }
 
-  function updateCompanyLogo(logoDataUrl, company) {
-    const resolved = company || getPrimaryPageCompany("funcionarios");
+  /**
+   * Atualiza dados da empresa com PROTEÇÃO:
+   * - merge campo a campo (não apaga valor preenchido com vazio);
+   * - bloqueia substituir registro válido por vazio sem options.force;
+   * - cria backup automático + carimba updatedAt.
+   * @returns {boolean} true se salvou.
+   */
+  function updateCompanyInfo(companyInfo, company, options = {}) {
+    const resolved = company || getActiveCompany();
     const data = getCompanyData(resolved);
-    if (!data) return;
-    data.companyInfo = {
-      ...(data.companyInfo || {}),
-      logoDataUrl: logoDataUrl || ""
-    };
+    if (!data) return false;
+
+    const existing = data.companyInfo || {};
+    const incoming = buildIncomingCompanyInfo(companyInfo || {});
+    const force = options.force === true;
+    const candidate = force ? { ...existing, ...incoming } : mergeCompanyInfoPreserving(existing, incoming);
+
+    if (isMeaningfulCompanyInfo(existing) && !isMeaningfulCompanyInfo(candidate) && !force) {
+      emitDataAlert(
+        `Alteração ignorada: os dados da empresa "${resolved}" ficariam sem Razão Social e CNPJ. Dados preservados.`
+      );
+      return false;
+    }
+
+    candidate.updatedAt = Date.now();
+    candidate.updatedBy = window.AppAuth?.getUser?.()?.email || candidate.updatedBy || "";
+    data.companyInfo = normalizeCompanyInfoShape(candidate, resolved);
+    backupCompanyInfoInState(state, resolved, data.companyInfo);
     saveState();
+    return true;
+  }
+
+  function updateCompanyLogo(logoDataUrl, company, options = {}) {
+    const resolved = company || getActiveCompany();
+    const data = getCompanyData(resolved);
+    if (!data) return false;
+
+    const existing = data.companyInfo || {};
+    const force = options.force === true;
+    const value = logoDataUrl || "";
+
+    if (!value && existing.logoDataUrl && !force) {
+      emitDataAlert(`Logo da empresa "${resolved}" preservado (remoção exige confirmação).`);
+      return false;
+    }
+
+    data.companyInfo = normalizeCompanyInfoShape(
+      { ...existing, logoDataUrl: value, updatedAt: Date.now() },
+      resolved
+    );
+    backupCompanyInfoInState(state, resolved, data.companyInfo);
+    saveState();
+    return true;
+  }
+
+  /** Diagnóstico de integridade dos dados da empresa. */
+  function diagnoseCompanyData(company) {
+    const target = company || getActiveCompany();
+    const block = state.companies?.[target];
+    const info = block?.companyInfo || {};
+    const backup = getCompanyInfoBackup(state, target);
+    const meaningful = isMeaningfulCompanyInfo(info);
+    const inconsistencies = [];
+    if (!resolveCompanyCnpj(info)) inconsistencies.push("CNPJ ausente");
+    if (!String(info.legalName || "").trim()) inconsistencies.push("Razão Social ausente");
+    if (!meaningful) inconsistencies.push("Registro vazio (sem CNPJ e sem Razão Social)");
+
+    return {
+      activeCompany: getActiveCompany(),
+      company: target,
+      source: meaningful ? "cadastro" : backup ? "backup disponível" : "sem dados",
+      updatedAt: info.updatedAt || 0,
+      updatedAtLabel: info.updatedAt ? new Date(info.updatedAt).toLocaleString("pt-BR") : "—",
+      updatedBy: info.updatedBy || "",
+      hasBackup: Boolean(backup),
+      backupUpdatedAt: backup?.updatedAt || 0,
+      historyCount: (state.companyInfoHistory?.[target] || []).length,
+      meaningful,
+      cnpj: resolveCompanyCnpj(info),
+      inconsistencies
+    };
+  }
+
+  /** Restauração manual a partir do backup (confirmação na UI). */
+  function restoreCompanyInfoFromBackup(company) {
+    const target = company || getActiveCompany();
+    const backup = getCompanyInfoBackup(state, target);
+    if (!backup) return false;
+    const data = getCompanyData(target);
+    data.companyInfo = normalizeCompanyInfoShape(backup, target);
+    saveState();
+    return true;
   }
 
   const MOCK_EMPLOYEE_NAMES = new Set(
@@ -1698,7 +2040,7 @@
   }
 
   function addVacation(vacation, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const data = getCompanyData(resolveCompanyForEmployeeWrite(vacation.employeeId, company, "ferias"));
     const employeeName = getEmployeeName(vacation.employeeId, data);
     upsertVacationRange(
       data,
@@ -1720,7 +2062,7 @@
   }
 
   function updateVacation(id, vacation, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const data = getCompanyData(resolveCompanyForEmployeeWrite(vacation.employeeId, company, "ferias"));
     const existing = data.vacations.find((item) => item.id === id);
     if (!existing) return false;
 
@@ -1745,7 +2087,7 @@
   }
 
   function addAbsence(absence, company) {
-    const resolved = company || getPrimaryPageCompany("ferias");
+    const resolved = resolveCompanyForEmployeeWrite(absence.employeeId, company, "ferias");
     const data = getCompanyData(resolved);
     if (!data.absences) data.absences = [];
     data.absences.push({
@@ -1769,8 +2111,74 @@
     saveState();
   }
 
+  /**
+   * Validação automática de Padroeira de Búzios (Fase 3A).
+   * Falha com erro se encontrar data incorreta (21/05 em vez de 26/07).
+   */
+  function validatePadroeiraBuziosIntegrity() {
+    const errors = [];
+
+    COMPANIES.forEach((company) => {
+      const data = getCompanyData(company);
+      (data.holidays || []).forEach((holiday) => {
+        if (!holiday.date) return;
+
+        const isBuzios = String(holiday.name || "").includes("Padroeira");
+        const isWrongDate = holiday.date.endsWith("-05-21");
+
+        if (isBuzios && isWrongDate) {
+          errors.push({
+            company,
+            holidayId: holiday.id,
+            message: `Padroeira de Búzios em ${holiday.date} (deveria ser 26/07)`
+          });
+        }
+      });
+    });
+
+    if (errors.length > 0) {
+      console.error("[Validação] FALHA: Padroeira de Búzios com data incorreta", errors);
+      return { valid: false, errors };
+    }
+
+    return { valid: true, errors: [] };
+  }
+
+  /**
+   * Corrigir automaticamente Padroeira de Búzios (Fase 3A).
+   * Muda de 21/05 para 26/07 se encontrado.
+   */
+  function correctPadroeiraBuziosAutomatically() {
+    let corrected = 0;
+
+    COMPANIES.forEach((company) => {
+      const data = getCompanyData(company);
+      (data.holidays || []).forEach((holiday) => {
+        if (!holiday.date) return;
+
+        const isBuzios = String(holiday.name || "").includes("Padroeira");
+        const isWrongDate = holiday.date.endsWith("-05-21");
+
+        if (isBuzios && isWrongDate) {
+          const year = holiday.date.slice(0, 4);
+          holiday.date = `${year}-07-26`;
+          corrected += 1;
+          console.warn(
+            `[Validação] Padroeira de Búzios corrigida para ${holiday.date} (empresa: ${company})`
+          );
+        }
+      });
+    });
+
+    if (corrected > 0) {
+      saveState();
+    }
+
+    return corrected;
+  }
+
   function updateAbsence(id, absence, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const data = getCompanyData(resolveCompanyForEmployeeWrite(absence.employeeId, company, "ferias"));
     const existing = (data.absences || []).find((item) => item.id === id);
     if (!existing) return false;
 
@@ -1868,11 +2276,46 @@
     return changed;
   }
 
+  /**
+   * Soft delete de feriado — marca como deletado em vez de remover.
+   * Permite restauração posterior.
+   */
   function removeHoliday(id, options = {}) {
     const company = options.company || getPrimaryPageCompany("feriados");
     const data = getCompanyData(company);
-    data.holidays = data.holidays.filter((holiday) => holiday.id !== id);
+    const holiday = (data.holidays || []).find((h) => h.id === id);
+    if (!holiday) return false;
+
+    // Soft delete: marcar com deletedAt em vez de remover
+    holiday.deletedAt = holiday.deletedAt || todayISO();
+    holiday.isDeleted = true;
+
     saveState();
+    return true;
+  }
+
+  /**
+   * Restaurar feriado que foi marcado como deletado.
+   */
+  function restoreHoliday(id, options = {}) {
+    const company = options.company || getPrimaryPageCompany("feriados");
+    const data = getCompanyData(company);
+    const holiday = (data.holidays || []).find((h) => h.id === id);
+    if (!holiday) return false;
+
+    delete holiday.deletedAt;
+    holiday.isDeleted = false;
+
+    saveState();
+    return true;
+  }
+
+  /**
+   * Listar feriados não deletados (filtro padrão na UI).
+   */
+  function getActiveHolidays(company) {
+    const data = getCompanyData(company);
+    return (data.holidays || []).filter((h) => !h.isDeleted);
   }
 
   function removeWorkedEmployeeFromHoliday(holidayId, employeeId, options = {}) {
@@ -2003,8 +2446,8 @@
     if (!canonicalId) return [];
 
     const company =
-      options.company ||
       findEmployeeRecord(canonicalId)?.company ||
+      options.company ||
       getPrimaryPageCompany("escala");
     const data = options.data || getCompanyData(company);
     normalizeWorkedEmployeeRefs(data);
@@ -2181,10 +2624,7 @@
   }
 
   function setManualScale(employeeId, date, code, linkedHolidayId, company) {
-    const resolvedCompany =
-      company ||
-      AppData.findEmployeeRecord(employeeId)?.company ||
-      AppData.getPrimaryPageCompany("escala");
+    const resolvedCompany = resolveCompanyForEmployeeWrite(employeeId, company, "escala");
     const data = getCompanyData(resolvedCompany);
     const key = `${employeeId}|${date}`;
     const previousCode = getPreviousManualScaleCode(data, employeeId, date);
@@ -2229,7 +2669,7 @@
   }
 
   function setVtDeduction(employeeId, yearMonth, days, options = {}) {
-    const company = resolveVtCompany(options.company);
+    const company = resolveCompanyForEmployeeWrite(employeeId, options.company, "vale-transporte");
     const vt = ensureValeTransporteState();
     if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
     const key = `${employeeId}|${yearMonth}`;
@@ -2303,6 +2743,30 @@
       absenceCode,
       manualCode
     };
+  }
+
+  /**
+   * Fonte única de verdade: um código de escala conta como dia trabalhado?
+   * Respeita state.scaleCodeConfig (override do usuário) e os defaults canônicos.
+   * Usado por VT, Escala, Controle de Feriados e Dashboard para eliminar divergências.
+   */
+  function isWorkedScaleCode(code) {
+    const normalized = String(code ?? "").trim();
+    if (!normalized) return true;
+
+    const config = state?.scaleCodeConfig;
+    if (config && typeof config === "object") {
+      if (config[normalized] === "not-worked") return false;
+      if (config[normalized] === "worked") return true;
+    }
+
+    if (NOT_WORKED_SCALE_CODES.has(normalized)) return false;
+    if (VT_WORKED_CODES.has(normalized)) return true;
+    return false;
+  }
+
+  function isNotWorkedScaleCode(code) {
+    return !isWorkedScaleCode(code);
   }
 
   function getScaleCode(employee, date, data = getCompanyData()) {
@@ -2546,6 +3010,8 @@
     setPageCompany,
     resolveCompaniesForPage,
     getPrimaryPageCompany,
+    getActiveCompany,
+    setActiveCompany,
     isPageCompanyAll,
     findEmployeeRecord,
     isEmployeeActive,
@@ -2584,6 +3050,10 @@
     compareEmployeeName,
     sortEmployeesByName,
     getScaleCode,
+    isWorkedScaleCode,
+    isNotWorkedScaleCode,
+    NOT_WORKED_SCALE_CODES,
+    resolveCompanyForEmployeeWrite,
     exportCurrentDataJSON,
     findEmployeeByCpf,
     findEmployeeByName,
@@ -2598,6 +3068,10 @@
     monthKey,
     removeEmployee,
     removeHoliday,
+    restoreHoliday,
+    getActiveHolidays,
+    validatePadroeiraBuziosIntegrity,
+    correctPadroeiraBuziosAutomatically,
     updateHoliday,
     removeWorkedEmployeeFromHoliday,
     removeVacation,
@@ -2607,6 +3081,11 @@
     todayISO,
     updateCompanyInfo,
     updateCompanyLogo,
+    diagnoseCompanyData,
+    restoreCompanyInfoFromBackup,
+    resolveCompanyCnpj,
+    isMeaningfulCompanyInfo,
+    COMPANY_CRITICAL_FIELDS,
     setRemoteState,
     mergeRemoteIntoLocal,
     readLocalStateSnapshot,

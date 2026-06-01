@@ -408,6 +408,8 @@
 
   .sidebar,
   .topbar,
+  .module-ribbon,
+  .company-tabs,
   .card:not(.vt-preview-card):not(.scale-print-preview-card),
   .vt-preview-card > .card-header,
   .vt-preview-card > .help-text,
@@ -416,12 +418,17 @@
     display: none !important;
   }
 
+  /* Fase 2 — neutralizar layout de cabeçalho fixo na impressão (evita 1ª página em branco) */
   body:not(.printing-contador):not(.printing-scale) .app-shell,
+  body:not(.printing-contador):not(.printing-scale) .app-content,
   body:not(.printing-contador):not(.printing-scale) .module.active,
   body:not(.printing-contador):not(.printing-scale) .vt-preview-card,
   body:not(.printing-contador):not(.printing-scale) .vt-preview-scroll,
   body:not(.printing-contador):not(.printing-scale) .vt-print-area {
     display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;

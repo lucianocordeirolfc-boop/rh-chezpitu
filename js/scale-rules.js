@@ -57,21 +57,27 @@
     return state.scaleCodeConfig;
   }
 
+  // Fonte única de verdade: delega para AppData.isWorkedScaleCode (mesmo state.scaleCodeConfig).
+  // O parâmetro `state` é mantido por compatibilidade de assinatura.
   function isScaleCodeWorked(code, state) {
+    if (typeof AppData.isWorkedScaleCode === "function") {
+      return AppData.isWorkedScaleCode(code);
+    }
+    // Fallback defensivo (não deve ocorrer: data.js carrega antes de scale-rules.js).
     const normalized = String(code ?? "").trim();
     if (!normalized) return true;
-
     const config = getCodeConfig(state);
     if (config[normalized] === "not-worked") return false;
     if (config[normalized] === "worked") return true;
-
     if (DEFAULT_NOT_WORKED.has(normalized)) return false;
     if (AppData.VT_WORKED_CODES.has(normalized) || DEFAULT_WORKED_EXTRA.has(normalized)) return true;
-
     return false;
   }
 
   function isScaleCodeNotWorked(code, state) {
+    if (typeof AppData.isNotWorkedScaleCode === "function") {
+      return AppData.isNotWorkedScaleCode(code);
+    }
     const normalized = String(code ?? "").trim();
     if (!normalized) return false;
     return !isScaleCodeWorked(normalized, state);
@@ -424,6 +430,22 @@
     AppData.saveState();
   }
 
+  function updateCalendarHoliday(id, patch = {}) {
+    const state = AppData.state;
+    const holiday = (state.calendarHolidays || []).find((item) => item.id === id);
+    if (!holiday) return false;
+    if (patch.name !== undefined) holiday.name = String(patch.name || "").trim();
+    if (patch.type !== undefined) holiday.type = patch.type || holiday.type || "nacional";
+    if (patch.date !== undefined) {
+      let date = String(patch.date || "").trim();
+      if (AppData.isPadroeiraBuziosName(holiday.name)) date = AppData.correctPadroeiraBuziosDate(date);
+      holiday.date = date;
+    }
+    if (Array.isArray(patch.companies)) holiday.companies = patch.companies;
+    AppData.saveState();
+    return true;
+  }
+
   window.ScaleRules = {
     COVERAGE_PRINCIPALS,
     isScaleCodeWorked,
@@ -438,6 +460,7 @@
     countAutoPendingHolidaysAllCompanies,
     getHolidayDatesForCompany,
     addCalendarHoliday,
+    updateCalendarHoliday,
     removeCalendarHoliday,
     getCalendarHolidaysOnDate,
     formatDateBR,
