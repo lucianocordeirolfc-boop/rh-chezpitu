@@ -2,6 +2,64 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06 — Fase 3A-2: Feriados Duplicados (CORRIGIDO)
+
+Problema:
+Mesmo feriado (data + nome) aparecia DUAS VEZES no histórico. Exemplo:
+Funcionária CAMILA (Pengold) — Corpus Christi (04/06/2026):
+  - Registro 1: Agendado com compensação 12/06/2026
+  - Registro 2: Pendente sem compensação
+
+Regra violada: Um feriado trabalhado por um funcionário deve aparecer 1x (ou 0x).
+
+Causa raiz:
+Função syncAutoHolidaysWorkedForMonth() em js/scale-rules.js:
+  1. Verificava se "O FUNCIONÁRIO tem algum feriado no dia" (não este feriado específico)
+  2. Processava apenas o PRIMEIRO feriado do dia (ignorava múltiplos)
+  3. Se existia um registro Agendado com CO, criava outro Pendente (duplicata)
+
+Correção implementada:
+1. Loop por CADA feriado no dia (suporta múltiplos feriados mesma data)
+2. Verificação per-feriado: se ESTE FUNCIONÁRIO já existe NESTE FERIADO → skip
+3. Deduplicação automática (findOrMergeDuplicateHolidays):
+   - Consolida workedEmployees únicos por employeeId
+   - Mantém registro mais completo (Agendado > Pendente)
+   - Soft delete no duplicado (preserva dados)
+4. Deduplicação global (deduplicateAllHolidays):
+   - Processa todas as empresas
+   - Script de migração idempotente
+
+Arquivos alterados:
+- js/scale-rules.js (+71/-71) — Loop múltiplos, verificação per-feriado
+- js/data.js (+183) — findOrMergeDuplicateHolidays, deduplicateAllHolidays
+- package.json (+3) — Novo script test:dedup
+
+Novos arquivos:
+- scripts/test-holiday-deduplication.mjs (300L) — 9 testes deduplicação
+- scripts/migrate-deduplicate-holidays.mjs (160L) — Migração segura, idempotente
+- CORRECAO_FERIADOS_DUPLICADOS.md (400L) — Documentação técnica
+
+Testes:
+- npm test → 47/47 (unitários — sem regressão)
+- npm run validate → 183/183 (funcional) + 15/15 (offline) + 9/9 (dedup) = 207/207 ✓
+- Total: 254/254 testes APROVADOS
+
+Caso Camila validado:
+✓ Corpus Christi 04/06/2026 não aparece duas vezes
+✓ Mantém status Agendado (não Pendente)
+✓ Preserva compensação 12/06/2026
+✓ Consolidado em 1 único registro
+
+Regras de consolidação:
+- Chave de unicidade: employeeId + data feriado + nome normalizado
+- Preferência: Agendado (com compensationDate) > Pendente
+- Soft delete no duplicado (isDeleted=true, deletedAt=todayISO)
+- Sem perda de dados
+
+Status: ✅ CORRIGIDO E TESTADO. Pronto para produção.
+
+---
+
 ## 2026-06 — "Natal 2025" aparecia só no modal CO (fonte divergente do Histórico)
 
 Problema:
