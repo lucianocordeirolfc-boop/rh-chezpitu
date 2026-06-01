@@ -2,6 +2,37 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06 — QuotaExceededError no localStorage (CORRIGIDO)
+
+Problema:
+Em produção, `setItem` da chave `chezPituPeopleSystem.v1` estourava a cota
+(`QuotaExceededError`) em `js/data.js` → `setRemoteState()` (e `saveState()`),
+quebrando a sincronização.
+
+Causa raiz:
+Gravava-se o estado inteiro (empresas, funcionários, feriados, escalas, ausências,
+históricos/backups e logos base64) sem try/catch. Maiores vilões: backups
+(`companyInfoHistory`) e logos base64. Em `saveState`, o `setItem` vinha antes do
+`FirebaseSync.save`; ao lançar, o Firebase nem era chamado.
+
+Correção:
+Persistência em camadas (`persistStateToLocal`) que nunca lança:
+- full → slim (sem logos/backups/soft-deletados/alertas) → lean (só sessão/empresa/
+  filtros/preferências/versão de cache) → desligado (mantém Firebase).
+`saveState` chama o Firebase sempre. Migração segura: `loadState` tolera payloads
+full/slim/lean; reload reconstrói empresas e o merge com Firebase restaura o operacional.
+try/catch em todos os setItem. Diagnóstico: `AppData.measureStorageUsage()`.
+
+Arquivos:
+- js/data.js, js/funcionarios.js, package.json
+- scripts/test-storage-quota.mjs (25), CORRECAO_QUOTA_LOCALSTORAGE.md
+
+Testes:
+- npm test → 47/47
+- npm run validate → funcional 183/183, offline 15/15, dedup 44/44, quota 25/25
+
+Status: ✅ CORRIGIDO E TESTADO. Sem commit/deploy (aguarda autorização).
+
 ## 2026-06 — Fase 3A-2: Feriados Duplicados (CORRIGIDO)
 
 Problema:

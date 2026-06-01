@@ -43,7 +43,11 @@
     if (trimmed && !presets.includes(trimmed)) {
       presets.push(trimmed);
       const sorted = sortShiftPresets(presets);
-      localStorage.setItem(SHIFT_PRESETS_KEY, JSON.stringify(sorted));
+      try {
+        localStorage.setItem(SHIFT_PRESETS_KEY, JSON.stringify(sorted));
+      } catch (error) {
+        console.warn("[Funcionarios] Não foi possível salvar horários no localStorage:", error);
+      }
       return sorted;
     }
     return presets;

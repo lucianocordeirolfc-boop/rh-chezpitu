@@ -2,6 +2,15 @@
   const STORAGE_KEY = "chezPituPeopleSystem.v1";
   const LEGACY_VT_BACKUP_KEY = "chezPituVtBackup.v1";
 
+  /**
+   * Versão do esquema persistido sob STORAGE_KEY. O leitor (loadState) tolera
+   * tanto o payload completo legado (sem schemaVersion) quanto os payloads
+   * reduzidos ("slim"/"lean") — a migração é sempre não-destrutiva: o que falta
+   * localmente é restaurado pelo merge com o Firebase (fonte de verdade).
+   */
+  const PERSIST_SCHEMA_VERSION = 2;
+  const CACHE_VERSION = "v1";
+
   const COMPANIES = ["Chez Pitu", "Pengold"];
   const DEFAULT_SELECTED_COMPANY = "Pengold";
   const HOLIDAY_COMPENSATION_DAYS = 120;
@@ -1430,6 +1439,219 @@
     return normalizeCompanyBlock(getCompanyData(company));
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // PERSISTÊNCIA ENXUTA / ANTI-QUOTA (QuotaExceededError)
+  //
+  // O estado completo (todas as empresas, funcionários, feriados, escalas,
+  // ausências, históricos, backups e logos base64) pode ultrapassar a cota do
+  // localStorage (~5 MB). Quando isso ocorre, setItem lança QuotaExceededError.
+  // Aqui a gravação é feita em CAMADAS, com try/catch, e NUNCA lança:
+  //   0) full  — estado completo (cache offline ideal);
+  //   1) slim  — remove logos base64, históricos/backups, feriados soft-deletados
+  //              e alertas (mantém dados operacionais offline);
+  //   2) lean  — apenas sessão, empresa ativa, filtros, preferências e versão de
+  //              cache; dados operacionais passam a vir do Firebase.
+  // Se nem o "lean" couber, registra warning e desliga o cache local na sessão.
+  // Em todos os casos o `state` em memória permanece completo e o Firebase
+  // continua sendo a fonte de verdade — a aplicação não quebra.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  let persistFloor = 0; // menor camada já aceita nesta sessão (sticky, evita re-tentar full caro)
+  let storageDegraded = false;
+  let degradedAlertShown = false;
+
+  function isQuotaError(error) {
+    if (!error) return false;
+    return (
+      error.name === "QuotaExceededError" ||
+      error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+      error.code === 22 ||
+      error.code === 1014
+    );
+  }
+
+  /** Camada "slim": preserva dados operacionais, descarta o que mais pesa. */
+  function buildSlimPersistedState(src) {
+    const clone = JSON.parse(JSON.stringify(src));
+    delete clone.companyInfoHistory; // histórico/backup recuperável do Firebase
+    delete clone.companyInfoBackup;
+    clone.coverageAlerts = [];
+    Object.values(clone.companies || {}).forEach((block) => {
+      if (!block) return;
+      if (block.companyInfo) block.companyInfo.logoDataUrl = ""; // logo base64 é o maior vilão
+      if (Array.isArray(block.holidays)) {
+        block.holidays = block.holidays.filter((holiday) => !holiday?.isDeleted);
+      }
+    });
+    clone.schemaVersion = PERSIST_SCHEMA_VERSION;
+    clone.cacheVersion = src.cacheVersion || CACHE_VERSION;
+    clone.persistTier = "slim";
+    return clone;
+  }
+
+  /** Camada "lean": só sessão/empresa/filtros/preferências/versão de cache. */
+  function buildLeanPersistedState(src) {
+    return {
+      schemaVersion: PERSIST_SCHEMA_VERSION,
+      cacheVersion: src.cacheVersion || CACHE_VERSION,
+      persistTier: "lean",
+      activeCompany: src.activeCompany || "",
+      pageFilters: src.pageFilters || {},
+      escalaSelectedYearMonth: src.escalaSelectedYearMonth || "",
+      scaleCodeConfig: src.scaleCodeConfig || {},
+      coveragePrincipalBindings: src.coveragePrincipalBindings || {},
+      valeTransporte: { selectedYearMonth: src.valeTransporte?.selectedYearMonth || "" },
+      companies: {} // dados operacionais vêm do Firebase
+    };
+  }
+
+  const PERSIST_TIERS = [
+    { name: "full", build: (src) => src },
+    { name: "slim", build: buildSlimPersistedState },
+    { name: "lean", build: buildLeanPersistedState }
+  ];
+
+  function trySetStorage(payload) {
+    let serialized;
+    try {
+      serialized = JSON.stringify(payload);
+    } catch (error) {
+      return { ok: false, quota: false, error };
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, serialized);
+      return { ok: true, bytes: serialized.length };
+    } catch (error) {
+      return { ok: false, quota: isQuotaError(error), error };
+    }
+  }
+
+  /**
+   * Persiste o estado no localStorage em camadas. Nunca lança: uma falha de
+   * cota jamais pode quebrar a aplicação nem o fluxo de sincronização.
+   * @returns {{ok:boolean, tier:string, bytes?:number}}
+   */
+  function persistStateToLocal(stateObj) {
+    if (!stateObj || typeof stateObj !== "object") return { ok: false, tier: "none" };
+
+    for (let i = persistFloor; i < PERSIST_TIERS.length; i += 1) {
+      const tier = PERSIST_TIERS[i];
+      const result = trySetStorage(tier.build(stateObj));
+
+      if (result.ok) {
+        if (i > persistFloor) {
+          persistFloor = i; // a partir de agora começamos direto nesta camada
+          storageDegraded = i > 0;
+          emitDataAlert(
+            `Armazenamento local quase cheio: salvando em modo "${tier.name}". ` +
+              `Dados completos preservados no Firebase.`
+          );
+        }
+        return { ok: true, tier: tier.name, bytes: result.bytes };
+      }
+
+      if (!result.quota) {
+        // Erro não relacionado à cota (ex.: storage indisponível): registra e desiste sem quebrar.
+        console.warn("[AppData] Falha ao persistir no localStorage (não-cota):", result.error);
+        return { ok: false, tier: tier.name };
+      }
+      // QuotaExceededError → tenta a próxima camada mais enxuta.
+    }
+
+    // Nem a camada "lean" coube: desliga o cache local nesta sessão.
+    persistFloor = PERSIST_TIERS.length;
+    storageDegraded = true;
+    if (!degradedAlertShown) {
+      degradedAlertShown = true;
+      emitDataAlert(
+        "Armazenamento local cheio (QuotaExceededError). Os dados continuam salvos no " +
+          "Firebase; o cache local foi desativado nesta sessão para não quebrar a aplicação."
+      );
+    }
+    return { ok: false, tier: "none" };
+  }
+
+  /**
+   * Diagnóstico de uso do localStorage. Rode no console de produção:
+   *   AppData.measureStorageUsage()
+   * Retorna tamanho total e por estrutura (em bytes) — base para o relatório.
+   */
+  function measureStorageUsage(targetState = state) {
+    const bytesOf = (value) => {
+      try {
+        return JSON.stringify(value ?? null).length;
+      } catch (_) {
+        return 0;
+      }
+    };
+
+    const perCompany = {};
+    const totals = {
+      employees: 0,
+      holidays: 0,
+      manualScale: 0,
+      vacations: 0,
+      absences: 0,
+      contadorLancamentos: 0,
+      logos: 0
+    };
+
+    Object.entries(targetState.companies || {}).forEach(([name, block]) => {
+      const entry = {
+        employees: bytesOf(block?.employees),
+        holidays: bytesOf(block?.holidays),
+        manualScale: bytesOf(block?.manualScale),
+        vacations: bytesOf(block?.vacations),
+        absences: bytesOf(block?.absences),
+        contadorLancamentos: bytesOf(block?.contadorLancamentos),
+        logo: bytesOf(block?.companyInfo?.logoDataUrl)
+      };
+      perCompany[name] = entry;
+      totals.employees += entry.employees;
+      totals.holidays += entry.holidays;
+      totals.manualScale += entry.manualScale;
+      totals.vacations += entry.vacations;
+      totals.absences += entry.absences;
+      totals.contadorLancamentos += entry.contadorLancamentos;
+      totals.logos += entry.logo;
+    });
+
+    let storedBytes = 0;
+    try {
+      storedBytes = (localStorage.getItem(STORAGE_KEY) || "").length;
+    } catch (_) {
+      storedBytes = 0;
+    }
+
+    const report = {
+      storageKey: STORAGE_KEY,
+      quotaApproxMB: 5,
+      storedBytes,
+      storedKB: Number((storedBytes / 1024).toFixed(1)),
+      stateBytes: bytesOf(targetState),
+      breakdown: {
+        ...totals,
+        backups:
+          bytesOf(targetState.companyInfoHistory) + bytesOf(targetState.companyInfoBackup),
+        calendarHolidays: bytesOf(targetState.calendarHolidays),
+        coverageAlerts: bytesOf(targetState.coverageAlerts),
+        valeTransporte: bytesOf(targetState.valeTransporte),
+        scaleCodeConfig: bytesOf(targetState.scaleCodeConfig)
+      },
+      perCompany,
+      persistTier: PERSIST_TIERS[Math.min(persistFloor, PERSIST_TIERS.length - 1)]?.name || "none",
+      degraded: storageDegraded
+    };
+
+    try {
+      console.info("[AppData] Uso de armazenamento (bytes):", report);
+      console.table(report.breakdown);
+    } catch (_) {
+      /* ambiente sem console.table */
+    }
+    return report;
+  }
+
   function loadState() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) {
@@ -1456,7 +1678,9 @@
 
   function saveState() {
     delete state.selectedCompany;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Persiste localmente em camadas (nunca lança). A sincronização com o
+    // Firebase ocorre SEMPRE, mesmo que o cache local esteja cheio/indisponível.
+    persistStateToLocal(state);
     if (window.FirebaseSync?.isReady()) {
       window.FirebaseSync.save(state);
     }
@@ -1719,10 +1943,12 @@
   }
 
   // Persiste estado já mesclado (merge ocorre apenas em mergeRemoteIntoLocal).
+  // O estado vem do Firebase/merge; uma QuotaExceededError aqui NÃO pode gerar
+  // erro de sincronização — persistStateToLocal degrada com segurança e nunca lança.
   function setRemoteState(remoteState) {
     if (!remoteState || typeof remoteState !== "object") return;
     state = finalizeIncomingState(remoteState);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    persistStateToLocal(state);
   }
 
   function getCompanyData(company) {
@@ -3376,6 +3602,8 @@
     setRemoteState,
     mergeRemoteIntoLocal,
     readLocalStateSnapshot,
+    measureStorageUsage,
+    STORAGE_KEY,
     getManualScaleEntry,
     setVtDeduction,
     getVtDeduction,
