@@ -767,6 +767,37 @@
     return [...new Set([...COMPANIES, ...Object.keys(targetState?.companies || {})])];
   }
 
+  /**
+   * Deduplica o calendário global de feriados (state.calendarHolidays).
+   * Chave de unicidade: data + nome normalizado. Quando há duplicados, mantém
+   * um único registro e une as empresas (companies) — assim o mesmo feriado não
+   * aparece repetido no filtro nem é processado em dobro pela escala. Idempotente.
+   */
+  function dedupeCalendarHolidays(targetState) {
+    if (!targetState || !Array.isArray(targetState.calendarHolidays)) return false;
+
+    const byKey = new Map();
+    let changed = false;
+
+    targetState.calendarHolidays.forEach((holiday) => {
+      if (!holiday || !holiday.date || !holiday.name) return;
+      const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, holiday);
+        return;
+      }
+      const companies = new Set([...(existing.companies || []), ...(holiday.companies || [])]);
+      existing.companies = Array.from(companies);
+      changed = true; // duplicado descartado
+    });
+
+    if (changed) {
+      targetState.calendarHolidays = Array.from(byKey.values());
+    }
+    return changed;
+  }
+
   function migrateVtStorage(targetState) {
     if (!targetState) return targetState;
     if (!targetState.valeTransporte) targetState.valeTransporte = createDefaultState().valeTransporte;
@@ -827,6 +858,7 @@
     migratePageFilters(next, defaults);
     migrateVtStorage(next);
     migratePadroeiraBuziosHoliday(next);
+    dedupeCalendarHolidays(next);
     delete next.selectedCompany;
 
     // Fase 2 — empresa ativa (aba). Migra de pageFilters.escala quando ausente; nunca apaga dados.
@@ -1512,6 +1544,9 @@
   function normalizeCompanyHolidays(companyBlock) {
     if (!companyBlock) return;
     companyBlock.holidays = mergeHolidayLists([], companyBlock.holidays || []);
+    // Dedup automático e idempotente a cada carga: mescla feriados duplicados
+    // (mesma data + nome) preservando vínculos compensados/agendados e CO.
+    mergeDuplicateHolidaysInBlock(companyBlock);
     normalizeWorkedEmployeeRefs(companyBlock);
     reconcileCoCompensationLinks(companyBlock);
   }
@@ -1545,7 +1580,15 @@
 
     if (status.key === "compensado" && !isEditingThisCo) return false;
     if (status.key === "agendado" && !isEditingThisCo) return false;
-    if (!isEditingThisCo && options.scaleCoLinks?.has(holiday.id)) return false;
+
+    // Regra crítica: Se não estou editando este CO específico, exclua feriados já marcados
+    if (!isEditingThisCo) {
+      // Verificar se o feriado já está no índice de COs (mapa de COs já lançados na escala)
+      if (options.scaleCoLinks?.has(holiday.id)) return false;
+
+      // Verificar se o feriado já está vinculado a um CO na escala (mesma verificação, mais explícita)
+      if (item.linkedFromScale && item.scaleCoDate) return false;
+    }
 
     if (item.linkedFromScale && item.scaleCoDate && item.scaleCoDate !== coDate && !isEditingThisCo) {
       return false;
@@ -2318,6 +2361,157 @@
     return (data.holidays || []).filter((h) => !h.isDeleted);
   }
 
+  /**
+   * FASE 3A — Deduplicação de feriados
+   *
+   * Chave de unicidade (por empresa/bloco): data + nome normalizado.
+   *
+   * Pontuação de um vínculo (workedEmployee) — quanto maior, mais completo:
+   *   Compensado(4) > Agendado(3) > Vencido(1) > Pendente(0), reforçado por
+   *   data de compensação, vínculo da escala e CO da escala. Garante que um
+   *   vínculo compensado/agendado nunca seja substituído por um pendente.
+   */
+  function scoreWorkedHolidayItem(item, holidayDate) {
+    if (!item) return -1;
+    const status = resolveWorkedHolidayStatus(item, holidayDate);
+    const statusRank =
+      status.key === "compensado" ? 4 : status.key === "agendado" ? 3 : status.key === "vencido" ? 1 : 0;
+    return (
+      statusRank * 100 +
+      (item.compensationDate ? 20 : 0) +
+      (item.linkedFromScale ? 10 : 0) +
+      (item.scaleCoDate ? 5 : 0) +
+      (item.status ? 1 : 0)
+    );
+  }
+
+  // Registro canônico = o mais completo: maior pontuação de vínculo e mais funcionários.
+  function scoreHolidayRecord(holiday) {
+    const worked = holiday.workedEmployees || [];
+    let best = 0;
+    worked.forEach((item) => {
+      best = Math.max(best, scoreWorkedHolidayItem(item, holiday.date));
+    });
+    return best * 1000 + worked.length;
+  }
+
+  /**
+   * Mescla, dentro de um bloco de empresa, feriados duplicados (mesma data + nome).
+   * - Escolhe o registro mais completo como canônico (prioridade req. 4).
+   * - Consolida todos os workedEmployees únicos por employeeId, preferindo o mais
+   *   completo (compensado/agendado nunca vira pendente — req. 5/6).
+   * - Aplica soft delete nos duplicados (idempotente — só agrupa registros ativos).
+   * - Religa vínculos CO (manualScale.linkedHolidayId e item.linkedHolidayId) do id
+   *   removido para o id canônico, preservando o vínculo CO existente (req. 2).
+   * Idempotente: rodar várias vezes não recria nem perde duplicados.
+   */
+  function mergeDuplicateHolidaysInBlock(data) {
+    if (!data || !Array.isArray(data.holidays) || data.holidays.length < 2) {
+      return { merged: 0, details: [] };
+    }
+
+    const byKey = new Map();
+    (data.holidays || []).forEach((holiday) => {
+      if (!holiday || holiday.isDeleted) return; // só agrupa registros ativos (idempotência)
+      if (!holiday.date || !holiday.name) return;
+      const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(holiday);
+    });
+
+    const details = [];
+    const remap = new Map(); // id removido -> id canônico (para religar vínculos CO)
+    let merged = 0;
+
+    byKey.forEach((group) => {
+      if (group.length < 2) return;
+
+      const primary = group.slice().sort((a, b) => scoreHolidayRecord(b) - scoreHolidayRecord(a))[0];
+
+      // Consolidar workedEmployees únicos por employeeId, preferindo o mais completo
+      const workedMap = new Map();
+      group.forEach((holiday) => {
+        (holiday.workedEmployees || []).forEach((item) => {
+          if (!item || !item.employeeId) return;
+          const existing = workedMap.get(item.employeeId);
+          if (!existing) {
+            workedMap.set(item.employeeId, item);
+            return;
+          }
+          const keepNew =
+            scoreWorkedHolidayItem(item, holiday.date) > scoreWorkedHolidayItem(existing, primary.date);
+          workedMap.set(item.employeeId, keepNew ? item : existing);
+        });
+      });
+
+      primary.workedEmployees = Array.from(workedMap.values());
+      primary.isDeleted = false;
+      delete primary.deletedAt;
+
+      group.forEach((holiday) => {
+        if (holiday === primary) return;
+        holiday.isDeleted = true;
+        holiday.deletedAt = todayISO();
+        if (holiday.id && holiday.id !== primary.id) remap.set(holiday.id, primary.id);
+        details.push({
+          action: "merged",
+          kept: primary.id,
+          deleted: holiday.id,
+          date: holiday.date,
+          name: holiday.name,
+          keptCount: primary.workedEmployees.length
+        });
+        merged += 1;
+      });
+    });
+
+    // Religar vínculos CO que apontavam para o registro removido (preserva o vínculo)
+    if (remap.size) {
+      Object.values(data.manualScale || {}).forEach((entry) => {
+        if (entry && typeof entry === "object" && remap.has(entry.linkedHolidayId)) {
+          entry.linkedHolidayId = remap.get(entry.linkedHolidayId);
+        }
+      });
+      (data.holidays || []).forEach((holiday) => {
+        (holiday.workedEmployees || []).forEach((item) => {
+          if (item && remap.has(item.linkedHolidayId)) {
+            item.linkedHolidayId = remap.get(item.linkedHolidayId);
+          }
+        });
+      });
+    }
+
+    return { merged, details };
+  }
+
+  function findOrMergeDuplicateHolidays(company, options = {}) {
+    const data = getCompanyData(company);
+    const result = mergeDuplicateHolidaysInBlock(data);
+    if (result.merged > 0 && options.save !== false) {
+      saveState();
+    }
+    return result;
+  }
+
+  /**
+   * Deduplicação global para todas as empresas.
+   */
+  function deduplicateAllHolidays(options = {}) {
+    const results = {};
+    COMPANIES.forEach((company) => {
+      const result = findOrMergeDuplicateHolidays(company, { save: false });
+      if (result.merged > 0) {
+        results[company] = result;
+      }
+    });
+
+    if (Object.keys(results).length > 0 && options.save !== false) {
+      saveState();
+    }
+
+    return results;
+  }
+
   function removeWorkedEmployeeFromHoliday(holidayId, employeeId, options = {}) {
     const company = options.company || getPrimaryPageCompany("feriados");
     const data = getCompanyData(company);
@@ -2441,42 +2635,128 @@
     return item.status === "Pendente" || item.status === "Agendado";
   }
 
-  function getPendingCoHolidaysForEmployee(employeeId, coDate, options = {}) {
+  /**
+   * Predicado ÚNICO de visibilidade de um vínculo (workedEmployee) no Histórico
+   * oficial do Controle de Feriados. É a fonte de verdade compartilhada entre o
+   * Controle de Feriados (feriados.js) e o dropdown do modal CO (Escala).
+   *
+   * Um vínculo é visível somente se:
+   *  - o feriado não está soft-deletado;
+   *  - tem employeeId;
+   *  - a data trabalhada NÃO é anterior à admissão do funcionário (feriado de
+   *    antes da admissão — ex.: "Natal 2025" para quem entrou depois — é invisível).
+   *
+   * Mantém a mesma semântica do filtro do Controle de Feriados: quando o
+   * funcionário não é encontrado ou não tem admissionDate, o vínculo é visível.
+   */
+  function isWorkedEntryVisibleInHistory(holiday, item, data) {
+    if (!holiday || holiday.isDeleted) return false;
+    if (!item || !item.employeeId) return false;
+    const emp = (data?.employees || []).find((entry) => entry.id === item.employeeId);
+    if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return false;
+    return true;
+  }
+
+  /**
+   * FONTE ÚNICA das opções do dropdown do modal CO (Escala de Folga).
+   *
+   * Chave lógica: employeeId + empresa + nome normalizado + data trabalhada.
+   * Para cada chave, agrega TODOS os registros do funcionário e decide UMA opção:
+   *   1. Se a chave tem o feriado já vinculado a ESTE CO (coDate em edição) → mantém
+   *      esse registro selecionável (permite reabrir/editar o CO atual).
+   *   2. Senão, se QUALQUER registro da chave está Agendado/Compensado, tem
+   *      compensationDate, ou já tem CO lançado na escala (qualquer data, inclusive
+   *      futura) → a chave inteira some do dropdown (remove o Pendente duplicado).
+   *   3. Senão, oferece um único representante Pendente/Vencido da chave.
+   *
+   * Exclui ainda: soft-deletados, duplicados, registros de outro employeeId e de
+   * outra empresa (os dados já chegam com escopo da empresa da aba ativa).
+   * Retorno: [{ holiday, item, status, company }] ordenado por data.
+   */
+  function getAvailableCoHolidayOptions(employeeId, coDate, options = {}) {
     const canonicalId = String(employeeId || "").trim();
     if (!canonicalId) return [];
 
     const company =
-      findEmployeeRecord(canonicalId)?.company ||
       options.company ||
+      findEmployeeRecord(canonicalId)?.company ||
       getPrimaryPageCompany("escala");
     const data = options.data || getCompanyData(company);
     normalizeWorkedEmployeeRefs(data);
     reconcileCoCompensationLinks(data);
 
+    // Empresa da aba ativa (regra 9): o funcionário precisa pertencer a este bloco.
     if (!data.employees.some((entry) => entry.id === canonicalId)) return [];
 
     const today = todayISO();
     const currentEntry = getManualScaleEntry(canonicalId, coDate, data);
     const currentLinkedId =
       currentEntry && typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
-    const scaleCoLinks = buildScaleCoHolidayIndex(data, canonicalId);
-    const context = { data, employeeId: canonicalId, scaleCoLinks };
+    const scaleCoIndex = buildScaleCoHolidayIndex(data, canonicalId); // linkedHolidayId -> coDate
 
-    return (data.holidays || [])
-      .map((holiday) => {
-        const item = resolveWorkedEmployeeEntry(data, canonicalId, holiday);
-        if (!item) return null;
+    // 1) Agrupar registros do funcionário por chave lógica (data + nome normalizado)
+    const groups = new Map();
+    (data.holidays || []).forEach((holiday) => {
+      if (!holiday || holiday.isDeleted) return; // regra 6: soft-deleted
+      if (!holiday.date || !holiday.name) return;
 
-        const isEditingThisCo =
-          holiday.id === currentLinkedId ||
-          (item.linkedFromScale && (item.scaleCoDate === coDate || item.compensationDate === coDate));
+      const item = resolveWorkedEmployeeEntry(data, canonicalId, holiday); // regra 8: employeeId
+      if (!item) return;
 
-        if (!isPendingCoCandidate(item, holiday, coDate, today, isEditingThisCo, context)) return null;
+      // Dropdown CO = subconjunto do Histórico oficial: descarta vínculos que o
+      // Controle de Feriados não exibe (ex.: feriado anterior à admissão).
+      if (!isWorkedEntryVisibleInHistory(holiday, item, data)) return;
 
-        return { holiday, item, status: resolveWorkedHolidayStatus(item, holiday.date, today), company };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
+      syncWorkedEmployeeStatus(item, holiday.date);
+      const status = resolveWorkedHolidayStatus(item, holiday.date, today);
+
+      // O feriado já vinculado a ESTE CO (em edição) permanece disponível.
+      const isEditingThisCo =
+        holiday.id === currentLinkedId ||
+        (item.linkedFromScale && (item.scaleCoDate === coDate || item.compensationDate === coDate));
+
+      // Este registro torna a chave indisponível? (regras 1,2,3,4,5)
+      const hasScaleCo = scaleCoIndex.has(holiday.id) || (item.linkedFromScale && Boolean(item.scaleCoDate));
+      const isResolved = status.key === "agendado" || status.key === "compensado";
+      const hasCompDate = Boolean(item.compensationDate);
+      const blocks = !isEditingThisCo && (isResolved || hasCompDate || hasScaleCo);
+
+      const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { blocked: false, editing: null, pending: null };
+        groups.set(key, group);
+      }
+      if (blocks) group.blocked = true;
+      if (isEditingThisCo && !group.editing) {
+        group.editing = { holiday, item, status, company };
+      }
+      if (!group.pending && FERIADOS_CO_PICKER_STATUSES.has(status.key)) {
+        group.pending = { holiday, item, status, company };
+      }
+    });
+
+    // 2) Uma opção por chave: edição > (bloqueado: nada) > pendente/vencido
+    const available = [];
+    groups.forEach((group) => {
+      if (group.editing) {
+        available.push(group.editing);
+        return;
+      }
+      if (group.blocked) return; // existe Agendado/Compensado/CO → some o Pendente (regra 7)
+      if (group.pending) available.push(group.pending);
+    });
+
+    return available.sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
+  }
+
+  // Mantidos como alias da fonte única para não divergirem (root cause original).
+  function getAvailableHolidaysForCo(employeeId, coDate, options = {}) {
+    return getAvailableCoHolidayOptions(employeeId, coDate, options);
+  }
+
+  function getPendingCoHolidaysForEmployee(employeeId, coDate, options = {}) {
+    return getAvailableCoHolidayOptions(employeeId, coDate, options);
   }
 
   function findOldestLinkableHolidayWorked(data, employeeId, preferredHolidayId, coDate = "") {
@@ -2492,6 +2772,7 @@
 
   function isCoDateAlreadyLinked(data, employeeId, coDate, excludeHolidayId = "") {
     return (data.holidays || []).some((holiday) => {
+      if (holiday.isDeleted) return false;
       if (holiday.id === excludeHolidayId) return false;
       return (holiday.workedEmployees || []).some(
         (item) => item.employeeId === employeeId && item.linkedFromScale && item.scaleCoDate === coDate
@@ -3026,6 +3307,9 @@
     findAbsenceForDate,
     getScaleAbsenceConflict,
     getPendingCoHolidaysForEmployee,
+    getAvailableHolidaysForCo,
+    getAvailableCoHolidayOptions,
+    isWorkedEntryVisibleInHistory,
     resolveWorkedEmployeeEntry,
     isWorkedHolidayPendingInFeriadosControl,
     reconcileCoCompensationLinks,
@@ -3070,6 +3354,9 @@
     removeHoliday,
     restoreHoliday,
     getActiveHolidays,
+    findOrMergeDuplicateHolidays,
+    deduplicateAllHolidays,
+    dedupeCalendarHolidays,
     validatePadroeiraBuziosIntegrity,
     correctPadroeiraBuziosAutomatically,
     updateHoliday,

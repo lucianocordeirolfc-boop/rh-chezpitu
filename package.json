@@ -6,7 +6,8 @@
     "bump-cache": "node scripts/bump-cache.js",
     "test": "node scripts/run-phase2-tests.mjs",
     "test:offline": "node scripts/test-offline-recovery.mjs",
-    "validate": "node scripts/run-functional-validation.mjs && node scripts/test-offline-recovery.mjs",
+    "test:dedup": "node scripts/test-holiday-deduplication.mjs",
+    "validate": "node scripts/run-functional-validation.mjs && node scripts/test-offline-recovery.mjs && node scripts/test-holiday-deduplication.mjs",
     "deploy:preview": "netlify deploy --dir .",
     "deploy": "npm run bump-cache && netlify deploy --prod --dir .",
     "deploy:ci": "netlify deploy --prod --dir ."

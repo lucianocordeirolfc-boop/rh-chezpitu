@@ -11,8 +11,6 @@
     compDateTo: ""
   };
 
-  let holidayPopupTab = "feriados";
-
   let searchDelegationReady = false;
 
   function esc(value) {
@@ -131,11 +129,9 @@
       }
 
       return holiday.workedEmployees
-        .filter((item) => {
-          const emp = getEmployee(item.employeeId, data);
-          if (!emp || !emp.admissionDate) return true;
-          return holiday.date >= emp.admissionDate;
-        })
+        // Fonte única compartilhada com o modal CO: só vínculos visíveis no Histórico
+        // oficial (descarta, p.ex., feriado anterior à admissão do funcionário).
+        .filter((item) => AppData.isWorkedEntryVisibleInHistory(holiday, item, data))
         .map((item) => {
           const employee = getEmployee(item.employeeId, data);
           AppData.syncWorkedEmployeeStatus(item, holiday.date);
@@ -349,7 +345,18 @@
     const employees = data.employees
       .filter((employee) => AppData.isEmployeeActive(employee))
       .map((employee) => ({ value: employee.id, label: employee.name }));
-    const holidays = data.holidays.map((holiday) => ({ value: holiday.id, label: holiday.name }));
+    // Filtro "Feriado": cada feriado uma única vez — ignora soft-deletados e
+    // deduplica por nome + data (defensivo, mesmo antes do dedup persistir).
+    const seenHolidayKeys = new Set();
+    const holidays = data.holidays
+      .filter((holiday) => !holiday.isDeleted)
+      .filter((holiday) => {
+        const key = `${holiday.date}|${AppData.normalizeSearchText(holiday.name)}`;
+        if (seenHolidayKeys.has(key)) return false;
+        seenHolidayKeys.add(key);
+        return true;
+      })
+      .map((holiday) => ({ value: holiday.id, label: holiday.name }));
     const departments = [...new Set(data.employees.map((employee) => employee.department).filter(Boolean))]
       .sort()
       .map((department) => ({ value: department, label: department }));
@@ -831,12 +838,24 @@
       if (button.dataset.boundRemoveCalendar) return;
       button.dataset.boundRemoveCalendar = "1";
       button.addEventListener("click", () => {
-        const holiday = (AppData.state.calendarHolidays || []).find(
-          (item) => item.id === button.dataset.removeCalendarHoliday
-        );
-        const label = holiday ? `${holiday.name} (${formatDateBR(holiday.date)})` : "este feriado";
-        if (!window.confirm(`Excluir ${label} do calendário?`)) return;
-        ScaleRules.removeCalendarHoliday(button.dataset.removeCalendarHoliday);
+        const holidayId = button.dataset.removeCalendarHoliday;
+        const company = AppData.getActiveCompany();
+        const data = AppData.getCompanyData(company);
+        const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+
+        if (!holiday) return;
+
+        const label = `${holiday.name} (${formatDateBR(holiday.date)})`;
+        const hasLinks = (holiday.workedEmployees || []).length > 0;
+
+        let message = `Excluir feriado: ${label}?`;
+        if (hasLinks) {
+          message += `\n\nEste feriado possui vínculos com ${holiday.workedEmployees.length} funcionário(s). A exclusão marcará o feriado como deletado, mas preservará o histórico de vínculos.`;
+        }
+
+        if (!window.confirm(message)) return;
+
+        AppData.removeHoliday(holidayId, { company });
         AppData.runScaleIntegrations([AppData.monthKey()]);
         refreshPopupCalendarList(root);
         window.App.renderCurrent();
@@ -932,70 +951,36 @@
     document.getElementById("holidayRegisterPopup")?.remove();
   }
 
-  function renderHolidayPopupTabs() {
-    const tabs = [
-      { id: "feriados", label: "Feriados" },
-      { id: "trabalharam", label: "Funcionários no feriado" }
-    ];
-    return `
-      <div class="feriados-popup-tabs" role="tablist">
-        ${tabs
-          .map(
-            (tab) => `
-          <button
-            type="button"
-            class="feriados-popup-tab ${holidayPopupTab === tab.id ? "is-active" : ""}"
-            data-holiday-popup-tab="${tab.id}"
-          >${tab.label}</button>
-        `
-          )
-          .join("")}
-      </div>
-    `;
-  }
 
-  /**
-   * Modal de feriados (simples, por empresa da aba ativa):
-   *  - Aba "Feriados": cadastrar / editar / excluir feriado.
-   *  - Aba "Funcionários no feriado": apenas visualizar/remover vínculos
-   *    (o vínculo é automático via Escala de Folga — sem opção de vincular aqui).
-   */
   function renderHolidayRegisterPopupBody(data) {
     const company = AppData.getActiveCompany();
     return `
-      ${renderHolidayPopupTabs()}
-      <div class="feriados-popup-panels">
-        <section data-holiday-popup-panel="feriados" class="feriados-panel" ${holidayPopupTab !== "feriados" ? "hidden" : ""}>
-          <form id="calendarHolidayForm" class="popup-form feriados-popup-form feriados-panel-form">
-            <div class="feriados-panel-body">
-              <p class="help-text compact-help">Cadastro vinculado à empresa da aba ativa: <strong>${esc(company)}</strong>.</p>
-              <div class="popup-grid">
-                ${renderCalendarHolidayNameField()}
-                <label class="popup-field">Data<input type="date" name="date" required value="${AppData.todayISO()}"></label>
-                <label class="popup-field">Tipo
-                  <select name="type">
-                    <option value="nacional">Nacional</option>
-                    <option value="estadual">Estadual</option>
-                    <option value="municipal">Municipal</option>
-                    <option value="interno">Interno</option>
-                  </select>
-                </label>
-              </div>
+      <div class="feriados-register-content" data-company-holiday-manager>
+        <form id="calendarHolidayForm" class="popup-form feriados-popup-form feriados-panel-form">
+          <div class="feriados-panel-body">
+            <p class="help-text compact-help">Calendário vinculado à empresa da aba ativa: <strong>${esc(company)}</strong>.</p>
+            <div class="popup-grid">
+              ${renderCalendarHolidayNameField()}
+              <label class="popup-field">Data<input type="date" name="date" required value="${AppData.todayISO()}"></label>
+              <label class="popup-field">Tipo
+                <select name="type">
+                  <option value="nacional">Nacional</option>
+                  <option value="estadual">Estadual</option>
+                  <option value="municipal">Municipal</option>
+                  <option value="interno">Interno</option>
+                </select>
+              </label>
             </div>
-            <div class="popup-actions feriados-panel-footer feriados-panel-footer-compact">
-              <button class="secondary btn-sm" type="button" data-close-holiday-popup>Cancelar</button>
-              <button class="primary btn-sm" type="submit">Cadastrar feriado</button>
-            </div>
-          </form>
-          <div class="feriados-popup-calendar-list" data-calendar-holiday-list>${renderCalendarHolidays()}</div>
-        </section>
-
-        <section data-holiday-popup-panel="trabalharam" class="feriados-panel" ${holidayPopupTab !== "trabalharam" ? "hidden" : ""}>
-          <div class="feriados-panel-info">
-            <p class="help-text compact-help">Os funcionários são vinculados <strong>automaticamente pela Escala de Folga</strong> quando trabalham num feriado. Aqui você apenas confere e, se necessário, remove um vínculo.</p>
           </div>
-          <div class="feriados-popup-worked-list" data-worked-list>${renderWorkedEmployeesList(data)}</div>
-        </section>
+          <div class="popup-actions feriados-panel-footer feriados-panel-footer-compact">
+            <button class="secondary btn-sm" type="button" data-close-holiday-popup>Cancelar</button>
+            <button class="primary btn-sm" type="submit">Salvar feriado</button>
+          </div>
+        </form>
+        <div class="feriados-register-list">
+          <h4 class="feriados-register-title">Feriados cadastrados</h4>
+          <div class="feriados-popup-calendar-list" data-calendar-holiday-list>${renderCalendarHolidays()}</div>
+        </div>
       </div>
     `;
   }
@@ -1085,16 +1070,6 @@
     };
     document.addEventListener("keydown", onKey);
 
-    overlay.querySelectorAll("[data-holiday-popup-tab]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        holidayPopupTab = btn.dataset.holidayPopupTab;
-        overlay.querySelectorAll("[data-holiday-popup-tab]").forEach((tabBtn) => {
-          tabBtn.classList.toggle("is-active", tabBtn === btn);
-        });
-        overlay.querySelector('[data-holiday-popup-panel="calendario"]')?.toggleAttribute("hidden", holidayPopupTab !== "calendario");
-        overlay.querySelector('[data-holiday-popup-panel="trabalhado"]')?.toggleAttribute("hidden", holidayPopupTab !== "trabalhado");
-      });
-    });
 
     bindWorkedHolidayNameField(overlay);
     bindCalendarHolidayNameField(overlay);
@@ -1119,7 +1094,6 @@
   }
 
   function openHolidayRegisterPopup(container, tab) {
-    if (tab) holidayPopupTab = tab;
     closeHolidayRegisterPopup();
     const company = AppData.getPrimaryPageCompany("feriados");
     const data = AppData.getCompanyData(company);
@@ -1138,7 +1112,7 @@
     overlay.innerHTML = `
       <div class="popup-card feriados-register-popup">
         <div class="popup-header">
-          <h3>Cadastrar feriado</h3>
+          <h3>Gerenciar Feriados</h3>
           <button class="popup-close" type="button" data-close-holiday-popup aria-label="Fechar">✕</button>
         </div>
         ${renderHolidayRegisterPopupBody(data, employees, calendarCompanyOptions)}

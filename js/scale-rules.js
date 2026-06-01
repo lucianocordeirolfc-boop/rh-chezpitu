@@ -295,38 +295,47 @@
 
             const holidaysOnDay = getCalendarHolidaysOnDate(date, company, state);
             if (!holidaysOnDay.length) return;
-            if (holidayWorkedExists(data, employee.id, date)) return;
 
-            const calendarHoliday = holidaysOnDay[0];
-            let holidayRecord = data.holidays.find(
-              (item) =>
-                item.date === date &&
-                normalizeName(item.name) === normalizeName(calendarHoliday.name)
-            );
+            // CORREÇÃO: Iterar por CADA feriado no dia (pode haver múltiplos)
+            holidaysOnDay.forEach((calendarHoliday) => {
+              // Procurar feriado existente por data + nome
+              let holidayRecord = data.holidays.find(
+                (item) =>
+                  item.date === date &&
+                  normalizeName(item.name) === normalizeName(calendarHoliday.name)
+              );
 
-            if (!holidayRecord) {
-              holidayRecord = {
-                id: `feriado-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-                name: calendarHoliday.name,
-                date,
-                workedEmployees: []
+              // Se não existe, criar novo registro
+              if (!holidayRecord) {
+                holidayRecord = {
+                  id: `feriado-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+                  name: calendarHoliday.name,
+                  date,
+                  workedEmployees: []
+                };
+                data.holidays.push(holidayRecord);
+              }
+
+              // CORREÇÃO: Verificar se ESTE FUNCIONÁRIO já existe NESTE FERIADO específico
+              const employeeAlreadyExists = (holidayRecord.workedEmployees || []).some(
+                (item) => item.employeeId === employee.id
+              );
+              if (employeeAlreadyExists) return; // Não duplicar
+
+              const autoItem = {
+                employeeId: employee.id,
+                compensationDate: "",
+                note: "",
+                origin: "Automático pela escala",
+                autoCreated: true,
+                role: employee.role || "",
+                department: employee.department || "",
+                company
               };
-              data.holidays.push(holidayRecord);
-            }
-
-            const autoItem = {
-              employeeId: employee.id,
-              compensationDate: "",
-              note: "",
-              origin: "Automático pela escala",
-              autoCreated: true,
-              role: employee.role || "",
-              department: employee.department || "",
-              company
-            };
-            AppData.syncWorkedEmployeeStatus(autoItem, holidayRecord.date);
-            holidayRecord.workedEmployees.push(autoItem);
-            created += 1;
+              AppData.syncWorkedEmployeeStatus(autoItem, holidayRecord.date);
+              holidayRecord.workedEmployees.push(autoItem);
+              created += 1;
+            });
           });
         });
     });

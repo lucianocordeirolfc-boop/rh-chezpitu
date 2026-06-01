@@ -2,6 +2,121 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06 — "Natal 2025" aparecia só no modal CO (fonte divergente do Histórico)
+
+Problema:
+O feriado "Natal (25/12/2025) — Vencido" não aparecia no Controle de Feriados, mas
+aparecia no dropdown do modal CO ao vincular CO na Escala.
+
+Origem do registro:
+Não era fonte legada/calendarHolidays/seed/cache. Era o mesmo data.holidays usado pelo
+Controle de Feriados: um feriado "Natal" 2025-12-25 com workedEmployees do funcionário,
+porém com data trabalhada ANTERIOR à admissão do funcionário.
+
+Causa raiz:
+O Controle de Feriados (feriados.js, buildLines) filtrava vínculos com
+holiday.date < emp.admissionDate, escondendo o registro. A função do modal CO
+(getAvailableCoHolidayOptions) não tinha essa guarda — ela existia no caminho antigo
+(isWorkedHolidayPendingInFeriadosControl) e se perdeu na unificação anterior das funções
+de CO. Resultado: o feriado aparecia só no dropdown da Escala.
+
+Correção:
+Predicado único de visibilidade do Histórico em js/data.js —
+isWorkedEntryVisibleInHistory(holiday, item, data): false se soft-deleted, sem employeeId,
+ou holiday.date < admissionDate. Usado nos dois lugares.
+
+Regras:
+- Dropdown CO = subconjunto estrito do Histórico oficial válido.
+- Se o Controle de Feriados não exibe, o modal CO também não exibe.
+- Mesma base (data.holidays da empresa ativa) + mesma função de validade nos dois pontos.
+- Nada recriado/apagado: o registro permanece em data.holidays, apenas deixa de ser oferecido.
+
+Arquivos:
+- js/data.js (isWorkedEntryVisibleInHistory + uso em getAvailableCoHolidayOptions + export)
+- js/feriados.js (buildLines usa AppData.isWorkedEntryVisibleInHistory)
+- scripts/test-holiday-deduplication.mjs (testNatal2025NotVisibleBeforeAdmission + subconjunto)
+
+Testes:
+- npm test → 47/47
+- npm run validate → funcional 183/183, offline 15/15, dedup/CO 44/44
+
+## 2026-06 — Dropdown do modal CO (Escala) mostrava feriados indisponíveis
+
+Problema:
+Ao abrir o modal CO pela Escala de Folga, o dropdown listava feriados já
+compensados, agendados, com data de compensação prevista ou já com CO lançado
+na escala (inclusive futuro). O Controle de Feriados (histórico) já estava correto.
+
+Causa raiz:
+Havia dois caminhos divergentes alimentando opções de CO — getAvailableHolidaysForCo
+(usado pelo dropdown) e getPendingCoHolidaysForEmployee (auto-vínculo). A checagem era
+por registro isolado, não por chave lógica. Quando o mesmo feriado existia em registros
+distintos (ex.: um Agendado com CO + um Pendente da escala, ids diferentes), o índice de
+CO mapeava só o id do Agendado; o registro Pendente, com outro id, escapava do filtro e
+aparecia no dropdown.
+
+Correção:
+Fonte única getAvailableCoHolidayOptions(employeeId, coDate, { company, data }) que agrupa
+por chave lógica (employeeId + empresa + nome normalizado + data trabalhada) e decide UMA
+opção por chave.
+
+Regras (dropdown CO):
+- feriado vinculado a ESTE CO (em edição) permanece selecionável;
+- se qualquer registro da chave estiver Agendado/Compensado, tiver compensationDate ou já
+  tiver CO na escala (qualquer data) → a chave inteira some (remove o Pendente duplicado);
+- caso contrário, oferece um único representante Pendente/Vencido;
+- exclui soft-deleted, duplicados, outro employeeId e outra empresa (escopo da aba ativa).
+- getAvailableHolidaysForCo e getPendingCoHolidaysForEmployee viram aliases da fonte única.
+
+Arquivos:
+- js/data.js (getAvailableCoHolidayOptions + aliases + export)
+- js/escala.js (modal CO usa getAvailableCoHolidayOptions)
+- scripts/test-holiday-deduplication.mjs (cenários do dropdown CO)
+
+Escopo:
+O erro estava apenas na montagem das opções do modal CO da Escala. O histórico do
+Controle de Feriados não foi alterado.
+
+Testes:
+- npm test → 47/47
+- npm run validate → funcional 183/183, offline 15/15, dedup/CO 39/39
+
+## 2026-06 — Feriados duplicados (cadastro, filtro e histórico)
+
+Problema:
+No filtro "Feriado" do Controle de Feriados apareciam feriados repetidos (ex.: Ano Novo
+2026, Corpus Christi). Existiam registros duplicados com mesma data + nome e ids diferentes.
+
+Causa raiz:
+Já existia função de deduplicação (findOrMergeDuplicateHolidays), porém nunca era chamada
+em tempo de execução — só em scripts. A normalização de carga (mergeHolidayLists) deduplica
+apenas por id; o calendário global (state.calendarHolidays) não tinha dedup por nome + data;
+e o dropdown listava todos os data.holidays (incluindo soft-deletados e duplicados).
+
+Correção:
+- Dedup por bloco de empresa (mergeDuplicateHolidaysInBlock) agora roda automaticamente e de
+  forma idempotente a cada carga, dentro de normalizeCompanyHolidays.
+- Novo dedupeCalendarHolidays() (chave nome + data, unindo empresas) chamado em
+  finalizeIncomingState.
+- Dropdown "Feriado" passa a ignorar isDeleted e deduplicar por nome + data.
+- Modal CO ignora feriados soft-deletados.
+
+Regras (dedup):
+- Chave de unicidade: data + nome normalizado (por empresa/aplicação).
+- Registro canônico = o mais completo; vínculo Compensado/Agendado nunca vira Pendente.
+- Remoção por soft delete (isDeleted/deletedAt); nunca destrutiva.
+- Vínculos CO (manualScale.linkedHolidayId e item.linkedHolidayId) são religados do id removido
+  para o id canônico, preservando o vínculo.
+- Empresas/funcionários diferentes podem ter o mesmo feriado sem conflito.
+
+Arquivos:
+- js/data.js, js/feriados.js
+- scripts/test-holiday-deduplication.mjs, scripts/migrate-deduplicate-holidays.mjs
+
+Migração:
+node scripts/migrate-deduplicate-holidays.mjs — idempotente; dados em produção são limpos no
+próximo carregamento de cada navegador (normalizeCompanyHolidays + dedupeCalendarHolidays).
+
 ## 2026-06 — Fase 3A Segurança Operacional
 
 Objetivo:
