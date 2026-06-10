@@ -621,6 +621,28 @@
     return next;
   }
 
+  /**
+   * Quando o remoto vence o merge de calendarHolidays, reanexa apenas as
+   * entradas do seed 2026 criadas localmente (ids "cal-seed-2026-*") que ainda
+   * não existem no remoto — sem isso, o seed seria perdido na primeira
+   * sincronização e a flag impediria nova tentativa.
+   */
+  function preserveSeededCalendarHolidays(remoteList, localList) {
+    const result = [...(remoteList || [])];
+    (localList || []).forEach((holiday) => {
+      const id = String(holiday?.id || "");
+      if (!id.startsWith("cal-seed-2026-")) return;
+      const seed = HOLIDAY_SEEDS_2026.find((item) => `cal-seed-2026-${item.slug}` === id);
+      const alreadyInRemote = result.some(
+        (item) =>
+          item?.id === id ||
+          (seed && String(item?.date || "").startsWith("2026") && holidayNameMatchesSeed(item?.name, seed))
+      );
+      if (!alreadyInRemote) result.push(holiday);
+    });
+    return result;
+  }
+
   function mergeRemoteIntoLocal(localState, remoteState) {
     if (!localState) return finalizeIncomingState(remoteState);
     if (!remoteState) return finalizeIncomingState(localState);
@@ -639,7 +661,7 @@
       },
       escalaSelectedYearMonth: local.escalaSelectedYearMonth || remote.escalaSelectedYearMonth || monthKey(),
       calendarHolidays: (remote.calendarHolidays || []).length
-        ? remote.calendarHolidays
+        ? preserveSeededCalendarHolidays(remote.calendarHolidays, local.calendarHolidays)
         : local.calendarHolidays || [],
       coverageAlerts: (remote.coverageAlerts || []).length ? remote.coverageAlerts : local.coverageAlerts || [],
       coveragePrincipalBindings: {
@@ -2531,8 +2553,89 @@
     });
   }
 
+  /**
+   * Feriados de 2026 que precisam ficar disponíveis para vincular funcionários
+   * pendentes de compensação (Pengold e Chez Pitu). Apenas ADICIONA quando o
+   * feriado ainda não existe — nunca altera ou remove lançamentos existentes.
+   */
+  const HOLIDAY_SEED_FLAG_KEY = "chezPituHolidaySeed2026.v1";
+  const HOLIDAY_SEEDS_2026 = [
+    {
+      slug: "semana-santa",
+      name: "Semana Santa",
+      date: "2026-04-03",
+      type: "nacional",
+      aliases: ["semana santa", "sexta-feira santa", "sexta feira santa", "sexta-feira da paixao", "paixao de cristo"]
+    },
+    { slug: "tiradentes", name: "Tiradentes", date: "2026-04-21", type: "nacional", aliases: ["tiradentes"] },
+    { slug: "sao-jorge", name: "São Jorge", date: "2026-04-23", type: "estadual", aliases: ["sao jorge", "dia de sao jorge"] }
+  ];
+
+  function holidayNameMatchesSeed(name, seed) {
+    const normalized = normalizeSearchText(name);
+    return seed.aliases.some((alias) => normalized === normalizeSearchText(alias));
+  }
+
+  function companySlug(company) {
+    return normalizeSearchText(company).replace(/[^a-z0-9]+/g, "-");
+  }
+
+  function seedComplianceHolidays2026() {
+    try {
+      if (localStorage.getItem(HOLIDAY_SEED_FLAG_KEY)) return false;
+    } catch (_) {
+      /* ignore */
+    }
+
+    let changed = false;
+    if (!Array.isArray(state.calendarHolidays)) state.calendarHolidays = [];
+
+    HOLIDAY_SEEDS_2026.forEach((seed) => {
+      const inCalendar = state.calendarHolidays.some(
+        (holiday) => String(holiday?.date || "").startsWith("2026") && holidayNameMatchesSeed(holiday?.name, seed)
+      );
+      if (!inCalendar) {
+        state.calendarHolidays.push({
+          id: `cal-seed-2026-${seed.slug}`,
+          date: seed.date,
+          name: seed.name,
+          type: seed.type,
+          companies: ["ambas"]
+        });
+        changed = true;
+      }
+
+      getCompanies().forEach((company) => {
+        const data = getCompanyData(company);
+        if (!data) return;
+        if (!Array.isArray(data.holidays)) data.holidays = [];
+        const exists = data.holidays.some(
+          (holiday) => String(holiday?.date || "").startsWith("2026") && holidayNameMatchesSeed(holiday?.name, seed)
+        );
+        if (exists) return;
+        data.holidays.push({
+          id: `feriado-seed-2026-${seed.slug}-${companySlug(company)}`,
+          name: seed.name,
+          date: seed.date,
+          workedEmployees: []
+        });
+        changed = true;
+      });
+    });
+
+    try {
+      localStorage.setItem(HOLIDAY_SEED_FLAG_KEY, todayISO());
+    } catch (_) {
+      /* ignore */
+    }
+
+    if (changed) saveState();
+    return changed;
+  }
+
   migrateEmployeeSources();
   purgeMockEmployees();
+  seedComplianceHolidays2026();
 
   window.AppData = {
     COMPANIES,

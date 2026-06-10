@@ -91,6 +91,25 @@ Havia duplicidade de seletor de empresa na sub aba Resumo.
 Correção:
 Manter apenas um seletor de empresa alinhado com mês, ano e botão Imprimir/PDF.
 
+## 2026-06 — Seed de feriados 2026
+
+Problema:
+A primeira versão do seed de feriados 2026 (Semana Santa 03/04, Tiradentes 21/04, São Jorge 23/04) foi revertida (commit ee762de): quando o remoto vencia o merge de calendarHolidays, o seed local era descartado e a flag chezPituHolidaySeed2026.v1 impedia nova tentativa — o seed se perdia na primeira sincronização com o Firebase.
+
+Correção:
+Nova implementação em js/data.js:
+- seedComplianceHolidays2026 só ADICIONA feriados inexistentes (calendário com escopo "ambas" + Controle de Feriados das 2 empresas), com matching por aliases de nome (ex.: "Sexta-feira Santa" = "Semana Santa") para não duplicar lançamentos existentes.
+- preserveSeededCalendarHolidays reanexa os seeds locais (ids "cal-seed-2026-*") quando o remoto vence o merge de calendarHolidays.
+
+Regra:
+Seeds de feriados nunca alteram nem removem lançamentos existentes (workedEmployees preservados).
+
+Validação:
+- scripts/test-seed-2026.mjs (temporário, não versionar): 15/15 OK.
+- npm test: 15/15 OK. npm run validate: sem erros.
+
+Observação de comportamento existente: normalizeWorkedEmployeeRefs descarta workedEmployees cujo employeeId não corresponde a funcionário cadastrado na empresa.
+
 ## 2026-05 — Deploy
 
 Projeto conectado:
