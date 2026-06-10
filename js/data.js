@@ -816,7 +816,7 @@
    * (data 2026 + nome normalizado, com variantes) e executado uma única vez
    * por dispositivo (flag em localStorage).
    */
-  const HOLIDAY_SEED_2026_FLAG = "chezPituHolidaySeed2026.v1";
+  const HOLIDAY_SEED_2026_FLAG = "chezPituHolidaySeed2026.v2";
   const HOLIDAY_SEED_2026 = [
     {
       slug: "semana-santa",
@@ -2911,6 +2911,36 @@
     return true;
   }
 
+  function addManualWorkedEmployee(holidayId, employeeId, options = {}) {
+    const company = options.company || getPrimaryPageCompany("feriados");
+    const data = getCompanyData(company);
+    const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+    if (!holiday) return { ok: false, error: "Feriado não encontrado." };
+
+    const emp = (data.employees || []).find((e) => e.id === employeeId);
+    if (!emp) return { ok: false, error: "Funcionário não encontrado nesta empresa." };
+
+    const existing = (holiday.workedEmployees || []).find((item) => item.employeeId === employeeId);
+    if (existing) {
+      const resolved = resolveWorkedHolidayStatus(existing, holiday.date);
+      if (resolved.key === "compensado") return { ok: false, error: `${emp.name} já tem este feriado compensado.` };
+      if (resolved.key === "agendado") return { ok: false, error: `${emp.name} já tem compensação agendada para este feriado.` };
+      return { ok: false, error: `${emp.name} já está vinculado a este feriado.` };
+    }
+
+    if (!holiday.workedEmployees) holiday.workedEmployees = [];
+    holiday.workedEmployees.push({
+      employeeId,
+      status: "Pendente",
+      origin: "Manual",
+      compensationDate: "",
+      autoCreated: false
+    });
+
+    if (options.save !== false) saveState();
+    return { ok: true };
+  }
+
   function updateHoliday(id, patch = {}, options = {}) {
     const data = getCompanyData(options.company || getPrimaryPageCompany("feriados"));
     const list = data.holidays || [];
@@ -3941,6 +3971,7 @@
     auditHolidayConsistency,
     updateHoliday,
     removeWorkedEmployeeFromHoliday,
+    addManualWorkedEmployee,
     removeVacation,
     saveState,
     setManualScale,

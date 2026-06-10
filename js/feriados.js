@@ -332,6 +332,7 @@
           <td>${compensationDisplay}</td>
           <td><span class="pill ${badgeClass}">${status}</span></td>
           <td class="actions holiday-actions">
+            ${isFirstHolidayRow ? `<button class="link-button" data-add-worked-employee="${esc(line.holiday.id)}" type="button">+ Funcionário</button>` : ""}
             ${line.employeeId ? `<input class="compact-date" type="date" data-compensation-date="${line.holiday.id}|${line.employeeId}" value="${esc(line.compensationDate)}" title="Data de compensação">` : ""}
             ${line.employeeId ? `<button class="link-button danger" data-unlink-holiday="${line.holiday.id}|${line.employeeId}" type="button">Excluir vínculo</button>` : ""}
           </td>
@@ -596,7 +597,104 @@
     }, 0);
   }
 
+  function showAddWorkedEmployeeModal(holidayId, container) {
+    document.getElementById("addWorkedEmployeePicker")?.remove();
+
+    const company = AppData.getPrimaryPageCompany("feriados");
+    const data = AppData.getCompanyData(company);
+    const holiday = (data.holidays || []).find((h) => h.id === holidayId);
+    if (!holiday) return;
+
+    const linkedIds = new Set((holiday.workedEmployees || []).map((item) => item.employeeId));
+    const available = (data.employees || []).filter(
+      (emp) => AppData.isEmployeeActive(emp) && !linkedIds.has(emp.id)
+    );
+
+    if (!available.length) {
+      alert("Todos os funcionários ativos já estão vinculados a este feriado.");
+      return;
+    }
+
+    const empOptions = available
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      .map((emp) => `<option value="${esc(emp.id)}">${esc(emp.name)}</option>`)
+      .join("");
+
+    const picker = document.createElement("div");
+    picker.id = "addWorkedEmployeePicker";
+    picker.className = "co-holiday-picker";
+    picker.innerHTML = `
+      <p class="co-picker-title">Adicionar funcionário ao feriado</p>
+      <p class="co-picker-hint"><strong>${esc(holiday.name)}</strong> · ${esc(formatDateBR(holiday.date))} · ${esc(company)}</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+          Funcionário
+          <select id="addWorkedEmpSelect" class="field-select">
+            <option value="" disabled selected>Selecione o funcionário</option>
+            ${empOptions}
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+          Data trabalhada
+          <input type="date" value="${esc(holiday.date)}" readonly style="background:var(--bg-alt,#f5f5f5);cursor:not-allowed">
+        </label>
+        <p style="font-size:0.8rem;color:var(--text-muted,#888);margin:0">Status inicial: <strong>Pendente</strong> · Origem: <strong>Manual</strong></p>
+      </div>
+      <div class="co-picker-actions">
+        <button id="addWorkedEmpCancel" class="secondary btn-sm" type="button">Cancelar</button>
+        <button id="addWorkedEmpSave" class="primary btn-sm" type="button">Salvar vínculo</button>
+      </div>
+    `;
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    const wrapper = document.createElement("div");
+    wrapper.className = "modal-center";
+    wrapper.appendChild(picker);
+    backdrop.appendChild(wrapper);
+    document.body.appendChild(backdrop);
+
+    const close = () => backdrop.remove();
+    picker.querySelector("#addWorkedEmpCancel").addEventListener("click", close);
+
+    picker.querySelector("#addWorkedEmpSave").addEventListener("click", () => {
+      const employeeId = picker.querySelector("#addWorkedEmpSelect").value;
+      if (!employeeId) {
+        alert("Selecione um funcionário.");
+        return;
+      }
+      const result = AppData.addManualWorkedEmployee(holidayId, employeeId, { company });
+      if (!result.ok) {
+        alert(result.error);
+        return;
+      }
+      close();
+      if (container) {
+        refreshTable(container);
+      } else {
+        window.App?.renderCurrent?.();
+      }
+      window.App?.toast?.("Vínculo criado com sucesso.", "success");
+    });
+
+    setTimeout(() => {
+      const outsideClick = (e) => {
+        if (!wrapper.contains(e.target)) {
+          close();
+          document.removeEventListener("mousedown", outsideClick);
+        }
+      };
+      document.addEventListener("mousedown", outsideClick);
+    }, 0);
+  }
+
   function bindTableActions(container) {
+
+    container.querySelectorAll("[data-add-worked-employee]").forEach((button) => {
+      button.addEventListener("click", () => {
+        showAddWorkedEmployeeModal(button.dataset.addWorkedEmployee, container);
+      });
+    });
 
     container.querySelectorAll("[data-unlink-holiday]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -834,6 +932,33 @@
   }
 
   function bindCalendarHolidayRemoveButtons(root) {
+    root.querySelectorAll("[data-link-employee-cal]").forEach((button) => {
+      if (button.dataset.boundLinkEmployeeCal) return;
+      button.dataset.boundLinkEmployeeCal = "1";
+      button.addEventListener("click", () => {
+        const calendarHolidayId = button.dataset.linkEmployeeCal;
+        const calHoliday = (AppData.state.calendarHolidays || []).find((h) => h.id === calendarHolidayId);
+        if (!calHoliday) return;
+        const company = AppData.getPrimaryPageCompany("feriados");
+        // Garante que o feriado da empresa existe antes de abrir o modal
+        AppData.syncCompanyHolidaysFromCalendarEntry(
+          { name: calHoliday.name, date: calHoliday.date, companies: [company] },
+          { save: true }
+        );
+        const data = AppData.getCompanyData(company);
+        const companyHoliday = (data.holidays || []).find(
+          (h) =>
+            h.date === calHoliday.date &&
+            AppData.normalizeSearchText(h.name) === AppData.normalizeSearchText(calHoliday.name)
+        );
+        if (!companyHoliday) {
+          alert("Não foi possível localizar o feriado nesta empresa. Recarregue a página e tente novamente.");
+          return;
+        }
+        showAddWorkedEmployeeModal(companyHoliday.id, null);
+      });
+    });
+
     root.querySelectorAll("[data-remove-calendar-holiday]").forEach((button) => {
       if (button.dataset.boundRemoveCalendar) return;
       button.dataset.boundRemoveCalendar = "1";
@@ -1409,6 +1534,7 @@
                 <td>${esc(holiday.name)}</td>
                 <td>${esc(holiday.type || "nacional")}</td>
                 <td class="actions">
+                  <button class="link-button success" data-link-employee-cal="${esc(holiday.id)}" type="button">+ Funcionário</button>
                   <button class="link-button" data-edit-calendar-holiday="${esc(holiday.id)}" type="button">Editar</button>
                   <button class="link-button danger" data-remove-calendar-holiday="${esc(holiday.id)}" type="button">Excluir</button>
                 </td>
