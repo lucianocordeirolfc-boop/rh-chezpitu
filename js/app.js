@@ -136,6 +136,68 @@
       .join(" ");
   }
 
+  /** "20260610.02" -> "v2026.06.10.02" (fallback: prefixo "v"). */
+  function formatVersionDisplay(version) {
+    const match = String(version || "").match(/^(\d{4})(\d{2})(\d{2})\.(\d+)$/);
+    if (!match) return "v" + String(version || "dev");
+    return `v${match[1]}.${match[2]}.${match[3]}.${match[4]}`;
+  }
+
+  function showVersionModal() {
+    document.getElementById("appVersionModal")?.remove();
+    const info = AppData.getSystemVersion();
+    const versionLabel = formatVersionDisplay(info.version);
+
+    const picker = document.createElement("div");
+    picker.id = "appVersionModal";
+    picker.className = "co-holiday-picker";
+    picker.innerHTML = `
+      <p class="co-picker-title">Informações da versão</p>
+      <table class="version-info-table">
+        <tbody>
+          <tr><th>Versão</th><td>${escapeHTML(versionLabel)}</td></tr>
+          <tr><th>Ambiente</th><td>${escapeHTML(info.environment)}</td></tr>
+          <tr><th>Data da publicação</th><td>${escapeHTML(info.buildDate || "—")}</td></tr>
+          <tr><th>Branch</th><td>${escapeHTML(info.branch || "—")}</td></tr>
+          <tr><th>Último commit</th><td>${escapeHTML(info.commit || "—")}</td></tr>
+        </tbody>
+      </table>
+      <div class="co-picker-actions">
+        <button id="appVersionModalClose" class="primary btn-sm" type="button">Fechar</button>
+      </div>
+    `;
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    const wrapper = document.createElement("div");
+    wrapper.className = "modal-center";
+    wrapper.appendChild(picker);
+    backdrop.appendChild(wrapper);
+    document.body.appendChild(backdrop);
+
+    const close = () => backdrop.remove();
+    picker.querySelector("#appVersionModalClose").addEventListener("click", close);
+    setTimeout(() => {
+      const outsideClick = (e) => {
+        if (!wrapper.contains(e.target)) {
+          close();
+          document.removeEventListener("mousedown", outsideClick);
+        }
+      };
+      document.addEventListener("mousedown", outsideClick);
+    }, 0);
+  }
+
+  /** Cabeçalho: badge de versão com ambiente (ex.: "v2026.06.10.02 | PRODUÇÃO"). */
+  function setupVersionBadge() {
+    const badge = document.getElementById("appVersionBadge");
+    if (!badge) return;
+    const info = AppData.getSystemVersion();
+    badge.textContent = `${formatVersionDisplay(info.version)} | ${info.environment}`;
+    badge.title = `Versão ${formatVersionDisplay(info.version)} · ${info.environment} · commit ${info.commit || "—"}`;
+    badge.addEventListener("click", showVersionModal);
+  }
+
   window.App = {
     escapeHTML,
     esc: escapeHTML,
@@ -143,7 +205,8 @@
     renderCurrent,
     render,
     updateCompanyTabsUI,
-    toast
+    toast,
+    showVersionModal
   };
 
   function collectScaleMonths() {
@@ -220,6 +283,7 @@
 
     setupCompanyTabs();
     setupRibbon();
+    setupVersionBadge();
 
     // Fase 2 — propaga a empresa ativa (aba) para todo o sistema, sem apagar dados.
     AppData.setActiveCompany(AppData.getActiveCompany(), { save: false });

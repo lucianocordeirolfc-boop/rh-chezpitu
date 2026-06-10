@@ -929,6 +929,35 @@
     return base;
   }
 
+  /**
+   * Detecta o ambiente de execução a partir da URL.
+   * file:// ou localhost → LOCAL; *.netlify.app → PRODUÇÃO.
+   */
+  function detectEnvironment() {
+    if (typeof window === "undefined" || !window.location) return "LOCAL";
+    const loc = window.location;
+    if (loc.protocol === "file:") return "LOCAL";
+    const host = loc.hostname || "";
+    if (/netlify\.app$/i.test(host)) return "PRODUÇÃO";
+    if (host === "localhost" || host === "127.0.0.1" || host === "") return "LOCAL";
+    return "PRODUÇÃO";
+  }
+
+  /**
+   * Auditoria de versão (item F). Consome a fonte única js/version.js
+   * (window.APP_BUILD_INFO). Retorna { version, environment, buildDate, branch, commit }.
+   */
+  function getSystemVersion() {
+    const info = (typeof window !== "undefined" && window.APP_BUILD_INFO) || {};
+    return {
+      version: info.APP_VERSION || "dev",
+      environment: detectEnvironment(),
+      buildDate: info.BUILD_DATE || "",
+      branch: info.BUILD_BRANCH || "",
+      commit: info.BUILD_COMMIT || ""
+    };
+  }
+
   function migrateVtStorage(targetState) {
     if (!targetState) return targetState;
     if (!targetState.valeTransporte) targetState.valeTransporte = createDefaultState().valeTransporte;
@@ -3969,6 +3998,7 @@
     correctPadroeiraBuziosAutomatically,
     applyHolidaySeed2026,
     auditHolidayConsistency,
+    getSystemVersion,
     updateHoliday,
     removeWorkedEmployeeFromHoliday,
     addManualWorkedEmployee,

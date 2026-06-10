@@ -407,6 +407,48 @@ button.stat-chip.module-company-chip.is-active {
   color: #a32b2b;
 }
 
+.app-version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: var(--sand);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.app-version-badge:hover {
+  border-color: var(--sea-200);
+  background: var(--sea-100);
+  color: var(--sea-700);
+}
+
+.version-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.85rem;
+}
+
+.version-info-table th,
+.version-info-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.version-info-table th {
+  width: 42%;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 h1,
 h2 {
   margin: 0;
@@ -935,6 +977,13 @@ tbody tr:hover {
 .feriados-quick-nav {
   flex: 1;
   min-width: 0;
+}
+
+.feriados-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
 }
 
 button.stat-chip.feriados-nav-chip {

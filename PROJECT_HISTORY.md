@@ -2,6 +2,65 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06-10 — Fase 3C: Vínculo manual funcionário × feriado + Controle de versão visível
+
+### Parte 1 — Botão global "+ Vincular funcionário a feriado"
+
+Problema:
+A vinculação manual implementada antes só existia dentro de linhas da tabela
+(botão "+ Funcionário" por linha) e no popup. Quando o filtro não retornava
+resultados (ex.: "Tiradentes" → "Nenhum resultado"), não havia linha e o botão
+sumia. Acrescido de cache `?v=` não incrementado, a funcionalidade não chegava
+à interface real.
+
+Solução definitiva (js/feriados.js):
+- Botão GLOBAL `#openLinkEmployeeHoliday` no topo do Controle de Feriados, ao
+  lado de "+ Cadastrar feriado". Sempre visível, mesmo com tabela vazia/filtrada.
+- `showLinkEmployeeToHolidayModal()`: modal com Feriado (cadastrados da empresa
+  ativa) + Funcionário (ativos da empresa ativa) + Data trabalhada (auto pelo
+  feriado, travada) + labels Pendente/Manual + Salvar vínculo.
+- `addManualWorkedEmployee()` (js/data.js): grava `{ employeeId, status:
+  "Pendente", origin: "Manual", compensationDate: "" }`. Bloqueia duplicidade
+  por employeeId (Pendente/Agendado/Compensado → aviso, não cria).
+- Vincula apenas o funcionário selecionado; nunca todos. employeeId como chave.
+
+### Parte 2 — Controle de versão visível
+
+- `js/version.js`: FONTE ÚNICA `APP_VERSION` (formato AAAAMMDD.RR). Único ponto
+  a editar; expõe `window.APP_BUILD_INFO`.
+- `AppData.getSystemVersion()` (js/data.js): `{ version, environment, buildDate,
+  branch, commit }`. `detectEnvironment()`: file://localhost → LOCAL;
+  *.netlify.app → PRODUÇÃO.
+- Badge `#appVersionBadge` no cabeçalho (index.html), ao lado de "Sincronizado":
+  exibe `v2026.06.10.02 | LOCAL|PRODUÇÃO`. Clique abre modal de auditoria
+  (`setupVersionBadge`/`showVersionModal` em js/app.js).
+- `scripts/bump-cache.js` reescrito: lê `APP_VERSION` e propaga para todos os
+  `?v=` do index.html; carimba branch/commit/data reais do git. Cache e versão
+  exibida ficam sempre idênticos.
+
+Arquivos:
+- js/feriados.js (botão global + modal + listener)
+- js/data.js (addManualWorkedEmployee, getSystemVersion, detectEnvironment, exports)
+- js/app.js (badge + modal de versão)
+- js/version.js (NOVO — fonte única da versão)
+- index.html (script version.js + badge + bump ?v=20260610.02)
+- css/style.css (.feriados-toolbar-actions, .app-version-badge, .version-info-table)
+- scripts/bump-cache.js (derivado de APP_VERSION + git stamp)
+- scripts/verify-vinculo-manual.mjs (NOVO — homologação temporária, não versionar)
+
+Versão de cache: 20260610.02 (exibida v2026.06.10.02).
+
+Testes:
+- npm test → 47/47
+- npm run validate → 267 checks, 0 falhas
+- verify-vinculo-manual.mjs → 24/24 (criação Pendente/Manual, bloqueio de
+  duplicidade, visibilidade no modal CO p/ vinculados e ocultação p/ não
+  vinculados, getSystemVersion)
+
+Pendência: commit/push/deploy aguardando autorização (regra CLAUDE.md). A
+validação em produção (aba anônima em rh-chezpitu.netlify.app) só é possível
+após deploy.
+
 ## 2026-06-10 — Fase 3B: Feriados de abril/2026 ausentes para vinculação de CO (CORRIGIDO)
 
 Problema:

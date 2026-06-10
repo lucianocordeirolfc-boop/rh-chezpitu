@@ -688,6 +688,126 @@
     }, 0);
   }
 
+  /**
+   * Modal global "+ Vincular funcionário a feriado".
+   * Disponível sempre no topo do Controle de Feriados, mesmo sem linhas na tabela.
+   * Permite escolher o feriado (cadastrado na empresa da aba ativa) E o funcionário
+   * (ativo, da mesma empresa) num único passo. A data trabalhada é a do feriado.
+   */
+  function showLinkEmployeeToHolidayModal(container) {
+    document.getElementById("linkEmployeeHolidayPicker")?.remove();
+
+    const company = AppData.getPrimaryPageCompany("feriados");
+    const data = AppData.getCompanyData(company);
+
+    const holidays = (data.holidays || [])
+      .filter((h) => !h.isDeleted)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const employees = (data.employees || [])
+      .filter((emp) => AppData.isEmployeeActive(emp))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+    if (!holidays.length) {
+      alert(`Nenhum feriado cadastrado para ${company}. Use "+ Cadastrar feriado" antes de vincular funcionários.`);
+      return;
+    }
+    if (!employees.length) {
+      alert(`Nenhum funcionário ativo em ${company}.`);
+      return;
+    }
+
+    const holidayOptions = [
+      `<option value="" disabled selected>Selecione o feriado</option>`,
+      ...holidays.map(
+        (h) => `<option value="${esc(h.id)}" data-holiday-date="${esc(h.date)}">${esc(h.name)} (${esc(formatDateBR(h.date))})</option>`
+      )
+    ].join("");
+
+    const employeeOptions = [
+      `<option value="" disabled selected>Selecione o funcionário</option>`,
+      ...employees.map((emp) => `<option value="${esc(emp.id)}">${esc(emp.name)}</option>`)
+    ].join("");
+
+    const picker = document.createElement("div");
+    picker.id = "linkEmployeeHolidayPicker";
+    picker.className = "co-holiday-picker";
+    picker.innerHTML = `
+      <p class="co-picker-title">Vincular funcionário a feriado</p>
+      <p class="co-picker-hint">Empresa da aba ativa: <strong>${esc(company)}</strong>.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+          Feriado
+          <select id="linkHolidaySelect" class="field-select">${holidayOptions}</select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+          Funcionário
+          <select id="linkEmployeeSelect" class="field-select">${employeeOptions}</select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+          Data trabalhada
+          <input id="linkWorkedDate" type="date" readonly class="field-select" style="background:var(--bg-alt,#f5f5f5);cursor:not-allowed">
+        </label>
+        <p style="font-size:0.8rem;color:var(--text-muted,#888);margin:0">Status inicial: <strong>Pendente</strong> · Origem: <strong>Manual</strong> · Sem data de compensação.</p>
+      </div>
+      <div class="co-picker-actions">
+        <button id="linkEmployeeHolidayCancel" class="secondary btn-sm" type="button">Cancelar</button>
+        <button id="linkEmployeeHolidaySave" class="primary btn-sm" type="button">Salvar vínculo</button>
+      </div>
+    `;
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    const wrapper = document.createElement("div");
+    wrapper.className = "modal-center";
+    wrapper.appendChild(picker);
+    backdrop.appendChild(wrapper);
+    document.body.appendChild(backdrop);
+
+    const close = () => backdrop.remove();
+    const holidaySelect = picker.querySelector("#linkHolidaySelect");
+    const dateInput = picker.querySelector("#linkWorkedDate");
+
+    const syncDate = () => {
+      const selected = holidaySelect.selectedOptions[0];
+      dateInput.value = selected?.dataset?.holidayDate || "";
+    };
+    holidaySelect.addEventListener("change", syncDate);
+
+    picker.querySelector("#linkEmployeeHolidayCancel").addEventListener("click", close);
+
+    picker.querySelector("#linkEmployeeHolidaySave").addEventListener("click", () => {
+      const holidayId = holidaySelect.value;
+      const employeeId = picker.querySelector("#linkEmployeeSelect").value;
+      if (!holidayId) {
+        alert("Selecione o feriado.");
+        return;
+      }
+      if (!employeeId) {
+        alert("Selecione o funcionário.");
+        return;
+      }
+      const result = AppData.addManualWorkedEmployee(holidayId, employeeId, { company });
+      if (!result.ok) {
+        alert(result.error);
+        return;
+      }
+      close();
+      if (container) refreshTable(container);
+      window.App?.renderCurrent?.();
+      window.App?.toast?.("Vínculo criado com sucesso.", "success");
+    });
+
+    setTimeout(() => {
+      const outsideClick = (e) => {
+        if (!wrapper.contains(e.target)) {
+          close();
+          document.removeEventListener("mousedown", outsideClick);
+        }
+      };
+      document.addEventListener("mousedown", outsideClick);
+    }, 0);
+  }
+
   function bindTableActions(container) {
 
     container.querySelectorAll("[data-add-worked-employee]").forEach((button) => {
@@ -1248,6 +1368,10 @@
   }
 
   function bindStaticEvents(container) {
+    container.querySelector("#openLinkEmployeeHoliday")?.addEventListener("click", () => {
+      showLinkEmployeeToHolidayModal(container);
+    });
+
     container.querySelector("#openHolidayRegister")?.addEventListener("click", () => {
       openHolidayRegisterPopup(container);
     });
@@ -1565,7 +1689,10 @@
         <div class="dash-metrics feriados-quick-nav" data-holiday-quick-nav>
           ${renderQuickNav(allLines, lineStats, autoPendingCount)}
         </div>
-        <button type="button" class="primary" id="openHolidayRegister">+ Cadastrar feriado</button>
+        <div class="feriados-toolbar-actions">
+          <button type="button" class="primary" id="openLinkEmployeeHoliday">+ Vincular funcionário a feriado</button>
+          <button type="button" class="primary" id="openHolidayRegister">+ Cadastrar feriado</button>
+        </div>
       </div>
 
       <article class="card card-compact">
