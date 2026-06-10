@@ -71,8 +71,9 @@ function loadCore(storage) {
 }
 
 function countVtWorkedDays(employee, yearMonth, data, AppData) {
+  // Espelha a produção: VT usa a fonte única AppData.isWorkedScaleCode.
   return AppData.getDaysInMonth(yearMonth).filter((day) =>
-    AppData.VT_WORKED_CODES.has(AppData.getScaleCode(employee, day, data))
+    AppData.isWorkedScaleCode(AppData.getScaleCode(employee, day, data))
   ).length;
 }
 
@@ -435,12 +436,14 @@ function validateFeriados(AppData, chez) {
   const pengOnlyId = "h-peng-only-test";
   peng.holidays.push({ id: pengOnlyId, name: "Feriado Pengold", date: "2026-08-15", workedEmployees: [] });
   AppData.removeHoliday(pengOnlyId, { company: "Pengold", save: false });
+  // Fase 3A — Soft delete: feriado continua existindo mas marcado como deletado
+  const deletedHoliday = peng.holidays.find((h) => h.id === pengOnlyId);
   assert(
     area,
-    !peng.holidays.some((h) => h.id === pengOnlyId) && chez.holidays.length > 0,
-    "removeHoliday respeita empresa do filtro Feriados (não apaga bloco errado)",
+    deletedHoliday?.isDeleted === true && chez.holidays.length > 0,
+    "removeHoliday respeita empresa do filtro Feriados (soft delete — não apaga bloco errado)",
     ["js/data.js", "js/feriados.js"],
-    "removeHoliday(id, { company })"
+    "removeHoliday(id, { company }) — Fase 3A soft delete"
   );
   AppData.setPageCompany("feriados", "Chez Pitu", { save: false });
 }
@@ -582,6 +585,37 @@ function validatePadroeiraBuzios(AppData) {
     "Merge Firebase remoto não reintroduz Padroeira em 21/05",
     ["js/data.js", "js/firebase-sync.js"],
     "migratePadroeiraBuziosHoliday após mergeRemoteIntoLocal"
+  );
+
+  // Idempotência: aplicar a migração repetidas vezes não altera o resultado (sempre 26/07).
+  const idempotentState = {
+    calendarHolidays: [
+      { id: "cal-idem", name: "Padroeira de Búzios", date: "2028-05-21", companies: ["ambas"] }
+    ],
+    companies: {
+      "Chez Pitu": {
+        holidays: [
+          { id: "h-idem", name: "Padroeira de Búzios", date: "2028-05-21", workedEmployees: [] }
+        ]
+      }
+    }
+  };
+  const firstPass = AppData.migratePadroeiraBuziosHoliday(idempotentState);
+  const secondPass = AppData.migratePadroeiraBuziosHoliday(idempotentState);
+  assert(
+    area,
+    firstPass === true && secondPass === false,
+    "Migração idempotente: corrige na 1ª passada e não muta mais nas seguintes",
+    ["js/data.js"],
+    "migratePadroeiraBuziosHoliday retorna false quando já está correto"
+  );
+  assert(
+    area,
+    idempotentState.calendarHolidays[0].date === "2028-07-26" &&
+      idempotentState.companies["Chez Pitu"].holidays[0].date === "2028-07-26",
+    "Migração idempotente força 26/07 em calendário e empresa",
+    ["js/data.js"],
+    "—"
   );
 }
 
@@ -1127,10 +1161,12 @@ function validateCadastroSingleFilter() {
   );
   assert(
     area,
-    html.includes("return allEmployees;") && html.includes("applyPageCompanyToEmployeeList"),
-    "Lista de funcionários não depende de pageFilters.funcionarios",
+    html.includes("applyPageCompanyToEmployeeList") &&
+      html.includes("AppData.getActiveCompany()") &&
+      !html.includes('id="employeeFilterCompany"'),
+    "Cadastro lista apenas a empresa da aba ativa, sem seletor interno de empresa (Fase 2)",
     ["js/funcionarios.js"],
-    "applyPageCompanyToEmployeeList"
+    "applyPageCompanyToEmployeeList filtra por getActiveCompany; seletor de empresa removido"
   );
   assert(
     area,
@@ -1303,10 +1339,12 @@ function validateContador(AppData, chez, peng, ym) {
   const printHtml = fs.readFileSync(path.join(root, "js/contador.js"), "utf8");
   assert(
     area,
-    !printHtml.includes("resumoCompanySelect") && printHtml.includes('id="contadorPageCompany"'),
-    "Contador: um único seletor de empresa na toolbar (sem duplicata no Resumo)",
+    !printHtml.includes("resumoCompanySelect") &&
+      !printHtml.includes('id="contadorPageCompany"') &&
+      printHtml.includes('AppData.getPrimaryPageCompany("contador")'),
+    "Contador sem seletor interno de empresa — contexto vem da aba ativa (Fase 2)",
     ["js/contador.js"],
-    "—"
+    "Empresa definida pela aba; contador lê getPrimaryPageCompany('contador')"
   );
   assert(
     area,
@@ -1315,6 +1353,493 @@ function validateContador(AppData, chez, peng, ym) {
     ["js/contador.js"],
     "Confirmar visualmente no browser: Imprimir / PDF no tab Resumo"
   );
+}
+
+function validateWorkedSourceOfTruth(AppData) {
+  const area = "Fonte única — dia trabalhado";
+
+  const notWorked = ["FOLGA", "DOM", "FÉRIAS", "CO", "ATESTADO", "FALTA", "SUSPENSÃO", "LICENÇA"];
+  notWorked.forEach((code) => {
+    assert(
+      area,
+      AppData.isWorkedScaleCode(code) === false,
+      `Código ${code} não conta como dia trabalhado (VT/Escala/Feriados/Dashboard)`,
+      ["js/data.js", "js/vale-transporte.js", "js/scale-rules.js"],
+      "isWorkedScaleCode (fonte única)"
+    );
+  });
+
+  ["", "MM", "TM", "MR", "TR", "NR", "NO", "MN", "TN", "NM"].forEach((code) => {
+    assert(
+      area,
+      AppData.isWorkedScaleCode(code) === true,
+      `Código "${code || "(vazio)"}" conta como dia trabalhado`,
+      ["js/data.js"],
+      "—"
+    );
+  });
+
+  assert(
+    area,
+    [...AppData.VT_WORKED_CODES].every((code) => AppData.isWorkedScaleCode(code)),
+    "VT_WORKED_CODES sem divergência com a fonte única (config padrão)",
+    ["js/data.js", "js/vale-transporte.js"],
+    "VT delega a isWorkedScaleCode"
+  );
+
+  assert(
+    area,
+    ["CO", "FÉRIAS", "ATESTADO", "LICENÇA", "FALTA", "TM", "", "MR"].every(
+      (code) => AppData.isWorkedScaleCode(code) === !AppData.isNotWorkedScaleCode(code)
+    ),
+    "isWorkedScaleCode e isNotWorkedScaleCode são complementares",
+    ["js/data.js"],
+    "—"
+  );
+
+  AppData.state.scaleCodeConfig = { TM: "not-worked", FALTA: "worked" };
+  assert(
+    area,
+    AppData.isWorkedScaleCode("TM") === false && AppData.isWorkedScaleCode("FALTA") === true,
+    "scaleCodeConfig sobrepõe a fonte única para todos os módulos (sem divergência VT × Escala)",
+    ["js/data.js", "js/scale-rules.js"],
+    "scaleCodeConfig respeitado em isWorkedScaleCode"
+  );
+  AppData.state.scaleCodeConfig = {};
+  assert(
+    area,
+    AppData.isWorkedScaleCode("TM") === true && AppData.isWorkedScaleCode("FALTA") === false,
+    "Reset de scaleCodeConfig retorna ao default canônico",
+    ["js/data.js"],
+    "—"
+  );
+}
+
+function validateCompanyWriteResolution(AppData, chez, peng) {
+  const area = "Gravação por empresa (employeeId)";
+
+  assert(
+    area,
+    AppData.resolveCompanyForEmployeeWrite("chez-1", "Pengold", "vale-transporte") === "Chez Pitu",
+    "Empresa de gravação resolve por employeeId mesmo com empresa errada no parâmetro",
+    ["js/data.js"],
+    "resolveCompanyForEmployeeWrite"
+  );
+  assert(
+    area,
+    AppData.resolveCompanyForEmployeeWrite("peng-1", "Chez Pitu", "ferias") === "Pengold",
+    "Funcionário Pengold grava em Pengold mesmo com filtro Chez Pitu",
+    ["js/data.js"],
+    "—"
+  );
+  assert(
+    area,
+    AppData.resolveCompanyForEmployeeWrite("nao-existe", "Pengold", "ferias") === "Pengold",
+    "employeeId inexistente: fallback seguro usa a empresa explícita (bloco)",
+    ["js/data.js"],
+    "fallback + alerta"
+  );
+
+  AppData.setVtDeduction("chez-1", "2026-09", "7", { company: "Pengold", save: false });
+  assert(
+    area,
+    AppData.getVtDeduction("chez-1", "2026-09", null, "Chez Pitu") === 7,
+    "setVtDeduction grava na empresa real (Chez Pitu) apesar de company=Pengold",
+    ["js/data.js", "js/vale-transporte.js"],
+    "setVtDeduction usa resolveCompanyForEmployeeWrite"
+  );
+  assert(
+    area,
+    AppData.getVtDeduction("chez-1", "2026-09", null, "Pengold") === 0,
+    "Desconto VT não vaza para a empresa do filtro (Pengold)",
+    ["js/data.js"],
+    "—"
+  );
+
+  AppData.setPageCompany("ferias", "Pengold", { save: false });
+  AppData.addAbsence(
+    { employeeId: "chez-1", type: "Falta justificada", startDate: "2026-09-03", endDate: "2026-09-03" },
+    null
+  );
+  assert(
+    area,
+    chez.absences.some((a) => a.startDate === "2026-09-03") &&
+      !peng.absences.some((a) => a.startDate === "2026-09-03"),
+    "Ausência sem empresa explícita grava no bloco do funcionário (Chez Pitu), não no filtro (Pengold)",
+    ["js/data.js", "js/ferias.js"],
+    "addAbsence usa resolveCompanyForEmployeeWrite"
+  );
+  AppData.setPageCompany("ferias", "Chez Pitu", { save: false });
+
+  const movedEmp = chez.employees.find((e) => e.id === "chez-1");
+  AppData.setManualScale("chez-1", "2026-09-10", "FOLGA", null, "Pengold");
+  assert(
+    area,
+    chez.manualScale["chez-1|2026-09-10"] === "FOLGA" && !peng.manualScale["chez-1|2026-09-10"],
+    "setManualScale grava na empresa real do funcionário mesmo com company=Pengold",
+    ["js/data.js", "js/escala.js"],
+    "setManualScale usa resolveCompanyForEmployeeWrite"
+  );
+  assert(
+    area,
+    Boolean(movedEmp) && AppData.getScaleCode(movedEmp, "2026-09-10", chez) === "FOLGA",
+    "Lançamento manual reflete na escala da empresa correta",
+    ["js/data.js"],
+    "—"
+  );
+  delete chez.manualScale["chez-1|2026-09-10"];
+  chez.absences = chez.absences.filter((a) => a.startDate !== "2026-09-03");
+}
+
+function validateActiveCompanyTabs(AppData, chez, peng, ym) {
+  const area = "Abas de empresa (Fase 2)";
+  const pageModules = ["dashboard", "funcionarios", "escala", "ferias", "vale-transporte", "feriados", "contador"];
+
+  // Aba Chez Pitu: contexto único propaga para todos os módulos
+  AppData.setActiveCompany("Chez Pitu", { save: false });
+  assert(area, AppData.getActiveCompany() === "Chez Pitu", "Aba ativa = Chez Pitu", ["js/data.js"], "getActiveCompany");
+  assert(
+    area,
+    pageModules.every((m) => AppData.getPrimaryPageCompany(m) === "Chez Pitu"),
+    "Aba Chez Pitu propaga para todos os módulos (sem filtros internos)",
+    ["js/data.js", "js/app.js"],
+    "setActiveCompany propaga pageFilters"
+  );
+
+  const pengIdSet = new Set(peng.employees.map((e) => e.id));
+  const chezIdSet = new Set(chez.employees.map((e) => e.id));
+  const chezView = AppData.getCompanyData(AppData.getActiveCompany());
+  assert(
+    area,
+    chezView.employees.length > 0 && !chezView.employees.some((e) => pengIdSet.has(e.id)),
+    "Aba Chez Pitu não mostra dados Pengold",
+    ["js/data.js"],
+    "—"
+  );
+
+  const chezCountBefore = chez.employees.length;
+  const pengCountBefore = peng.employees.length;
+
+  // Troca para aba Pengold
+  AppData.setActiveCompany("Pengold", { save: false });
+  assert(
+    area,
+    AppData.getActiveCompany() === "Pengold" &&
+      pageModules.every((m) => AppData.getPrimaryPageCompany(m) === "Pengold"),
+    "Aba Pengold propaga para todos os módulos",
+    ["js/data.js"],
+    "—"
+  );
+  const pengView = AppData.getCompanyData(AppData.getActiveCompany());
+  assert(
+    area,
+    pengView.employees.length > 0 && !pengView.employees.some((e) => chezIdSet.has(e.id)),
+    "Aba Pengold não mostra dados Chez Pitu",
+    ["js/data.js"],
+    "—"
+  );
+
+  // Trocar aba não apaga dados de nenhuma empresa
+  assert(
+    area,
+    chez.employees.length === chezCountBefore && peng.employees.length === pengCountBefore,
+    "Trocar aba não apaga cadastro (Chez Pitu e Pengold preservados)",
+    ["js/data.js"],
+    "—"
+  );
+
+  // Escala/VT/Ausências/Feriados/Contador/Dashboard respeitam a empresa da aba
+  AppData.setActiveCompany("Chez Pitu", { save: false });
+  const empChez = chez.employees.find((e) => e.id === "chez-1");
+  assert(
+    area,
+    empChez && AppData.getScaleCode(empChez, "2026-05-12", AppData.getCompanyData(AppData.getPrimaryPageCompany("escala"))) === "ATESTADO",
+    "Escala respeita a empresa da aba (dados Chez Pitu)",
+    ["js/escala.js", "js/data.js"],
+    "—"
+  );
+  assert(
+    area,
+    AppData.getVtDeduction("chez-1", ym, null, AppData.getPrimaryPageCompany("vale-transporte")) >= 0 &&
+      AppData.getPrimaryPageCompany("vale-transporte") === "Chez Pitu",
+    "VT, Ausências, Feriados, Contador e Dashboard usam a empresa da aba ativa",
+    ["js/vale-transporte.js", "js/contador.js", "js/dashboard.js", "js/data.js"],
+    "getPrimaryPageCompany segue a aba"
+  );
+
+  // Persistência da aba após reload (F5) — não reseta dados
+  const storage2 = createStorage();
+  const snap = JSON.parse(JSON.stringify(AppData.state));
+  snap.activeCompany = "Pengold";
+  storage2.setItem("chezPituPeopleSystem.v1", JSON.stringify(snap));
+  const reloaded = loadCore(storage2).AppData;
+  assert(
+    area,
+    reloaded.getActiveCompany() === "Pengold" &&
+      reloaded.getCompanyData("Chez Pitu").employees.length === chezCountBefore &&
+      reloaded.getCompanyData("Pengold").employees.length === pengCountBefore,
+    "Empresa ativa persiste após reload e nenhum dado é apagado",
+    ["js/data.js"],
+    "finalizeIncomingState preserva activeCompany e companies"
+  );
+
+  AppData.setActiveCompany("Chez Pitu", { save: false });
+}
+
+function validatePhase2Improvements(AppData) {
+  const area = "Melhorias Fase 2";
+  const read = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
+  const funcionarios = read("js/funcionarios.js");
+  const contador = read("js/contador.js");
+  const feriados = read("js/feriados.js");
+  const empresa = read("js/empresa.js");
+  const vt = read("js/vale-transporte.js");
+  const dataJs = read("js/data.js");
+  const firebaseJs = read("js/firebase-sync.js");
+  const printCss = read("css/print.css");
+  const styleCss = read("css/style.css");
+
+  // === Proteção dos dados da empresa (dados críticos) ===
+  assert(
+    area,
+    dataJs.includes("mergeCompanyInfoPreserving") &&
+      dataJs.includes("recoverCompanyInfoForState") &&
+      dataJs.includes("backupCompanyInfoInState") &&
+      dataJs.includes("COMPANY_CRITICAL_FIELDS"),
+    "Core: merge preservando + backup + recuperação automática dos dados da empresa",
+    ["js/data.js"],
+    "Nunca apagar/sobrescrever com vazio; restaurar do backup"
+  );
+  assert(
+    area,
+    firebaseJs.includes("empresasBackup") && firebaseJs.includes("empresasHistory"),
+    "Firebase: backup/histórico dos dados da empresa preservados no round-trip",
+    ["js/firebase-sync.js"],
+    "—"
+  );
+  assert(
+    area,
+    empresa.includes("renderDiagnostics") &&
+      empresa.includes('"bankInfo"') &&
+      empresa.includes('"address"') &&
+      empresa.includes('"tradeName"') &&
+      empresa.includes("restoreCompanyInfoFromBackup"),
+    "Dados da Empresa: campos críticos completos + diagnóstico + restauração",
+    ["js/empresa.js"],
+    "—"
+  );
+  if (AppData) {
+    const diag = AppData.diagnoseCompanyData("Chez Pitu");
+    assert(
+      area,
+      diag &&
+        diag.company === "Chez Pitu" &&
+        Array.isArray(diag.inconsistencies) &&
+        typeof diag.hasBackup === "boolean" &&
+        typeof diag.source === "string",
+      "Diagnóstico da empresa retorna empresa ativa, origem, atualização, backup e inconsistências",
+      ["js/data.js"],
+      "diagnoseCompanyData"
+    );
+  }
+
+  // 1. Cabeçalho fixo
+  assert(
+    area,
+    /\.app-shell\s*\{[^}]*height:\s*100vh/.test(styleCss) &&
+      /\.app-content\s*\{[^}]*overflow-y:\s*auto/.test(styleCss),
+    "Cabeçalho fixo: app-shell em 100vh e somente .app-content rola",
+    ["css/style.css"],
+    "Header/abas/ribbon fora do contêiner de rolagem"
+  );
+
+  // 2. Cadastro sem bloco 'Visualizando todas as empresas'
+  assert(
+    area,
+    !funcionarios.includes("Visualizando") && !funcionarios.includes("no grupo"),
+    "Cadastro: bloco 'Visualizando … empresas' removido",
+    ["js/funcionarios.js"],
+    "—"
+  );
+
+  // 3. Pop-up funcionário sem seletor de empresa; grava na aba ativa
+  assert(
+    area,
+    !funcionarios.includes('name="employeeCompany"') &&
+      funcionarios.includes("const targetCompany = AppData.getActiveCompany();"),
+    "Pop-up funcionário: sem seletor de empresa; grava na empresa da aba ativa",
+    ["js/funcionarios.js"],
+    "targetCompany = getActiveCompany()"
+  );
+
+  // 4. VT print sem 1ª página em branco (reset de layout Fase 2)
+  assert(
+    area,
+    /\.app-content[^{]*\{[\s\S]*?height:\s*auto\s*!important/.test(printCss) &&
+      printCss.includes(".module-ribbon,"),
+    "Impressão VT: layout de cabeçalho fixo neutralizado no print (sem página em branco)",
+    ["css/print.css"],
+    "Reset .app-shell/.app-content + ocultar .module-ribbon no @media print"
+  );
+
+  // 5. Feriados — contexto do funcionário sem editar/excluir feriado
+  assert(
+    area,
+    !feriados.includes("data-edit-holiday=") &&
+      !feriados.includes("data-remove-holiday=") &&
+      feriados.includes('data-unlink-holiday="') &&
+      feriados.includes(">Excluir vínculo<"),
+    "Feriados: linhas de funcionário só têm 'Excluir vínculo' (sem editar/excluir feriado)",
+    ["js/feriados.js"],
+    "Editar/Excluir feriado movidos para o modal de cadastro"
+  );
+
+  // 6. Feriados — editar/excluir dentro do modal de cadastro, com confirmação
+  assert(
+    area,
+    feriados.includes("data-popup-edit-holiday=") &&
+      feriados.includes("data-popup-remove-holiday=") &&
+      feriados.includes("renderCompanyHolidaysManager") &&
+      feriados.includes("confirmDeleteHoliday(holidayId)"),
+    "Feriados: editar/excluir e lista de cadastrados dentro do modal, com confirmação",
+    ["js/feriados.js"],
+    "renderCompanyHolidaysManager + bindCompanyHolidayManager"
+  );
+
+  // 7. Contador Resumo com scroll horizontal
+  assert(
+    area,
+    /\.resumo-scroll\s*\{[^}]*overflow-x:\s*auto/.test(styleCss) &&
+      contador.includes('class="table-scroll resumo-scroll"'),
+    "Contador Resumo: barra de rolagem horizontal funcional (overflow-x auto)",
+    ["css/style.css", "js/contador.js"],
+    "—"
+  );
+
+  // 8. Contador — novo lançamento sem seletor de empresa
+  assert(
+    area,
+    !contador.includes('id="popupCompany"') &&
+      contador.includes("var targetCompany = AppData.getActiveCompany();"),
+    "Contador: pop-up de lançamento sem seletor de empresa; usa a aba ativa",
+    ["js/contador.js"],
+    "—"
+  );
+
+  // === Modal Cadastrar Feriado — alto (~85vh), lista priorizada, rolagem única ===
+  assert(
+    area,
+    /\.feriados-register-popup\s*\{[^}]*height:\s*85vh[\s\S]*?flex-direction:\s*column/.test(styleCss) &&
+      /\.feriados-register-popup\s*\{[^}]*overflow:\s*hidden/.test(styleCss),
+    "Modal Feriado: card em coluna, altura ~85vh, sem rolagem do card inteiro",
+    ["css/style.css"],
+    "—"
+  );
+  assert(
+    area,
+    /\.feriados-popup-manager\s*\{[^}]*flex:\s*1 1 auto/.test(styleCss) &&
+      /\.feriados-popup-manager \.feriados-manager-table\s*\{[^}]*overflow-y:\s*auto/.test(styleCss) &&
+      /\.feriados-panel-footer\s*\{[^}]*flex-shrink/.test(styleCss),
+    "Modal Feriado: lista 'Feriados cadastrados' é a área principal com rolagem única; rodapé fixo",
+    ["css/style.css"],
+    "—"
+  );
+  assert(
+    area,
+    /thead th\s*\{[^}]*position:\s*sticky/.test(styleCss) &&
+      feriados.includes("Funcionários Vinculados"),
+    "Modal Feriado: tabela com cabeçalho fixo e coluna de funcionários vinculados",
+    ["css/style.css", "js/feriados.js"],
+    "—"
+  );
+  assert(
+    area,
+    feriados.includes('class="feriados-panel-body"') &&
+      feriados.includes("feriados-panel-footer") &&
+      feriados.includes("data-company-holiday-manager"),
+    "Modal Feriado: formulário e lista de feriados cadastrados separados",
+    ["js/feriados.js"],
+    "Lista de cadastrados com edição/exclusão dentro do modal"
+  );
+
+  // Aba Calendário: sem seletor de empresa; vinculado à aba ativa; com editar
+  const scaleRules = read("js/scale-rules.js");
+  assert(
+    area,
+    !feriados.includes('name="companyScope"') && !feriados.includes("Empresa aplicável"),
+    "Calendário: seletor 'Empresa aplicável' removido (sem informações cruzadas)",
+    ["js/feriados.js"],
+    "—"
+  );
+  assert(
+    area,
+    feriados.includes("const companies = [AppData.getActiveCompany()];") &&
+      feriados.includes("calendarHolidayBelongsToActiveCompany"),
+    "Calendário: criação e listagem vinculadas à empresa da aba ativa",
+    ["js/feriados.js"],
+    "submitCalendarHolidayForm usa getActiveCompany; lista filtra por empresa"
+  );
+  assert(
+    area,
+    feriados.includes("data-edit-calendar-holiday") &&
+      feriados.includes("showEditCalendarHolidayModal") &&
+      scaleRules.includes("updateCalendarHoliday"),
+    "Calendário: opção de editar feriado já cadastrado",
+    ["js/feriados.js", "js/scale-rules.js"],
+    "showEditCalendarHolidayModal + ScaleRules.updateCalendarHoliday"
+  );
+  assert(
+    area,
+    feriados.includes("feriados-panel-footer-compact") &&
+      feriados.includes('class="secondary btn-sm"') &&
+      feriados.includes('class="primary btn-sm"'),
+    "Modal Feriado: botões Cancelar/Salvar compactos no rodapé",
+    ["js/feriados.js", "css/style.css"],
+    "—"
+  );
+
+  // === Correção 2 — VT lê CNPJ da empresa ativa com normalização ===
+  assert(
+    area,
+    vt.includes("CNPJ_FIELDS") &&
+      vt.includes("resolveCompanyCnpjRaw") &&
+      vt.includes("formatCnpjDisplay") &&
+      vt.includes("getCompanyInfo(data, company)"),
+    "VT: CNPJ resolvido da empresa ativa (cnpj/CNPJ/document/taxId/companyCnpj) com formatação",
+    ["js/vale-transporte.js"],
+    "Não bloqueia se CNPJ existir em qualquer campo válido"
+  );
+  assert(
+    area,
+    empresa.includes("CNPJ_FIELDS") && empresa.includes("resolveCnpj"),
+    "Dados da Empresa: exibe CNPJ aceitando campos variantes",
+    ["js/empresa.js"],
+    "—"
+  );
+
+  // CNPJ persiste/lê por empresa (isolamento) — com e sem máscara
+  if (AppData) {
+    AppData.updateCompanyInfo({ legalName: "Chez Pitu Ltda", cnpj: "11222333000181", responsibleName: "RH" }, "Chez Pitu");
+    AppData.updateCompanyInfo({ legalName: "Pengold Ltda", cnpj: "99.888.777/0001-66", responsibleName: "RH" }, "Pengold");
+    const chezCnpj = AppData.getCompanyData("Chez Pitu").companyInfo.cnpj;
+    const pengCnpj = AppData.getCompanyData("Pengold").companyInfo.cnpj;
+    assert(
+      area,
+      chezCnpj === "11222333000181" && pengCnpj === "99.888.777/0001-66",
+      "CNPJ salvo e lido por empresa (com ou sem máscara)",
+      ["js/data.js", "js/empresa.js"],
+      "updateCompanyInfo / companyInfo.cnpj"
+    );
+    assert(
+      area,
+      chezCnpj !== pengCnpj &&
+        Boolean(chezCnpj) &&
+        Boolean(pengCnpj),
+      "CNPJ não vaza entre Chez Pitu e Pengold (dados separados por empresa)",
+      ["js/data.js"],
+      "—"
+    );
+  }
 }
 
 function main() {
@@ -1342,6 +1867,10 @@ function main() {
   validateScalePrintLayout();
   validateCadastroSingleFilter();
   validateDateFormatBR(AppData);
+  validateWorkedSourceOfTruth(AppData);
+  validateCompanyWriteResolution(AppData, chez, peng);
+  validateActiveCompanyTabs(AppData, chez, peng, ym);
+  validatePhase2Improvements(AppData);
 
   console.log("\n=== RELATÓRIO DE VALIDAÇÃO FUNCIONAL ===\n");
   console.log(`Aprovadas: ${results.approved.length}`);

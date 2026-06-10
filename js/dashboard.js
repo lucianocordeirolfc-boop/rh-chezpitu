@@ -39,7 +39,11 @@
     let pendingCompensations = [];
     let agendadosPreview = [];
     const holidayStats = { pending: 0, agendado: 0, vencido: 0, compensado: 0, deadlineAlerts: 0 };
-    let coverageAlertCount = window.ScaleRules?.getCoverageAlertCount() || 0;
+    const companySet = new Set(companies);
+    const scopedCoverageAlerts = (AppData.state.coverageAlerts || []).filter(
+      (alert) => companySet.has(alert.principalCompany)
+    );
+    let coverageAlertCount = scopedCoverageAlerts.length;
     let autoHolidayPending = 0;
     let totalEmployees = 0;
 
@@ -78,7 +82,7 @@
 
     const nearDue = pendingCompensations.filter((item) => item.daysLeft <= 20);
     const deadlineAlerts = pendingCompensations.filter((item) => item.daysLeft <= 20 || item.daysLeft < 0);
-    const coverageAlertsPreview = (AppData.state.coverageAlerts || []).slice(0, 6);
+    const coverageAlertsPreview = scopedCoverageAlerts.slice(0, 6);
 
     return {
       today,

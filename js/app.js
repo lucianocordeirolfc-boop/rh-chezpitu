@@ -1,39 +1,44 @@
 (function () {
   const moduleTitles = {
+    empresa: "Dados da Empresa",
     dashboard: "Dashboard",
-    funcionarios: "Cadastro",
+    funcionarios: "Cadastro de Funcionários",
     escala: "Escala de Folga",
     ferias: "Ausências",
-    "vale-transporte": "Recibo de Vale-transporte",
+    "vale-transporte": "Recibo de Vale Transporte",
     feriados: "Controle de Feriados",
-    contador: "Informações Contador"
+    contador: "Informações do Contador"
   };
 
   const renderers = {
-    dashboard: window.DashboardModule?.render,
-    funcionarios: window.FuncionariosModule?.render,
-    escala: window.EscalaModule?.render,
-    ferias: window.FeriasModule?.render,
-    "vale-transporte": window.ValeTransporteModule?.render,
-    feriados: window.FeriadosModule?.render,
-    contador: window.ContadorModule?.render
+    empresa: () => window.EmpresaModule?.render,
+    dashboard: () => window.DashboardModule?.render,
+    funcionarios: () => window.FuncionariosModule?.render,
+    escala: () => window.EscalaModule?.render,
+    ferias: () => window.FeriasModule?.render,
+    "vale-transporte": () => window.ValeTransporteModule?.render,
+    feriados: () => window.FeriadosModule?.render,
+    contador: () => window.ContadorModule?.render
   };
 
   function activeModuleId() {
-    return document.querySelector(".menu-item.active")?.dataset.module || "dashboard";
+    return document.querySelector(".ribbon-item.active")?.dataset.module || "dashboard";
   }
 
   function render(moduleId = activeModuleId()) {
     document.querySelectorAll(".module").forEach((section) => {
       section.classList.toggle("active", section.id === moduleId);
     });
-    document.querySelectorAll(".menu-item").forEach((button) => {
+    document.querySelectorAll(".ribbon-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.module === moduleId);
     });
 
     document.body.dataset.activeModule = moduleId;
-    document.getElementById("pageTitle").textContent = moduleTitles[moduleId];
+    const titleEl = document.getElementById("pageTitle");
+    if (titleEl) titleEl.textContent = moduleTitles[moduleId] || "";
     const container = document.getElementById(moduleId);
+
+    if (!container) return;
 
     if (moduleId === "vale-transporte") {
       const yearMonth = AppData.getVtSelectedYearMonth() || AppData.getEscalaSelectedYearMonth();
@@ -41,8 +46,9 @@
       return;
     }
 
-    if (typeof renderers[moduleId] === "function") {
-      renderers[moduleId](container);
+    const renderFn = renderers[moduleId]?.();
+    if (typeof renderFn === "function") {
+      renderFn(container);
     }
   }
 
@@ -50,36 +56,41 @@
     render(activeModuleId());
   }
 
-  function setupCompanySelect() {
-    /* Seleção de empresa fica em cada módulo (Cadastro, Escala, etc.). */
+  function flushModuleBeforeLeave() {
+    if (activeModuleId() === "vale-transporte" && window.ValeTransporteModule?.flushPersist) {
+      window.ValeTransporteModule.flushPersist();
+    }
   }
 
-  function setupMenu() {
-    document.querySelectorAll(".menu-item").forEach((button) => {
+  /** Menu horizontal (ribbon) — troca de módulo dentro da empresa ativa. */
+  function setupRibbon() {
+    document.querySelectorAll(".ribbon-item").forEach((button) => {
       button.addEventListener("click", () => {
-        if (activeModuleId() === "vale-transporte" && window.ValeTransporteModule?.flushPersist) {
-          window.ValeTransporteModule.flushPersist();
-        }
+        flushModuleBeforeLeave();
         render(button.dataset.module);
       });
     });
   }
 
-  function setupSidebarToggle() {
-    const btn = document.getElementById("sidebarToggle");
-    if (!btn) return;
-    if (localStorage.getItem("sidebarCollapsed") === "true") {
-      document.body.dataset.sidebar = "collapsed";
-    }
-    btn.addEventListener("click", () => {
-      const collapsed = document.body.dataset.sidebar === "collapsed";
-      if (collapsed) {
-        delete document.body.dataset.sidebar;
-        localStorage.setItem("sidebarCollapsed", "false");
-      } else {
-        document.body.dataset.sidebar = "collapsed";
-        localStorage.setItem("sidebarCollapsed", "true");
-      }
+  function updateCompanyTabsUI() {
+    const active = AppData.getActiveCompany();
+    document.querySelectorAll(".company-tab").forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.company === active);
+      tab.setAttribute("aria-selected", tab.dataset.company === active ? "true" : "false");
+    });
+  }
+
+  /** Abas superiores de empresa — definem o contexto único de todo o sistema. */
+  function setupCompanyTabs() {
+    document.querySelectorAll(".company-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const company = tab.dataset.company;
+        if (!company || company === AppData.getActiveCompany()) return;
+        flushModuleBeforeLeave();
+        AppData.setActiveCompany(company);
+        updateCompanyTabsUI();
+        renderCurrent();
+      });
     });
   }
 
@@ -131,6 +142,7 @@
     formatDisplayName,
     renderCurrent,
     render,
+    updateCompanyTabsUI,
     toast
   };
 
@@ -190,6 +202,7 @@
       payload = AppData.finalizeIncomingState(remoteState);
     }
     AppData.setRemoteState(payload);
+    updateCompanyTabsUI();
     refreshActiveModuleUI();
   }
 
@@ -205,15 +218,23 @@
     if (appBooted) return;
     appBooted = true;
 
-    setupCompanySelect();
-    setupMenu();
-    setupSidebarToggle();
+    setupCompanyTabs();
+    setupRibbon();
+
+    // Fase 2 — propaga a empresa ativa (aba) para todo o sistema, sem apagar dados.
+    AppData.setActiveCompany(AppData.getActiveCompany(), { save: false });
+    updateCompanyTabsUI();
 
     let booted = false;
     const boot = () => {
       if (booted) return;
       booted = true;
       refreshScaleIntegrations();
+      // Integração retroativa: seed de abril/2026 não pôde chamar ScaleRules
+      // (carregado após data.js). Aqui é o primeiro ponto seguro pós-boot onde
+      // ScaleRules já existe. É idempotente: meses passados convergem na 1ª exec.
+      AppData.runScaleIntegrations(["2026-04"]);
+      updateCompanyTabsUI();
       render("dashboard");
       initSync();
     };

@@ -993,7 +993,7 @@
       const currentEntry = AppData.getManualScaleEntry(resolvedEmployeeId, date, data);
       const currentLinkedId = typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
 
-      const eligible = AppData.getPendingCoHolidaysForEmployee(resolvedEmployeeId, date, {
+      const eligible = AppData.getAvailableCoHolidayOptions(resolvedEmployeeId, date, {
         company: scaleCompany || getViewCompany(),
         data
       });

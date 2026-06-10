@@ -106,9 +106,12 @@ if (window.firebase && firebase.apps.length) {
       configuracoes: {
         pageFilters: state.pageFilters || {},
         escalaYearMonth: state.escalaSelectedYearMonth || "",
+        activeCompany: state.activeCompany || "",
         updatedAt: Date.now()
       },
       empresas,
+      empresasBackup: state.companyInfoBackup || {},
+      empresasHistory: state.companyInfoHistory || {},
       funcionarios,
       escalas,
       ferias,
@@ -190,7 +193,10 @@ if (window.firebase && firebase.apps.length) {
     return {
       pageFilters: data.configuracoes?.pageFilters || {},
       escalaSelectedYearMonth: data.configuracoes?.escalaYearMonth || "",
+      activeCompany: data.configuracoes?.activeCompany || "",
       companies,
+      companyInfoBackup: data.empresasBackup || {},
+      companyInfoHistory: data.empresasHistory || {},
       valeTransporte: vtFromFirebase,
       calendarHolidays: data.feriadosCalendario || data.calendarHolidays || [],
       coverageAlerts: data.coverageAlerts || [],

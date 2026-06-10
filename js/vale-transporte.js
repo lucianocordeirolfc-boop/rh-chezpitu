@@ -40,7 +40,7 @@
 
   function calculateReceipt(employee, yearMonth, data, company) {
     const days = AppData.getDaysInMonth(yearMonth);
-    const workedDays = days.filter((day) => AppData.VT_WORKED_CODES.has(AppData.getScaleCode(employee, day, data))).length;
+    const workedDays = days.filter((day) => AppData.isWorkedScaleCode(AppData.getScaleCode(employee, day, data))).length;
     const dailyValue = ImportUtils.repairVtDailyValue(Number(employee.vtDaily || 0));
     const deductDays = AppData.getVtDeduction(employee.id, yearMonth, data, company);
     const effectiveDays = Math.max(0, workedDays - deductDays);
@@ -56,12 +56,42 @@
     };
   }
 
-  function getCompanyInfo(data) {
-    return data.companyInfo || { legalName: "", cnpj: "" };
+  // Aceita CNPJ em qualquer um destes campos (com ou sem máscara).
+  const CNPJ_FIELDS = ["cnpj", "CNPJ", "document", "taxId", "companyCnpj"];
+
+  function resolveCompanyCnpjRaw(companyInfo) {
+    if (!companyInfo || typeof companyInfo !== "object") return "";
+    for (const field of CNPJ_FIELDS) {
+      const value = companyInfo[field];
+      if (value != null && String(value).trim()) return String(value).trim();
+    }
+    return "";
   }
 
-  function validateReceipts(receipts, data) {
-    const companyInfo = getCompanyInfo(data);
+  function formatCnpjDisplay(value) {
+    const raw = String(value || "").trim();
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 14) {
+      return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+    }
+    return raw;
+  }
+
+  // Lê os dados da empresa pagadora da ABA ATIVA (Dados da Empresa), com normalização segura.
+  function getCompanyInfo(data, company) {
+    const info = (data && data.companyInfo) || {};
+    const cnpjRaw = resolveCompanyCnpjRaw(info);
+    return {
+      ...info,
+      legalName: (info.legalName && String(info.legalName).trim()) || company || "",
+      cnpj: cnpjRaw,
+      cnpjDisplay: formatCnpjDisplay(cnpjRaw),
+      logoDataUrl: info.logoDataUrl || ""
+    };
+  }
+
+  function validateReceipts(receipts, data, company) {
+    const companyInfo = getCompanyInfo(data, company);
     const missing = [];
 
     if (!companyInfo.legalName?.trim()) missing.push("Empresa: Nome da empresa pagadora");
@@ -177,7 +207,7 @@
 
         <div class="vt-receipt-meta">
           <p><span>Empresa</span><strong>${esc(company)}</strong></p>
-          <p><span>CNPJ</span><strong>${esc(companyInfo.cnpj)}</strong></p>
+          <p><span>CNPJ</span><strong>${esc(companyInfo.cnpjDisplay || companyInfo.cnpj)}</strong></p>
           <p><span>Mês/Ano</span><strong>${esc(monthYear)}</strong></p>
           <p><span>Funcionário</span><strong>${esc(receipt.employee.name)}</strong></p>
           <p><span>CPF</span><strong>${esc(receipt.employee.cpf)}</strong></p>
@@ -219,7 +249,7 @@
     return pages;
   }
 
-  function receiptsPreviewHTML(receipts, yearMonth, data, validation) {
+  function receiptsPreviewHTML(receipts, yearMonth, data, validation, company) {
     if (!receipts.length) {
       return `<div class="empty-state"><strong>Nenhum recibo para visualizar.</strong><span>Cadastre funcionários ativos para gerar os recibos.</span></div>`;
     }
@@ -234,7 +264,7 @@
       `;
     }
 
-    const companyInfo = getCompanyInfo(data);
+    const companyInfo = getCompanyInfo(data, company);
     return chunkReceipts(receipts)
       .map((pageReceipts) => {
         const receiptSlots = Array.from({ length: 3 }, (_, index) => {
@@ -291,14 +321,14 @@
     const company = AppData.getPrimaryPageCompany("vale-transporte");
     const data = AppData.getCompanyData(company);
     const receipts = buildReceipts(yearMonth, data, company);
-    const validation = validateReceipts(receipts, data);
+    const validation = validateReceipts(receipts, data, company);
 
     receipts.forEach((receipt) => updateEmployeeTableRow(container, receipt));
     updateSummaryStrip(container, receipts);
 
     const previewArea = container.querySelector(".vt-print-area");
     if (previewArea) {
-      previewArea.innerHTML = receiptsPreviewHTML(receipts, yearMonth, data, validation);
+      previewArea.innerHTML = receiptsPreviewHTML(receipts, yearMonth, data, validation, company);
     }
 
     container._vtValidation = validation;
@@ -410,7 +440,7 @@
     const company = AppData.getPrimaryPageCompany("vale-transporte");
     const data = AppData.getCompanyData(company);
     const receipts = buildReceipts(resolvedMonth, data, company);
-    const validation = validateReceipts(receipts, data);
+    const validation = validateReceipts(receipts, data, company);
     const total = receipts.reduce((sum, receipt) => sum + receipt.total, 0);
     const discountTotal = receipts.reduce((sum, receipt) => sum + (receipt.discountAmount || 0), 0);
 
@@ -491,7 +521,7 @@
         </div>
         <div class="vt-preview-scroll vt-preview-scroll-compact">
           <div class="vt-print-area show-cut-lines">
-            ${receiptsPreviewHTML(receipts, resolvedMonth, data, validation)}
+            ${receiptsPreviewHTML(receipts, resolvedMonth, data, validation, company)}
           </div>
         </div>
       </article>

@@ -2,6 +2,15 @@
   const STORAGE_KEY = "chezPituPeopleSystem.v1";
   const LEGACY_VT_BACKUP_KEY = "chezPituVtBackup.v1";
 
+  /**
+   * Versão do esquema persistido sob STORAGE_KEY. O leitor (loadState) tolera
+   * tanto o payload completo legado (sem schemaVersion) quanto os payloads
+   * reduzidos ("slim"/"lean") — a migração é sempre não-destrutiva: o que falta
+   * localmente é restaurado pelo merge com o Firebase (fonte de verdade).
+   */
+  const PERSIST_SCHEMA_VERSION = 2;
+  const CACHE_VERSION = "v1";
+
   const COMPANIES = ["Chez Pitu", "Pengold"];
   const DEFAULT_SELECTED_COMPANY = "Pengold";
   const HOLIDAY_COMPENSATION_DAYS = 120;
@@ -62,6 +71,21 @@
   ];
 
   const VT_WORKED_CODES = new Set(["", "MM", "TM", "NM", "MN", "TN", "NO", "MR", "TR", "NR"]);
+
+  /**
+   * Códigos que NUNCA contam como dia trabalhado (folga, ausência e compensação).
+   * Fonte única de verdade compartilhada por VT, Escala, Feriados e Dashboard.
+   */
+  const NOT_WORKED_SCALE_CODES = new Set([
+    "FOLGA",
+    "DOM",
+    "FÉRIAS",
+    "CO",
+    "ATESTADO",
+    "FALTA",
+    "SUSPENSÃO",
+    "LICENÇA"
+  ]);
 
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -198,14 +222,156 @@
     return dateISO >= startISO && dateISO <= endISO;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // PROTEÇÃO DOS DADOS DA EMPRESA (dados críticos — nunca apagar automaticamente)
+  // ─────────────────────────────────────────────────────────────────────────
+  const COMPANY_CRITICAL_FIELDS = [
+    { key: "legalName", label: "Razão Social" },
+    { key: "tradeName", label: "Nome Fantasia" },
+    { key: "cnpj", label: "CNPJ" },
+    { key: "responsibleName", label: "Responsável" },
+    { key: "address", label: "Endereço" },
+    { key: "phones", label: "Telefones" },
+    { key: "email", label: "E-mail" },
+    { key: "bankInfo", label: "Dados Bancários" },
+    { key: "logoDataUrl", label: "Logo" },
+    { key: "contadorInfo", label: "Informações do Contador" },
+    { key: "vtInfo", label: "Informações do Vale Transporte" }
+  ];
+  const COMPANY_INFO_HISTORY_LIMIT = 15;
+  /** CNPJ pode estar salvo sob qualquer um destes nomes de campo. */
+  const COMPANY_CNPJ_FIELDS = ["cnpj", "CNPJ", "document", "taxId", "companyCnpj"];
+
+  function emptyCompanyInfo(companyName = "") {
+    const info = {};
+    COMPANY_CRITICAL_FIELDS.forEach((field) => {
+      info[field.key] = "";
+    });
+    info.legalName = companyName;
+    info.updatedAt = 0;
+    return info;
+  }
+
+  function resolveCompanyCnpj(info) {
+    if (!info || typeof info !== "object") return "";
+    for (const field of COMPANY_CNPJ_FIELDS) {
+      const value = info[field];
+      if (value != null && String(value).trim()) return String(value).trim();
+    }
+    return "";
+  }
+
+  /** Um registro é "significativo" (válido) se tiver CNPJ OU Razão Social. */
+  function isMeaningfulCompanyInfo(info) {
+    if (!info || typeof info !== "object") return false;
+    const cnpj = resolveCompanyCnpj(info);
+    const legal = String(info.legalName || "").trim();
+    return Boolean(cnpj || legal);
+  }
+
+  function valueIsFilled(value) {
+    return value !== null && value !== undefined && String(value).trim() !== "";
+  }
+
+  /**
+   * Merge campo a campo que NUNCA substitui um valor preenchido por vazio/null/undefined.
+   * Só sobrescreve quando o valor de entrada está realmente preenchido.
+   */
+  function mergeCompanyInfoPreserving(existing = {}, incoming = {}) {
+    const result = { ...(existing || {}) };
+    Object.keys(incoming || {}).forEach((key) => {
+      if (valueIsFilled(incoming[key])) result[key] = incoming[key];
+    });
+    return result;
+  }
+
+  function normalizeCompanyInfoShape(info, companyName = "") {
+    const base = emptyCompanyInfo(companyName);
+    const merged = { ...base, ...(info || {}) };
+    // Consolida CNPJ vindo de campos variantes para o campo canônico `cnpj`.
+    const cnpj = resolveCompanyCnpj(merged);
+    if (cnpj && !valueIsFilled(merged.cnpj)) merged.cnpj = cnpj;
+    return merged;
+  }
+
+  function ensureCompanyInfoBackupStores(targetState) {
+    if (!targetState.companyInfoBackup || typeof targetState.companyInfoBackup !== "object") {
+      targetState.companyInfoBackup = {};
+    }
+    if (!targetState.companyInfoHistory || typeof targetState.companyInfoHistory !== "object") {
+      targetState.companyInfoHistory = {};
+    }
+  }
+
+  /** Guarda backup + histórico de uma versão válida dos dados da empresa. */
+  function backupCompanyInfoInState(targetState, company, info) {
+    if (!isMeaningfulCompanyInfo(info)) return;
+    ensureCompanyInfoBackupStores(targetState);
+    const snapshot = { ...info };
+    const prev = targetState.companyInfoBackup[company];
+    targetState.companyInfoBackup[company] = snapshot;
+    // Só registra no histórico se mudou de fato.
+    if (!prev || JSON.stringify(prev) !== JSON.stringify(snapshot)) {
+      const hist = Array.isArray(targetState.companyInfoHistory[company])
+        ? targetState.companyInfoHistory[company]
+        : [];
+      hist.unshift({ info: snapshot, at: snapshot.updatedAt || Date.now() });
+      targetState.companyInfoHistory[company] = hist.slice(0, COMPANY_INFO_HISTORY_LIMIT);
+    }
+  }
+
+  function getCompanyInfoBackup(targetState, company) {
+    const direct = targetState.companyInfoBackup?.[company];
+    if (isMeaningfulCompanyInfo(direct)) return direct;
+    const fromHistory = targetState.companyInfoHistory?.[company]?.find((entry) =>
+      isMeaningfulCompanyInfo(entry?.info)
+    );
+    return fromHistory?.info || null;
+  }
+
+  /**
+   * Recuperação automática: se a empresa estiver sem CNPJ e sem Razão Social
+   * (vazia/resetada) mas existir backup válido, restaura. Caso contrário,
+   * mantém o que existe e atualiza o backup com a versão válida atual.
+   */
+  function recoverCompanyInfoForState(targetState) {
+    ensureCompanyInfoBackupStores(targetState);
+    let recovered = false;
+    companyKeysFromState(targetState).forEach((company) => {
+      const block = targetState.companies?.[company];
+      if (!block) return;
+      const info = normalizeCompanyInfoShape(block.companyInfo, company);
+      const backup = getCompanyInfoBackup(targetState, company);
+
+      // Recuperação campo a campo: preenche QUALQUER campo crítico vazio a partir do
+      // backup válido — nunca apaga o que já existe. Cobre "sem CNPJ", "sem Razão
+      // Social" e "empresa vazia".
+      if (backup) {
+        let filled = false;
+        COMPANY_CRITICAL_FIELDS.forEach((field) => {
+          if (!valueIsFilled(info[field.key]) && valueIsFilled(backup[field.key])) {
+            info[field.key] = backup[field.key];
+            filled = true;
+          }
+        });
+        if (filled) {
+          recovered = true;
+          console.warn(`[AppData] Dados da empresa "${company}" recuperados do backup.`);
+        }
+      }
+
+      // Garante uma Razão Social mínima (nome da empresa) só para exibição.
+      if (!valueIsFilled(info.legalName)) info.legalName = company;
+
+      block.companyInfo = info;
+      if (isMeaningfulCompanyInfo(info)) backupCompanyInfoInState(targetState, company, info);
+    });
+    return recovered;
+  }
+
   function createCompanyData(companyName = "") {
     return {
-      companyInfo: {
-        legalName: companyName,
-        cnpj: "",
-        responsibleName: "",
-        logoDataUrl: ""
-      },
+      companyInfo: emptyCompanyInfo(companyName),
       employees: [],
       vacations: [],
       absences: [],
@@ -376,8 +542,11 @@
 
     return {
       pageFilters: createDefaultPageFilters(),
+      activeCompany: COMPANIES[0],
       escalaSelectedYearMonth: monthKey(),
       companies,
+      companyInfoBackup: {},
+      companyInfoHistory: {},
       calendarHolidays: [],
       coverageAlerts: [],
       coveragePrincipalBindings: {},
@@ -388,6 +557,34 @@
         deductionDays: {}
       }
     };
+  }
+
+  /**
+   * Fase 2 — empresa ativa (aba superior). É o contexto único de todo o sistema.
+   * Substitui os filtros de empresa internos: cada módulo lê getPrimaryPageCompany
+   * (que segue pageFilters), e setActiveCompany propaga a empresa para todos os
+   * pageFilters de uma vez. Nunca apaga dados — apenas troca o contexto de exibição.
+   */
+  function getActiveCompany() {
+    const raw = String(state?.activeCompany || "").trim();
+    if (raw && (state?.companies?.[raw] || COMPANIES.includes(raw))) return raw;
+    const fromEscala = state?.pageFilters?.escala;
+    if (fromEscala && fromEscala !== PAGE_COMPANY_ALL && (state?.companies?.[fromEscala] || COMPANIES.includes(fromEscala))) {
+      return fromEscala;
+    }
+    return getCompanies()[0] || COMPANIES[0];
+  }
+
+  function setActiveCompany(company, options = {}) {
+    const normalized = normalizePageFilterValue(company, COMPANIES[0]);
+    const resolved = isPageCompanyAll(normalized) ? getCompanies()[0] || COMPANIES[0] : normalized;
+    state.activeCompany = resolved;
+    if (!state.pageFilters) state.pageFilters = createDefaultPageFilters();
+    PAGE_MODULE_IDS.forEach((moduleId) => {
+      state.pageFilters[moduleId] = resolved;
+    });
+    if (options.save !== false) saveState();
+    return resolved;
   }
 
   /** Dados locais prevalecem sobre remoto vazio/desatualizado (evita apagar descontos VT no sync). */
@@ -412,6 +609,35 @@
 
   function resolveVtCompany(company) {
     return company || getPrimaryPageCompany("vale-transporte");
+  }
+
+  /** Alerta não-bloqueante (console + toast quando a UI existir). */
+  function emitDataAlert(message, type = "warning") {
+    console.warn(`[AppData] ${message}`);
+    try {
+      window.App?.toast?.(message, type, 6000);
+    } catch (_) {
+      /* ambiente sem UI (testes) */
+    }
+  }
+
+  /**
+   * Resolve a empresa de destino de uma GRAVAÇÃO sem depender do filtro de página.
+   * Ordem: (1) empresa real do funcionário (employeeId) → (2) bloco de empresa
+   * explícito → (3) fallback seguro + alerta. Nunca usa o filtro como verdade.
+   */
+  function resolveCompanyForEmployeeWrite(employeeId, explicitCompany, moduleId = "escala") {
+    const id = String(employeeId || "").trim();
+    const record = id ? findEmployeeRecord(id) : null;
+    if (record?.company) return record.company;
+
+    if (explicitCompany && state?.companies?.[explicitCompany]) return explicitCompany;
+
+    const fallback = explicitCompany || getPrimaryPageCompany(moduleId);
+    emitDataAlert(
+      `Funcionário "${id || "?"}" não localizado pelo employeeId; gravando em "${fallback}" como destino seguro. Verifique o cadastro.`
+    );
+    return fallback;
   }
 
   function mergeDiscountValuesByCompany(localVt = {}, remoteVt = {}) {
@@ -520,6 +746,10 @@
 
     if (!mergedPadroeira.size) return changed;
 
+    // Idempotência: só reescreve o array quando houve correção/deduplicação real.
+    // Já estando tudo em 26/07 e sem duplicatas, não muta nem sinaliza mudança.
+    if (!changed) return false;
+
     holidays.length = 0;
     holidays.push(...keep, ...mergedPadroeira.values());
     return true;
@@ -544,6 +774,159 @@
 
   function companyKeysFromState(targetState) {
     return [...new Set([...COMPANIES, ...Object.keys(targetState?.companies || {})])];
+  }
+
+  /**
+   * Deduplica o calendário global de feriados (state.calendarHolidays).
+   * Chave de unicidade: data + nome normalizado. Quando há duplicados, mantém
+   * um único registro e une as empresas (companies) — assim o mesmo feriado não
+   * aparece repetido no filtro nem é processado em dobro pela escala. Idempotente.
+   */
+  function dedupeCalendarHolidays(targetState) {
+    if (!targetState || !Array.isArray(targetState.calendarHolidays)) return false;
+
+    const byKey = new Map();
+    let changed = false;
+
+    targetState.calendarHolidays.forEach((holiday) => {
+      if (!holiday || !holiday.date || !holiday.name) return;
+      const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, holiday);
+        return;
+      }
+      const companies = new Set([...(existing.companies || []), ...(holiday.companies || [])]);
+      existing.companies = Array.from(companies);
+      changed = true; // duplicado descartado
+    });
+
+    if (changed) {
+      targetState.calendarHolidays = Array.from(byKey.values());
+    }
+    return changed;
+  }
+
+  /**
+   * SEED 2026 — Semana Santa, Tiradentes e São Jorge (Fase 3B).
+   * Esses feriados de abril/2026 não existiam na base e por isso nunca
+   * apareciam para vinculação manual de CO. O seed apenas DISPONIBILIZA os
+   * feriados (workedEmployees vazio): nenhum vínculo automático é criado e
+   * nenhum lançamento existente é alterado. Idempotente por conteúdo
+   * (data 2026 + nome normalizado, com variantes) e executado uma única vez
+   * por dispositivo (flag em localStorage).
+   */
+  const HOLIDAY_SEED_2026_FLAG = "chezPituHolidaySeed2026.v1";
+  const HOLIDAY_SEED_2026 = [
+    {
+      slug: "semana-santa",
+      name: "Semana Santa",
+      date: "2026-04-03",
+      type: "nacional",
+      aliases: [
+        "semana santa",
+        "sexta-feira santa",
+        "sexta feira santa",
+        "sexta-feira da paixao",
+        "sexta feira da paixao",
+        "paixao de cristo"
+      ]
+    },
+    {
+      slug: "tiradentes",
+      name: "Tiradentes",
+      date: "2026-04-21",
+      type: "nacional",
+      aliases: ["tiradentes", "dia de tiradentes"]
+    },
+    {
+      slug: "sao-jorge",
+      name: "São Jorge",
+      date: "2026-04-23",
+      type: "estadual",
+      aliases: ["sao jorge", "dia de sao jorge"]
+    }
+  ];
+
+  /** Variante do mesmo feriado em 2026 (qualquer data do ano, nome equivalente). */
+  function holidayMatchesSeed2026(holiday, seed) {
+    if (!holiday || !String(holiday.date || "").startsWith("2026")) return false;
+    const name = normalizeSearchText(holiday.name);
+    return seed.aliases.some((alias) => name === normalizeSearchText(alias));
+  }
+
+  function applyHolidaySeed2026(targetState) {
+    if (!targetState) return false;
+    let changed = false;
+
+    if (!Array.isArray(targetState.calendarHolidays)) targetState.calendarHolidays = [];
+    HOLIDAY_SEED_2026.forEach((seed) => {
+      if (targetState.calendarHolidays.some((holiday) => holidayMatchesSeed2026(holiday, seed))) return;
+      targetState.calendarHolidays.push({
+        id: `cal-seed-2026-${seed.slug}`,
+        date: seed.date,
+        name: seed.name,
+        type: seed.type,
+        companies: ["ambas"]
+      });
+      changed = true;
+    });
+
+    companyKeysFromState(targetState).forEach((company) => {
+      const block = targetState.companies?.[company];
+      if (!block) return;
+      if (!Array.isArray(block.holidays)) block.holidays = [];
+      HOLIDAY_SEED_2026.forEach((seed) => {
+        // Soft-deletados também contam como existentes: o seed nunca ressuscita
+        // um feriado que o usuário removeu de propósito.
+        if (block.holidays.some((holiday) => holidayMatchesSeed2026(holiday, seed))) return;
+        block.holidays.push({
+          id: `feriado-seed-2026-${seed.slug}-${normalizeSearchText(company).replace(/\s+/g, "-")}`,
+          name: seed.name,
+          date: seed.date,
+          workedEmployees: []
+        });
+        changed = true;
+      });
+    });
+
+    return changed;
+  }
+
+  function applyHolidaySeed2026IfNeeded() {
+    try {
+      if (localStorage.getItem(HOLIDAY_SEED_2026_FLAG)) return false;
+    } catch (_) {
+      /* storage indisponível: segue — o seed é idempotente por conteúdo */
+    }
+    const changed = applyHolidaySeed2026(state);
+    try {
+      localStorage.setItem(HOLIDAY_SEED_2026_FLAG, new Date().toISOString());
+    } catch (_) {
+      /* sem flag o seed continua seguro (idempotente por conteúdo) */
+    }
+    if (changed) saveState();
+    return changed;
+  }
+
+  /**
+   * Calendário no merge: o remoto prevalece quando existe, mas os seeds 2026
+   * locais não podem ser perdidos enquanto o remoto ainda não os recebeu
+   * (a flag local impediria um novo seed e os feriados sumiriam para sempre).
+   */
+  function mergeCalendarHolidaysPreservingSeeds(localList = [], remoteList = []) {
+    const base = (remoteList || []).length ? [...remoteList] : [...(localList || [])];
+    HOLIDAY_SEED_2026.forEach((seed) => {
+      const localSeed = (localList || []).find(
+        (holiday) => String(holiday?.id || "") === `cal-seed-2026-${seed.slug}`
+      );
+      if (!localSeed) return;
+      const exists = base.some(
+        (holiday) => holiday?.id === localSeed.id || holidayMatchesSeed2026(holiday, seed)
+      );
+      if (!exists) base.push(localSeed);
+    });
+    return base;
   }
 
   function migrateVtStorage(targetState) {
@@ -606,12 +989,27 @@
     migratePageFilters(next, defaults);
     migrateVtStorage(next);
     migratePadroeiraBuziosHoliday(next);
+    dedupeCalendarHolidays(next);
     delete next.selectedCompany;
+
+    // Fase 2 — empresa ativa (aba). Migra de pageFilters.escala quando ausente; nunca apaga dados.
+    const activeRaw = String(next.activeCompany || "").trim();
+    if (!activeRaw || !(next.companies[activeRaw] || COMPANIES.includes(activeRaw))) {
+      const legacy = next.pageFilters?.escala;
+      next.activeCompany =
+        legacy && legacy !== PAGE_COMPANY_ALL && (next.companies[legacy] || COMPANIES.includes(legacy))
+          ? legacy
+          : COMPANIES[0];
+    }
     companyKeysFromState(next).forEach((company) => {
       if (!next.companies[company]) next.companies[company] = createCompanyData(company);
       normalizeCompanyBlock(next.companies[company]);
       normalizeCompanyHolidays(next.companies[company]);
     });
+
+    // Proteção dos dados da empresa: restaura do backup se vazio; atualiza backup se válido.
+    recoverCompanyInfoForState(next);
+
     if (companyKeysFromState(next).some((company) => next.companies[company]?._vacationRepairPending)) {
       companyKeysFromState(next).forEach((company) => {
         delete next.companies[company]?._vacationRepairPending;
@@ -660,9 +1058,10 @@
         ...(local.pageFilters || {})
       },
       escalaSelectedYearMonth: local.escalaSelectedYearMonth || remote.escalaSelectedYearMonth || monthKey(),
-      calendarHolidays: (remote.calendarHolidays || []).length
-        ? preserveSeededCalendarHolidays(remote.calendarHolidays, local.calendarHolidays)
-        : local.calendarHolidays || [],
+      calendarHolidays: mergeCalendarHolidaysPreservingSeeds(
+        local.calendarHolidays,
+        remote.calendarHolidays
+      ),
       coverageAlerts: (remote.coverageAlerts || []).length ? remote.coverageAlerts : local.coverageAlerts || [],
       coveragePrincipalBindings: {
         ...(remote.coveragePrincipalBindings || {}),
@@ -710,11 +1109,11 @@
         ...defaultBlock,
         ...remoteCo,
         ...localCo,
-        companyInfo: {
-          ...defaultBlock.companyInfo,
-          ...(remoteCo.companyInfo || {}),
-          ...(localCo.companyInfo || {})
-        },
+        // Dados da empresa: merge campo a campo que NUNCA apaga valor preenchido.
+        companyInfo: mergeCompanyInfoPreserving(
+          mergeCompanyInfoPreserving(defaultBlock.companyInfo, remoteCo.companyInfo),
+          localCo.companyInfo
+        ),
         employees: mergeEmployeesById(localCo.employees, remoteCo.employees),
         manualScale: mergeRecordMapsPreferLocal(remoteCo.manualScale || {}, localCo.manualScale || {}),
         holidays: mergeHolidayLists(localCo.holidays, remoteCo.holidays),
@@ -726,6 +1125,31 @@
         )
       };
       delete merged.companies[company].vtDeductions;
+    });
+
+    // Preserva backups/histórico dos dados da empresa através da sincronização Firebase.
+    merged.companyInfoBackup = {};
+    merged.companyInfoHistory = {};
+    companyKeys.forEach((company) => {
+      const backupCandidate =
+        [local.companyInfoBackup?.[company], remote.companyInfoBackup?.[company]].find(isMeaningfulCompanyInfo) ||
+        null;
+      if (backupCandidate) merged.companyInfoBackup[company] = backupCandidate;
+
+      const histLocal = Array.isArray(local.companyInfoHistory?.[company]) ? local.companyInfoHistory[company] : [];
+      const histRemote = Array.isArray(remote.companyInfoHistory?.[company]) ? remote.companyInfoHistory[company] : [];
+      const seen = new Set();
+      const histMerged = [...histLocal, ...histRemote]
+        .filter((entry) => entry && isMeaningfulCompanyInfo(entry.info))
+        .sort((a, b) => (b.at || 0) - (a.at || 0))
+        .filter((entry) => {
+          const key = JSON.stringify(entry.info);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, COMPANY_INFO_HISTORY_LIMIT);
+      if (histMerged.length) merged.companyInfoHistory[company] = histMerged;
     });
 
     return finalizeIncomingState(merged);
@@ -1160,6 +1584,219 @@
     return normalizeCompanyBlock(getCompanyData(company));
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // PERSISTÊNCIA ENXUTA / ANTI-QUOTA (QuotaExceededError)
+  //
+  // O estado completo (todas as empresas, funcionários, feriados, escalas,
+  // ausências, históricos, backups e logos base64) pode ultrapassar a cota do
+  // localStorage (~5 MB). Quando isso ocorre, setItem lança QuotaExceededError.
+  // Aqui a gravação é feita em CAMADAS, com try/catch, e NUNCA lança:
+  //   0) full  — estado completo (cache offline ideal);
+  //   1) slim  — remove logos base64, históricos/backups, feriados soft-deletados
+  //              e alertas (mantém dados operacionais offline);
+  //   2) lean  — apenas sessão, empresa ativa, filtros, preferências e versão de
+  //              cache; dados operacionais passam a vir do Firebase.
+  // Se nem o "lean" couber, registra warning e desliga o cache local na sessão.
+  // Em todos os casos o `state` em memória permanece completo e o Firebase
+  // continua sendo a fonte de verdade — a aplicação não quebra.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  let persistFloor = 0; // menor camada já aceita nesta sessão (sticky, evita re-tentar full caro)
+  let storageDegraded = false;
+  let degradedAlertShown = false;
+
+  function isQuotaError(error) {
+    if (!error) return false;
+    return (
+      error.name === "QuotaExceededError" ||
+      error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+      error.code === 22 ||
+      error.code === 1014
+    );
+  }
+
+  /** Camada "slim": preserva dados operacionais, descarta o que mais pesa. */
+  function buildSlimPersistedState(src) {
+    const clone = JSON.parse(JSON.stringify(src));
+    delete clone.companyInfoHistory; // histórico/backup recuperável do Firebase
+    delete clone.companyInfoBackup;
+    clone.coverageAlerts = [];
+    Object.values(clone.companies || {}).forEach((block) => {
+      if (!block) return;
+      if (block.companyInfo) block.companyInfo.logoDataUrl = ""; // logo base64 é o maior vilão
+      if (Array.isArray(block.holidays)) {
+        block.holidays = block.holidays.filter((holiday) => !holiday?.isDeleted);
+      }
+    });
+    clone.schemaVersion = PERSIST_SCHEMA_VERSION;
+    clone.cacheVersion = src.cacheVersion || CACHE_VERSION;
+    clone.persistTier = "slim";
+    return clone;
+  }
+
+  /** Camada "lean": só sessão/empresa/filtros/preferências/versão de cache. */
+  function buildLeanPersistedState(src) {
+    return {
+      schemaVersion: PERSIST_SCHEMA_VERSION,
+      cacheVersion: src.cacheVersion || CACHE_VERSION,
+      persistTier: "lean",
+      activeCompany: src.activeCompany || "",
+      pageFilters: src.pageFilters || {},
+      escalaSelectedYearMonth: src.escalaSelectedYearMonth || "",
+      scaleCodeConfig: src.scaleCodeConfig || {},
+      coveragePrincipalBindings: src.coveragePrincipalBindings || {},
+      valeTransporte: { selectedYearMonth: src.valeTransporte?.selectedYearMonth || "" },
+      companies: {} // dados operacionais vêm do Firebase
+    };
+  }
+
+  const PERSIST_TIERS = [
+    { name: "full", build: (src) => src },
+    { name: "slim", build: buildSlimPersistedState },
+    { name: "lean", build: buildLeanPersistedState }
+  ];
+
+  function trySetStorage(payload) {
+    let serialized;
+    try {
+      serialized = JSON.stringify(payload);
+    } catch (error) {
+      return { ok: false, quota: false, error };
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, serialized);
+      return { ok: true, bytes: serialized.length };
+    } catch (error) {
+      return { ok: false, quota: isQuotaError(error), error };
+    }
+  }
+
+  /**
+   * Persiste o estado no localStorage em camadas. Nunca lança: uma falha de
+   * cota jamais pode quebrar a aplicação nem o fluxo de sincronização.
+   * @returns {{ok:boolean, tier:string, bytes?:number}}
+   */
+  function persistStateToLocal(stateObj) {
+    if (!stateObj || typeof stateObj !== "object") return { ok: false, tier: "none" };
+
+    for (let i = persistFloor; i < PERSIST_TIERS.length; i += 1) {
+      const tier = PERSIST_TIERS[i];
+      const result = trySetStorage(tier.build(stateObj));
+
+      if (result.ok) {
+        if (i > persistFloor) {
+          persistFloor = i; // a partir de agora começamos direto nesta camada
+          storageDegraded = i > 0;
+          emitDataAlert(
+            `Armazenamento local quase cheio: salvando em modo "${tier.name}". ` +
+              `Dados completos preservados no Firebase.`
+          );
+        }
+        return { ok: true, tier: tier.name, bytes: result.bytes };
+      }
+
+      if (!result.quota) {
+        // Erro não relacionado à cota (ex.: storage indisponível): registra e desiste sem quebrar.
+        console.warn("[AppData] Falha ao persistir no localStorage (não-cota):", result.error);
+        return { ok: false, tier: tier.name };
+      }
+      // QuotaExceededError → tenta a próxima camada mais enxuta.
+    }
+
+    // Nem a camada "lean" coube: desliga o cache local nesta sessão.
+    persistFloor = PERSIST_TIERS.length;
+    storageDegraded = true;
+    if (!degradedAlertShown) {
+      degradedAlertShown = true;
+      emitDataAlert(
+        "Armazenamento local cheio (QuotaExceededError). Os dados continuam salvos no " +
+          "Firebase; o cache local foi desativado nesta sessão para não quebrar a aplicação."
+      );
+    }
+    return { ok: false, tier: "none" };
+  }
+
+  /**
+   * Diagnóstico de uso do localStorage. Rode no console de produção:
+   *   AppData.measureStorageUsage()
+   * Retorna tamanho total e por estrutura (em bytes) — base para o relatório.
+   */
+  function measureStorageUsage(targetState = state) {
+    const bytesOf = (value) => {
+      try {
+        return JSON.stringify(value ?? null).length;
+      } catch (_) {
+        return 0;
+      }
+    };
+
+    const perCompany = {};
+    const totals = {
+      employees: 0,
+      holidays: 0,
+      manualScale: 0,
+      vacations: 0,
+      absences: 0,
+      contadorLancamentos: 0,
+      logos: 0
+    };
+
+    Object.entries(targetState.companies || {}).forEach(([name, block]) => {
+      const entry = {
+        employees: bytesOf(block?.employees),
+        holidays: bytesOf(block?.holidays),
+        manualScale: bytesOf(block?.manualScale),
+        vacations: bytesOf(block?.vacations),
+        absences: bytesOf(block?.absences),
+        contadorLancamentos: bytesOf(block?.contadorLancamentos),
+        logo: bytesOf(block?.companyInfo?.logoDataUrl)
+      };
+      perCompany[name] = entry;
+      totals.employees += entry.employees;
+      totals.holidays += entry.holidays;
+      totals.manualScale += entry.manualScale;
+      totals.vacations += entry.vacations;
+      totals.absences += entry.absences;
+      totals.contadorLancamentos += entry.contadorLancamentos;
+      totals.logos += entry.logo;
+    });
+
+    let storedBytes = 0;
+    try {
+      storedBytes = (localStorage.getItem(STORAGE_KEY) || "").length;
+    } catch (_) {
+      storedBytes = 0;
+    }
+
+    const report = {
+      storageKey: STORAGE_KEY,
+      quotaApproxMB: 5,
+      storedBytes,
+      storedKB: Number((storedBytes / 1024).toFixed(1)),
+      stateBytes: bytesOf(targetState),
+      breakdown: {
+        ...totals,
+        backups:
+          bytesOf(targetState.companyInfoHistory) + bytesOf(targetState.companyInfoBackup),
+        calendarHolidays: bytesOf(targetState.calendarHolidays),
+        coverageAlerts: bytesOf(targetState.coverageAlerts),
+        valeTransporte: bytesOf(targetState.valeTransporte),
+        scaleCodeConfig: bytesOf(targetState.scaleCodeConfig)
+      },
+      perCompany,
+      persistTier: PERSIST_TIERS[Math.min(persistFloor, PERSIST_TIERS.length - 1)]?.name || "none",
+      degraded: storageDegraded
+    };
+
+    try {
+      console.info("[AppData] Uso de armazenamento (bytes):", report);
+      console.table(report.breakdown);
+    } catch (_) {
+      /* ambiente sem console.table */
+    }
+    return report;
+  }
+
   function loadState() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) {
@@ -1186,11 +1823,17 @@
 
   function saveState() {
     delete state.selectedCompany;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Persiste localmente em camadas (nunca lança). A sincronização com o
+    // Firebase ocorre SEMPRE, mesmo que o cache local esteja cheio/indisponível.
+    persistStateToLocal(state);
     if (window.FirebaseSync?.isReady()) {
       window.FirebaseSync.save(state);
     }
   }
+
+  // Seed 2026 (Semana Santa, Tiradentes, São Jorge): roda uma única vez por
+  // dispositivo, logo após o carregamento — antes de qualquer renderização.
+  applyHolidaySeed2026IfNeeded();
 
   function normalizeHolidayRecord(holiday) {
     if (!holiday || typeof holiday !== "object") return null;
@@ -1274,6 +1917,9 @@
   function normalizeCompanyHolidays(companyBlock) {
     if (!companyBlock) return;
     companyBlock.holidays = mergeHolidayLists([], companyBlock.holidays || []);
+    // Dedup automático e idempotente a cada carga: mescla feriados duplicados
+    // (mesma data + nome) preservando vínculos compensados/agendados e CO.
+    mergeDuplicateHolidaysInBlock(companyBlock);
     normalizeWorkedEmployeeRefs(companyBlock);
     reconcileCoCompensationLinks(companyBlock);
   }
@@ -1307,7 +1953,15 @@
 
     if (status.key === "compensado" && !isEditingThisCo) return false;
     if (status.key === "agendado" && !isEditingThisCo) return false;
-    if (!isEditingThisCo && options.scaleCoLinks?.has(holiday.id)) return false;
+
+    // Regra crítica: Se não estou editando este CO específico, exclua feriados já marcados
+    if (!isEditingThisCo) {
+      // Verificar se o feriado já está no índice de COs (mapa de COs já lançados na escala)
+      if (options.scaleCoLinks?.has(holiday.id)) return false;
+
+      // Verificar se o feriado já está vinculado a um CO na escala (mesma verificação, mais explícita)
+      if (item.linkedFromScale && item.scaleCoDate) return false;
+    }
 
     if (item.linkedFromScale && item.scaleCoDate && item.scaleCoDate !== coDate && !isEditingThisCo) {
       return false;
@@ -1438,10 +2092,12 @@
   }
 
   // Persiste estado já mesclado (merge ocorre apenas em mergeRemoteIntoLocal).
+  // O estado vem do Firebase/merge; uma QuotaExceededError aqui NÃO pode gerar
+  // erro de sincronização — persistStateToLocal degrada com segurança e nunca lança.
   function setRemoteState(remoteState) {
     if (!remoteState || typeof remoteState !== "object") return;
     state = finalizeIncomingState(remoteState);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    persistStateToLocal(state);
   }
 
   function getCompanyData(company) {
@@ -1452,28 +2108,110 @@
     return normalizeCompanyBlock(state.companies[resolved]);
   }
 
-  function updateCompanyInfo(companyInfo, company) {
-    const resolved = company || getPrimaryPageCompany("funcionarios");
-    const data = getCompanyData(resolved);
-    if (!data) return;
-    data.companyInfo = {
-      ...(data.companyInfo || {}),
-      legalName: String(companyInfo.legalName || "").trim(),
-      cnpj: String(companyInfo.cnpj || "").trim(),
-      responsibleName: String(companyInfo.responsibleName ?? data.companyInfo?.responsibleName ?? "").trim()
-    };
-    saveState();
+  function buildIncomingCompanyInfo(companyInfo) {
+    const incoming = {};
+    COMPANY_CRITICAL_FIELDS.forEach((field) => {
+      if (field.key === "logoDataUrl") return; // logo tratado em updateCompanyLogo
+      if (Object.prototype.hasOwnProperty.call(companyInfo || {}, field.key)) {
+        const raw = companyInfo[field.key];
+        incoming[field.key] = raw == null ? "" : String(raw).trim();
+      }
+    });
+    return incoming;
   }
 
-  function updateCompanyLogo(logoDataUrl, company) {
-    const resolved = company || getPrimaryPageCompany("funcionarios");
+  /**
+   * Atualiza dados da empresa com PROTEÇÃO:
+   * - merge campo a campo (não apaga valor preenchido com vazio);
+   * - bloqueia substituir registro válido por vazio sem options.force;
+   * - cria backup automático + carimba updatedAt.
+   * @returns {boolean} true se salvou.
+   */
+  function updateCompanyInfo(companyInfo, company, options = {}) {
+    const resolved = company || getActiveCompany();
     const data = getCompanyData(resolved);
-    if (!data) return;
-    data.companyInfo = {
-      ...(data.companyInfo || {}),
-      logoDataUrl: logoDataUrl || ""
-    };
+    if (!data) return false;
+
+    const existing = data.companyInfo || {};
+    const incoming = buildIncomingCompanyInfo(companyInfo || {});
+    const force = options.force === true;
+    const candidate = force ? { ...existing, ...incoming } : mergeCompanyInfoPreserving(existing, incoming);
+
+    if (isMeaningfulCompanyInfo(existing) && !isMeaningfulCompanyInfo(candidate) && !force) {
+      emitDataAlert(
+        `Alteração ignorada: os dados da empresa "${resolved}" ficariam sem Razão Social e CNPJ. Dados preservados.`
+      );
+      return false;
+    }
+
+    candidate.updatedAt = Date.now();
+    candidate.updatedBy = window.AppAuth?.getUser?.()?.email || candidate.updatedBy || "";
+    data.companyInfo = normalizeCompanyInfoShape(candidate, resolved);
+    backupCompanyInfoInState(state, resolved, data.companyInfo);
     saveState();
+    return true;
+  }
+
+  function updateCompanyLogo(logoDataUrl, company, options = {}) {
+    const resolved = company || getActiveCompany();
+    const data = getCompanyData(resolved);
+    if (!data) return false;
+
+    const existing = data.companyInfo || {};
+    const force = options.force === true;
+    const value = logoDataUrl || "";
+
+    if (!value && existing.logoDataUrl && !force) {
+      emitDataAlert(`Logo da empresa "${resolved}" preservado (remoção exige confirmação).`);
+      return false;
+    }
+
+    data.companyInfo = normalizeCompanyInfoShape(
+      { ...existing, logoDataUrl: value, updatedAt: Date.now() },
+      resolved
+    );
+    backupCompanyInfoInState(state, resolved, data.companyInfo);
+    saveState();
+    return true;
+  }
+
+  /** Diagnóstico de integridade dos dados da empresa. */
+  function diagnoseCompanyData(company) {
+    const target = company || getActiveCompany();
+    const block = state.companies?.[target];
+    const info = block?.companyInfo || {};
+    const backup = getCompanyInfoBackup(state, target);
+    const meaningful = isMeaningfulCompanyInfo(info);
+    const inconsistencies = [];
+    if (!resolveCompanyCnpj(info)) inconsistencies.push("CNPJ ausente");
+    if (!String(info.legalName || "").trim()) inconsistencies.push("Razão Social ausente");
+    if (!meaningful) inconsistencies.push("Registro vazio (sem CNPJ e sem Razão Social)");
+
+    return {
+      activeCompany: getActiveCompany(),
+      company: target,
+      source: meaningful ? "cadastro" : backup ? "backup disponível" : "sem dados",
+      updatedAt: info.updatedAt || 0,
+      updatedAtLabel: info.updatedAt ? new Date(info.updatedAt).toLocaleString("pt-BR") : "—",
+      updatedBy: info.updatedBy || "",
+      hasBackup: Boolean(backup),
+      backupUpdatedAt: backup?.updatedAt || 0,
+      historyCount: (state.companyInfoHistory?.[target] || []).length,
+      meaningful,
+      cnpj: resolveCompanyCnpj(info),
+      inconsistencies
+    };
+  }
+
+  /** Restauração manual a partir do backup (confirmação na UI). */
+  function restoreCompanyInfoFromBackup(company) {
+    const target = company || getActiveCompany();
+    const backup = getCompanyInfoBackup(state, target);
+    if (!backup) return false;
+    const data = getCompanyData(target);
+    data.companyInfo = normalizeCompanyInfoShape(backup, target);
+    saveState();
+    return true;
   }
 
   const MOCK_EMPLOYEE_NAMES = new Set(
@@ -1720,7 +2458,7 @@
   }
 
   function addVacation(vacation, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const data = getCompanyData(resolveCompanyForEmployeeWrite(vacation.employeeId, company, "ferias"));
     const employeeName = getEmployeeName(vacation.employeeId, data);
     upsertVacationRange(
       data,
@@ -1742,7 +2480,7 @@
   }
 
   function updateVacation(id, vacation, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const data = getCompanyData(resolveCompanyForEmployeeWrite(vacation.employeeId, company, "ferias"));
     const existing = data.vacations.find((item) => item.id === id);
     if (!existing) return false;
 
@@ -1767,7 +2505,7 @@
   }
 
   function addAbsence(absence, company) {
-    const resolved = company || getPrimaryPageCompany("ferias");
+    const resolved = resolveCompanyForEmployeeWrite(absence.employeeId, company, "ferias");
     const data = getCompanyData(resolved);
     if (!data.absences) data.absences = [];
     data.absences.push({
@@ -1791,8 +2529,74 @@
     saveState();
   }
 
+  /**
+   * Validação automática de Padroeira de Búzios (Fase 3A).
+   * Falha com erro se encontrar data incorreta (21/05 em vez de 26/07).
+   */
+  function validatePadroeiraBuziosIntegrity() {
+    const errors = [];
+
+    COMPANIES.forEach((company) => {
+      const data = getCompanyData(company);
+      (data.holidays || []).forEach((holiday) => {
+        if (!holiday.date) return;
+
+        const isBuzios = String(holiday.name || "").includes("Padroeira");
+        const isWrongDate = holiday.date.endsWith("-05-21");
+
+        if (isBuzios && isWrongDate) {
+          errors.push({
+            company,
+            holidayId: holiday.id,
+            message: `Padroeira de Búzios em ${holiday.date} (deveria ser 26/07)`
+          });
+        }
+      });
+    });
+
+    if (errors.length > 0) {
+      console.error("[Validação] FALHA: Padroeira de Búzios com data incorreta", errors);
+      return { valid: false, errors };
+    }
+
+    return { valid: true, errors: [] };
+  }
+
+  /**
+   * Corrigir automaticamente Padroeira de Búzios (Fase 3A).
+   * Muda de 21/05 para 26/07 se encontrado.
+   */
+  function correctPadroeiraBuziosAutomatically() {
+    let corrected = 0;
+
+    COMPANIES.forEach((company) => {
+      const data = getCompanyData(company);
+      (data.holidays || []).forEach((holiday) => {
+        if (!holiday.date) return;
+
+        const isBuzios = String(holiday.name || "").includes("Padroeira");
+        const isWrongDate = holiday.date.endsWith("-05-21");
+
+        if (isBuzios && isWrongDate) {
+          const year = holiday.date.slice(0, 4);
+          holiday.date = `${year}-07-26`;
+          corrected += 1;
+          console.warn(
+            `[Validação] Padroeira de Búzios corrigida para ${holiday.date} (empresa: ${company})`
+          );
+        }
+      });
+    });
+
+    if (corrected > 0) {
+      saveState();
+    }
+
+    return corrected;
+  }
+
   function updateAbsence(id, absence, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const data = getCompanyData(resolveCompanyForEmployeeWrite(absence.employeeId, company, "ferias"));
     const existing = (data.absences || []).find((item) => item.id === id);
     if (!existing) return false;
 
@@ -1890,11 +2694,197 @@
     return changed;
   }
 
+  /**
+   * Soft delete de feriado — marca como deletado em vez de remover.
+   * Permite restauração posterior.
+   */
   function removeHoliday(id, options = {}) {
     const company = options.company || getPrimaryPageCompany("feriados");
     const data = getCompanyData(company);
-    data.holidays = data.holidays.filter((holiday) => holiday.id !== id);
+    const holiday = (data.holidays || []).find((h) => h.id === id);
+    if (!holiday) return false;
+
+    // Soft delete: marcar com deletedAt em vez de remover
+    holiday.deletedAt = holiday.deletedAt || todayISO();
+    holiday.isDeleted = true;
+
     saveState();
+    return true;
+  }
+
+  /**
+   * Restaurar feriado que foi marcado como deletado.
+   */
+  function restoreHoliday(id, options = {}) {
+    const company = options.company || getPrimaryPageCompany("feriados");
+    const data = getCompanyData(company);
+    const holiday = (data.holidays || []).find((h) => h.id === id);
+    if (!holiday) return false;
+
+    delete holiday.deletedAt;
+    holiday.isDeleted = false;
+
+    saveState();
+    return true;
+  }
+
+  /**
+   * Listar feriados não deletados (filtro padrão na UI).
+   */
+  function getActiveHolidays(company) {
+    const data = getCompanyData(company);
+    return (data.holidays || []).filter((h) => !h.isDeleted);
+  }
+
+  /**
+   * FASE 3A — Deduplicação de feriados
+   *
+   * Chave de unicidade (por empresa/bloco): data + nome normalizado.
+   *
+   * Pontuação de um vínculo (workedEmployee) — quanto maior, mais completo:
+   *   Compensado(4) > Agendado(3) > Vencido(1) > Pendente(0), reforçado por
+   *   data de compensação, vínculo da escala e CO da escala. Garante que um
+   *   vínculo compensado/agendado nunca seja substituído por um pendente.
+   */
+  function scoreWorkedHolidayItem(item, holidayDate) {
+    if (!item) return -1;
+    const status = resolveWorkedHolidayStatus(item, holidayDate);
+    const statusRank =
+      status.key === "compensado" ? 4 : status.key === "agendado" ? 3 : status.key === "vencido" ? 1 : 0;
+    return (
+      statusRank * 100 +
+      (item.compensationDate ? 20 : 0) +
+      (item.linkedFromScale ? 10 : 0) +
+      (item.scaleCoDate ? 5 : 0) +
+      (item.status ? 1 : 0)
+    );
+  }
+
+  // Registro canônico = o mais completo: maior pontuação de vínculo e mais funcionários.
+  function scoreHolidayRecord(holiday) {
+    const worked = holiday.workedEmployees || [];
+    let best = 0;
+    worked.forEach((item) => {
+      best = Math.max(best, scoreWorkedHolidayItem(item, holiday.date));
+    });
+    return best * 1000 + worked.length;
+  }
+
+  /**
+   * Mescla, dentro de um bloco de empresa, feriados duplicados (mesma data + nome).
+   * - Escolhe o registro mais completo como canônico (prioridade req. 4).
+   * - Consolida todos os workedEmployees únicos por employeeId, preferindo o mais
+   *   completo (compensado/agendado nunca vira pendente — req. 5/6).
+   * - Aplica soft delete nos duplicados (idempotente — só agrupa registros ativos).
+   * - Religa vínculos CO (manualScale.linkedHolidayId e item.linkedHolidayId) do id
+   *   removido para o id canônico, preservando o vínculo CO existente (req. 2).
+   * Idempotente: rodar várias vezes não recria nem perde duplicados.
+   */
+  function mergeDuplicateHolidaysInBlock(data) {
+    if (!data || !Array.isArray(data.holidays) || data.holidays.length < 2) {
+      return { merged: 0, details: [] };
+    }
+
+    const byKey = new Map();
+    (data.holidays || []).forEach((holiday) => {
+      if (!holiday || holiday.isDeleted) return; // só agrupa registros ativos (idempotência)
+      if (!holiday.date || !holiday.name) return;
+      const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(holiday);
+    });
+
+    const details = [];
+    const remap = new Map(); // id removido -> id canônico (para religar vínculos CO)
+    let merged = 0;
+
+    byKey.forEach((group) => {
+      if (group.length < 2) return;
+
+      const primary = group.slice().sort((a, b) => scoreHolidayRecord(b) - scoreHolidayRecord(a))[0];
+
+      // Consolidar workedEmployees únicos por employeeId, preferindo o mais completo
+      const workedMap = new Map();
+      group.forEach((holiday) => {
+        (holiday.workedEmployees || []).forEach((item) => {
+          if (!item || !item.employeeId) return;
+          const existing = workedMap.get(item.employeeId);
+          if (!existing) {
+            workedMap.set(item.employeeId, item);
+            return;
+          }
+          const keepNew =
+            scoreWorkedHolidayItem(item, holiday.date) > scoreWorkedHolidayItem(existing, primary.date);
+          workedMap.set(item.employeeId, keepNew ? item : existing);
+        });
+      });
+
+      primary.workedEmployees = Array.from(workedMap.values());
+      primary.isDeleted = false;
+      delete primary.deletedAt;
+
+      group.forEach((holiday) => {
+        if (holiday === primary) return;
+        holiday.isDeleted = true;
+        holiday.deletedAt = todayISO();
+        if (holiday.id && holiday.id !== primary.id) remap.set(holiday.id, primary.id);
+        details.push({
+          action: "merged",
+          kept: primary.id,
+          deleted: holiday.id,
+          date: holiday.date,
+          name: holiday.name,
+          keptCount: primary.workedEmployees.length
+        });
+        merged += 1;
+      });
+    });
+
+    // Religar vínculos CO que apontavam para o registro removido (preserva o vínculo)
+    if (remap.size) {
+      Object.values(data.manualScale || {}).forEach((entry) => {
+        if (entry && typeof entry === "object" && remap.has(entry.linkedHolidayId)) {
+          entry.linkedHolidayId = remap.get(entry.linkedHolidayId);
+        }
+      });
+      (data.holidays || []).forEach((holiday) => {
+        (holiday.workedEmployees || []).forEach((item) => {
+          if (item && remap.has(item.linkedHolidayId)) {
+            item.linkedHolidayId = remap.get(item.linkedHolidayId);
+          }
+        });
+      });
+    }
+
+    return { merged, details };
+  }
+
+  function findOrMergeDuplicateHolidays(company, options = {}) {
+    const data = getCompanyData(company);
+    const result = mergeDuplicateHolidaysInBlock(data);
+    if (result.merged > 0 && options.save !== false) {
+      saveState();
+    }
+    return result;
+  }
+
+  /**
+   * Deduplicação global para todas as empresas.
+   */
+  function deduplicateAllHolidays(options = {}) {
+    const results = {};
+    COMPANIES.forEach((company) => {
+      const result = findOrMergeDuplicateHolidays(company, { save: false });
+      if (result.merged > 0) {
+        results[company] = result;
+      }
+    });
+
+    if (Object.keys(results).length > 0 && options.save !== false) {
+      saveState();
+    }
+
+    return results;
   }
 
   function removeWorkedEmployeeFromHoliday(holidayId, employeeId, options = {}) {
@@ -2020,7 +3010,45 @@
     return item.status === "Pendente" || item.status === "Agendado";
   }
 
-  function getPendingCoHolidaysForEmployee(employeeId, coDate, options = {}) {
+  /**
+   * Predicado ÚNICO de visibilidade de um vínculo (workedEmployee) no Histórico
+   * oficial do Controle de Feriados. É a fonte de verdade compartilhada entre o
+   * Controle de Feriados (feriados.js) e o dropdown do modal CO (Escala).
+   *
+   * Um vínculo é visível somente se:
+   *  - o feriado não está soft-deletado;
+   *  - tem employeeId;
+   *  - a data trabalhada NÃO é anterior à admissão do funcionário (feriado de
+   *    antes da admissão — ex.: "Natal 2025" para quem entrou depois — é invisível).
+   *
+   * Mantém a mesma semântica do filtro do Controle de Feriados: quando o
+   * funcionário não é encontrado ou não tem admissionDate, o vínculo é visível.
+   */
+  function isWorkedEntryVisibleInHistory(holiday, item, data) {
+    if (!holiday || holiday.isDeleted) return false;
+    if (!item || !item.employeeId) return false;
+    const emp = (data?.employees || []).find((entry) => entry.id === item.employeeId);
+    if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return false;
+    return true;
+  }
+
+  /**
+   * FONTE ÚNICA das opções do dropdown do modal CO (Escala de Folga).
+   *
+   * Chave lógica: employeeId + empresa + nome normalizado + data trabalhada.
+   * Para cada chave, agrega TODOS os registros do funcionário e decide UMA opção:
+   *   1. Se a chave tem o feriado já vinculado a ESTE CO (coDate em edição) → mantém
+   *      esse registro selecionável (permite reabrir/editar o CO atual).
+   *   2. Senão, se QUALQUER registro da chave está Agendado/Compensado, tem
+   *      compensationDate, ou já tem CO lançado na escala (qualquer data, inclusive
+   *      futura) → a chave inteira some do dropdown (remove o Pendente duplicado).
+   *   3. Senão, oferece um único representante Pendente/Vencido da chave.
+   *
+   * Exclui ainda: soft-deletados, duplicados, registros de outro employeeId e de
+   * outra empresa (os dados já chegam com escopo da empresa da aba ativa).
+   * Retorno: [{ holiday, item, status, company }] ordenado por data.
+   */
+  function getAvailableCoHolidayOptions(employeeId, coDate, options = {}) {
     const canonicalId = String(employeeId || "").trim();
     if (!canonicalId) return [];
 
@@ -2032,30 +3060,200 @@
     normalizeWorkedEmployeeRefs(data);
     reconcileCoCompensationLinks(data);
 
+    // Empresa da aba ativa (regra 9): o funcionário precisa pertencer a este bloco.
     if (!data.employees.some((entry) => entry.id === canonicalId)) return [];
 
     const today = todayISO();
     const currentEntry = getManualScaleEntry(canonicalId, coDate, data);
     const currentLinkedId =
       currentEntry && typeof currentEntry === "object" ? currentEntry.linkedHolidayId : null;
-    const scaleCoLinks = buildScaleCoHolidayIndex(data, canonicalId);
-    const context = { data, employeeId: canonicalId, scaleCoLinks };
+    const scaleCoIndex = buildScaleCoHolidayIndex(data, canonicalId); // linkedHolidayId -> coDate
 
-    return (data.holidays || [])
-      .map((holiday) => {
-        const item = resolveWorkedEmployeeEntry(data, canonicalId, holiday);
-        if (!item) return null;
+    // 1) Agrupar registros do funcionário por chave lógica (data + nome normalizado)
+    const groups = new Map();
+    (data.holidays || []).forEach((holiday) => {
+      if (!holiday || holiday.isDeleted) return; // regra 6: soft-deleted
+      if (!holiday.date || !holiday.name) return;
 
-        const isEditingThisCo =
-          holiday.id === currentLinkedId ||
-          (item.linkedFromScale && (item.scaleCoDate === coDate || item.compensationDate === coDate));
+      const item = resolveWorkedEmployeeEntry(data, canonicalId, holiday); // regra 8: employeeId
+      if (!item) return;
 
-        if (!isPendingCoCandidate(item, holiday, coDate, today, isEditingThisCo, context)) return null;
+      // Dropdown CO = subconjunto do Histórico oficial: descarta vínculos que o
+      // Controle de Feriados não exibe (ex.: feriado anterior à admissão).
+      if (!isWorkedEntryVisibleInHistory(holiday, item, data)) return;
 
-        return { holiday, item, status: resolveWorkedHolidayStatus(item, holiday.date, today), company };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
+      syncWorkedEmployeeStatus(item, holiday.date);
+      const status = resolveWorkedHolidayStatus(item, holiday.date, today);
+
+      // O feriado já vinculado a ESTE CO (em edição) permanece disponível.
+      const isEditingThisCo =
+        holiday.id === currentLinkedId ||
+        (item.linkedFromScale && (item.scaleCoDate === coDate || item.compensationDate === coDate));
+
+      // Este registro torna a chave indisponível? (regras 1,2,3,4,5)
+      const hasScaleCo = scaleCoIndex.has(holiday.id) || (item.linkedFromScale && Boolean(item.scaleCoDate));
+      const isResolved = status.key === "agendado" || status.key === "compensado";
+      const hasCompDate = Boolean(item.compensationDate);
+      const blocks = !isEditingThisCo && (isResolved || hasCompDate || hasScaleCo);
+
+      const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { blocked: false, editing: null, pending: null };
+        groups.set(key, group);
+      }
+      if (blocks) group.blocked = true;
+      if (isEditingThisCo && !group.editing) {
+        group.editing = { holiday, item, status, company };
+      }
+      if (!group.pending && FERIADOS_CO_PICKER_STATUSES.has(status.key)) {
+        group.pending = { holiday, item, status, company };
+      }
+    });
+
+    // 2) Uma opção por chave: edição > (bloqueado: nada) > pendente/vencido
+    const available = [];
+    groups.forEach((group) => {
+      if (group.editing) {
+        available.push(group.editing);
+        return;
+      }
+      if (group.blocked) return; // existe Agendado/Compensado/CO → some o Pendente (regra 7)
+      if (group.pending) available.push(group.pending);
+    });
+
+    return available.sort((a, b) => a.holiday.date.localeCompare(b.holiday.date));
+  }
+
+  // Mantidos como alias da fonte única para não divergirem (root cause original).
+  function getAvailableHolidaysForCo(employeeId, coDate, options = {}) {
+    return getAvailableCoHolidayOptions(employeeId, coDate, options);
+  }
+
+  function getPendingCoHolidaysForEmployee(employeeId, coDate, options = {}) {
+    return getAvailableCoHolidayOptions(employeeId, coDate, options);
+  }
+
+  /**
+   * AUDITORIA de consistência dos feriados (Fase 3B) — SOMENTE LEITURA.
+   * Não altera nenhum dado. Rode no console: AppData.auditHolidayConsistency()
+   *
+   * Verifica, por empresa:
+   *  - vínculos invisíveis para CO (feriado soft-deletado com pendência);
+   *  - vínculos anteriores à admissão (invisíveis no Histórico);
+   *  - status gravado divergente do status calculado;
+   *  - vínculos órfãos (employeeId inexistente na empresa);
+   *  - "Compensado" sem nenhuma data de compensação;
+   *  - duplicidades ativas (mesma data + nome normalizado);
+   *  - data divergente entre feriado da empresa e calendário (mesmo ano);
+   *  - feriados sem nenhum funcionário vinculado (informativo).
+   * E no calendário: mesmo feriado (variantes de nome) em datas diferentes
+   * no mesmo ano (risco de duplicidade futura).
+   */
+  function auditHolidayConsistency() {
+    const today = todayISO();
+    const report = {
+      generatedAt: new Date().toISOString(),
+      calendar: [],
+      companies: {},
+      totalIssues: 0
+    };
+
+    // Calendário global: nome equivalente em datas diferentes no mesmo ano.
+    const calendarByKey = new Map();
+    (state.calendarHolidays || []).forEach((holiday) => {
+      if (!holiday?.date || !holiday?.name) return;
+      const key = `${String(holiday.date).slice(0, 4)}|${normalizeSearchText(holiday.name)}`;
+      const knownDate = calendarByKey.get(key);
+      if (knownDate && knownDate !== holiday.date) {
+        report.calendar.push({
+          tipo: "datas-divergentes-calendario",
+          feriado: holiday.name,
+          datas: [knownDate, holiday.date]
+        });
+      } else if (!knownDate) {
+        calendarByKey.set(key, holiday.date);
+      }
+    });
+
+    getCompanies().forEach((company) => {
+      const data = getCompanyData(company);
+      const findings = {
+        invisiveisParaCo: [],
+        anterioresAdmissao: [],
+        statusDivergente: [],
+        vinculoOrfao: [],
+        compensadoSemData: [],
+        duplicadosAtivos: [],
+        dataDivergenteCalendario: [],
+        semFuncionarioVinculado: []
+      };
+      const employeeIds = new Set((data.employees || []).map((employee) => employee.id));
+      const activeByKey = new Map();
+
+      (data.holidays || []).forEach((holiday) => {
+        if (!holiday?.date || !holiday?.name) return;
+        const base = { feriado: holiday.name, data: holiday.date, id: holiday.id };
+        const worked = holiday.workedEmployees || [];
+
+        if (!holiday.isDeleted) {
+          const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+          if (activeByKey.has(key)) {
+            findings.duplicadosAtivos.push({ ...base, duplicaDe: activeByKey.get(key) });
+          } else {
+            activeByKey.set(key, holiday.id);
+          }
+
+          const yearKey = `${String(holiday.date).slice(0, 4)}|${normalizeSearchText(holiday.name)}`;
+          const calendarDate = calendarByKey.get(yearKey);
+          if (calendarDate && calendarDate !== holiday.date) {
+            findings.dataDivergenteCalendario.push({ ...base, dataCalendario: calendarDate });
+          }
+
+          if (!worked.length) findings.semFuncionarioVinculado.push(base);
+        }
+
+        worked.forEach((item) => {
+          if (!item) return;
+          const employee = (data.employees || []).find((entry) => entry.id === item.employeeId);
+          const who = { funcionarioId: item.employeeId || "", funcionario: employee?.name || "" };
+          const resolved = resolveWorkedHolidayStatus(item, holiday.date, today);
+
+          if (holiday.isDeleted && resolved.key !== "compensado") {
+            findings.invisiveisParaCo.push({ ...base, ...who, status: resolved.label });
+          }
+          if (!item.employeeId || !employeeIds.has(item.employeeId)) {
+            findings.vinculoOrfao.push({ ...base, ...who });
+            return;
+          }
+          if (employee?.admissionDate && holiday.date < employee.admissionDate) {
+            findings.anterioresAdmissao.push({ ...base, ...who, admissao: employee.admissionDate });
+          }
+          if (item.status && item.status !== resolved.label) {
+            findings.statusDivergente.push({
+              ...base,
+              ...who,
+              statusGravado: item.status,
+              statusCalculado: resolved.label
+            });
+          }
+          const hasAnyCompDate = Boolean(
+            item.compensationDate || item.scheduledCoDate || item.scaleCoDate
+          );
+          if (resolved.key === "compensado" && !hasAnyCompDate) {
+            findings.compensadoSemData.push({ ...base, ...who });
+          }
+        });
+      });
+
+      report.companies[company] = findings;
+      report.totalIssues += Object.entries(findings)
+        .filter(([name]) => name !== "semFuncionarioVinculado")
+        .reduce((sum, [, list]) => sum + list.length, 0);
+    });
+
+    report.totalIssues += report.calendar.length;
+    return report;
   }
 
   function findOldestLinkableHolidayWorked(data, employeeId, preferredHolidayId, coDate = "") {
@@ -2071,6 +3269,7 @@
 
   function isCoDateAlreadyLinked(data, employeeId, coDate, excludeHolidayId = "") {
     return (data.holidays || []).some((holiday) => {
+      if (holiday.isDeleted) return false;
       if (holiday.id === excludeHolidayId) return false;
       return (holiday.workedEmployees || []).some(
         (item) => item.employeeId === employeeId && item.linkedFromScale && item.scaleCoDate === coDate
@@ -2203,10 +3402,7 @@
   }
 
   function setManualScale(employeeId, date, code, linkedHolidayId, company) {
-    const resolvedCompany =
-      company ||
-      AppData.findEmployeeRecord(employeeId)?.company ||
-      AppData.getPrimaryPageCompany("escala");
+    const resolvedCompany = resolveCompanyForEmployeeWrite(employeeId, company, "escala");
     const data = getCompanyData(resolvedCompany);
     const key = `${employeeId}|${date}`;
     const previousCode = getPreviousManualScaleCode(data, employeeId, date);
@@ -2251,7 +3447,7 @@
   }
 
   function setVtDeduction(employeeId, yearMonth, days, options = {}) {
-    const company = resolveVtCompany(options.company);
+    const company = resolveCompanyForEmployeeWrite(employeeId, options.company, "vale-transporte");
     const vt = ensureValeTransporteState();
     if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
     const key = `${employeeId}|${yearMonth}`;
@@ -2325,6 +3521,30 @@
       absenceCode,
       manualCode
     };
+  }
+
+  /**
+   * Fonte única de verdade: um código de escala conta como dia trabalhado?
+   * Respeita state.scaleCodeConfig (override do usuário) e os defaults canônicos.
+   * Usado por VT, Escala, Controle de Feriados e Dashboard para eliminar divergências.
+   */
+  function isWorkedScaleCode(code) {
+    const normalized = String(code ?? "").trim();
+    if (!normalized) return true;
+
+    const config = state?.scaleCodeConfig;
+    if (config && typeof config === "object") {
+      if (config[normalized] === "not-worked") return false;
+      if (config[normalized] === "worked") return true;
+    }
+
+    if (NOT_WORKED_SCALE_CODES.has(normalized)) return false;
+    if (VT_WORKED_CODES.has(normalized)) return true;
+    return false;
+  }
+
+  function isNotWorkedScaleCode(code) {
+    return !isWorkedScaleCode(code);
   }
 
   function getScaleCode(employee, date, data = getCompanyData()) {
@@ -2649,6 +3869,8 @@
     setPageCompany,
     resolveCompaniesForPage,
     getPrimaryPageCompany,
+    getActiveCompany,
+    setActiveCompany,
     isPageCompanyAll,
     findEmployeeRecord,
     isEmployeeActive,
@@ -2663,6 +3885,9 @@
     findAbsenceForDate,
     getScaleAbsenceConflict,
     getPendingCoHolidaysForEmployee,
+    getAvailableHolidaysForCo,
+    getAvailableCoHolidayOptions,
+    isWorkedEntryVisibleInHistory,
     resolveWorkedEmployeeEntry,
     isWorkedHolidayPendingInFeriadosControl,
     reconcileCoCompensationLinks,
@@ -2687,6 +3912,10 @@
     compareEmployeeName,
     sortEmployeesByName,
     getScaleCode,
+    isWorkedScaleCode,
+    isNotWorkedScaleCode,
+    NOT_WORKED_SCALE_CODES,
+    resolveCompanyForEmployeeWrite,
     exportCurrentDataJSON,
     findEmployeeByCpf,
     findEmployeeByName,
@@ -2701,6 +3930,15 @@
     monthKey,
     removeEmployee,
     removeHoliday,
+    restoreHoliday,
+    getActiveHolidays,
+    findOrMergeDuplicateHolidays,
+    deduplicateAllHolidays,
+    dedupeCalendarHolidays,
+    validatePadroeiraBuziosIntegrity,
+    correctPadroeiraBuziosAutomatically,
+    applyHolidaySeed2026,
+    auditHolidayConsistency,
     updateHoliday,
     removeWorkedEmployeeFromHoliday,
     removeVacation,
@@ -2710,9 +3948,16 @@
     todayISO,
     updateCompanyInfo,
     updateCompanyLogo,
+    diagnoseCompanyData,
+    restoreCompanyInfoFromBackup,
+    resolveCompanyCnpj,
+    isMeaningfulCompanyInfo,
+    COMPANY_CRITICAL_FIELDS,
     setRemoteState,
     mergeRemoteIntoLocal,
     readLocalStateSnapshot,
+    measureStorageUsage,
+    STORAGE_KEY,
     getManualScaleEntry,
     setVtDeduction,
     getVtDeduction,

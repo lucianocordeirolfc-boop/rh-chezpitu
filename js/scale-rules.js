@@ -57,21 +57,27 @@
     return state.scaleCodeConfig;
   }
 
+  // Fonte única de verdade: delega para AppData.isWorkedScaleCode (mesmo state.scaleCodeConfig).
+  // O parâmetro `state` é mantido por compatibilidade de assinatura.
   function isScaleCodeWorked(code, state) {
+    if (typeof AppData.isWorkedScaleCode === "function") {
+      return AppData.isWorkedScaleCode(code);
+    }
+    // Fallback defensivo (não deve ocorrer: data.js carrega antes de scale-rules.js).
     const normalized = String(code ?? "").trim();
     if (!normalized) return true;
-
     const config = getCodeConfig(state);
     if (config[normalized] === "not-worked") return false;
     if (config[normalized] === "worked") return true;
-
     if (DEFAULT_NOT_WORKED.has(normalized)) return false;
     if (AppData.VT_WORKED_CODES.has(normalized) || DEFAULT_WORKED_EXTRA.has(normalized)) return true;
-
     return false;
   }
 
   function isScaleCodeNotWorked(code, state) {
+    if (typeof AppData.isNotWorkedScaleCode === "function") {
+      return AppData.isNotWorkedScaleCode(code);
+    }
     const normalized = String(code ?? "").trim();
     if (!normalized) return false;
     return !isScaleCodeWorked(normalized, state);
@@ -289,38 +295,47 @@
 
             const holidaysOnDay = getCalendarHolidaysOnDate(date, company, state);
             if (!holidaysOnDay.length) return;
-            if (holidayWorkedExists(data, employee.id, date)) return;
 
-            const calendarHoliday = holidaysOnDay[0];
-            let holidayRecord = data.holidays.find(
-              (item) =>
-                item.date === date &&
-                normalizeName(item.name) === normalizeName(calendarHoliday.name)
-            );
+            // CORREÇÃO: Iterar por CADA feriado no dia (pode haver múltiplos)
+            holidaysOnDay.forEach((calendarHoliday) => {
+              // Procurar feriado existente por data + nome
+              let holidayRecord = data.holidays.find(
+                (item) =>
+                  item.date === date &&
+                  normalizeName(item.name) === normalizeName(calendarHoliday.name)
+              );
 
-            if (!holidayRecord) {
-              holidayRecord = {
-                id: `feriado-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-                name: calendarHoliday.name,
-                date,
-                workedEmployees: []
+              // Se não existe, criar novo registro
+              if (!holidayRecord) {
+                holidayRecord = {
+                  id: `feriado-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+                  name: calendarHoliday.name,
+                  date,
+                  workedEmployees: []
+                };
+                data.holidays.push(holidayRecord);
+              }
+
+              // CORREÇÃO: Verificar se ESTE FUNCIONÁRIO já existe NESTE FERIADO específico
+              const employeeAlreadyExists = (holidayRecord.workedEmployees || []).some(
+                (item) => item.employeeId === employee.id
+              );
+              if (employeeAlreadyExists) return; // Não duplicar
+
+              const autoItem = {
+                employeeId: employee.id,
+                compensationDate: "",
+                note: "",
+                origin: "Automático pela escala",
+                autoCreated: true,
+                role: employee.role || "",
+                department: employee.department || "",
+                company
               };
-              data.holidays.push(holidayRecord);
-            }
-
-            const autoItem = {
-              employeeId: employee.id,
-              compensationDate: "",
-              note: "",
-              origin: "Automático pela escala",
-              autoCreated: true,
-              role: employee.role || "",
-              department: employee.department || "",
-              company
-            };
-            AppData.syncWorkedEmployeeStatus(autoItem, holidayRecord.date);
-            holidayRecord.workedEmployees.push(autoItem);
-            created += 1;
+              AppData.syncWorkedEmployeeStatus(autoItem, holidayRecord.date);
+              holidayRecord.workedEmployees.push(autoItem);
+              created += 1;
+            });
           });
         });
     });
@@ -424,6 +439,22 @@
     AppData.saveState();
   }
 
+  function updateCalendarHoliday(id, patch = {}) {
+    const state = AppData.state;
+    const holiday = (state.calendarHolidays || []).find((item) => item.id === id);
+    if (!holiday) return false;
+    if (patch.name !== undefined) holiday.name = String(patch.name || "").trim();
+    if (patch.type !== undefined) holiday.type = patch.type || holiday.type || "nacional";
+    if (patch.date !== undefined) {
+      let date = String(patch.date || "").trim();
+      if (AppData.isPadroeiraBuziosName(holiday.name)) date = AppData.correctPadroeiraBuziosDate(date);
+      holiday.date = date;
+    }
+    if (Array.isArray(patch.companies)) holiday.companies = patch.companies;
+    AppData.saveState();
+    return true;
+  }
+
   window.ScaleRules = {
     COVERAGE_PRINCIPALS,
     isScaleCodeWorked,
@@ -438,6 +469,7 @@
     countAutoPendingHolidaysAllCompanies,
     getHolidayDatesForCompany,
     addCalendarHoliday,
+    updateCalendarHoliday,
     removeCalendarHoliday,
     getCalendarHolidaysOnDate,
     formatDateBR,

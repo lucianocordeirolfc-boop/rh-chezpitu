@@ -957,19 +957,164 @@ button.stat-chip.feriados-nav-chip.is-active {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--sea-400) 35%, transparent);
 }
 
+/* Modal alto (~85% da tela) priorizando a lista de feriados cadastrados */
 .feriados-register-popup {
-  width: min(720px, 96vw);
-  max-height: 90vh;
-  overflow: auto;
+  width: min(820px, 96vw);
+  height: 85vh;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Cabeçalho do modal fixo */
+.feriados-register-popup > .popup-header {
+  flex-shrink: 0;
 }
 
 .feriados-popup-tabs {
+  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  margin: 12px 24px 0;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
+}
+
+/* Área de painéis ocupa o restante; sem rolagem do card inteiro */
+.feriados-popup-panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.feriados-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.feriados-panel[hidden] {
+  display: none;
+}
+
+/* Formulário compacto, altura natural (não concorre por rolagem) */
+.feriados-panel-form {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+}
+
+.feriados-panel-body {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 14px 24px 10px;
+}
+
+.feriados-panel-body .popup-grid {
+  gap: 10px;
+}
+
+.feriados-panel-footer {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 10px 24px;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Funcionários: lista compacta com rolagem contida pequena */
+.feriados-emp-group {
+  max-height: 104px;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.feriados-emp-group legend {
+  font-size: 0.8rem;
+}
+
+/* Lista "Feriados cadastrados" — área PRINCIPAL, rolagem única */
+.feriados-popup-manager {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 12px 24px 16px;
+  background: var(--sand);
+}
+
+.feriados-popup-manager .feriados-manager-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+/* Cabeçalho fixo das tabelas do modal durante a rolagem */
+.feriados-popup-manager .feriados-manager-table thead th,
+.feriados-popup-calendar-list table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--sea-100);
+}
+
+/* Aba Calendário: lista ocupa o restante; rolagem única na tabela interna */
+.feriados-popup-calendar-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0;
+  padding: 12px 24px 16px;
+  background: var(--sand);
+}
+
+.feriados-popup-calendar-list .feriados-manager-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+/* Rodapé compacto: botões menores e alinhados à direita */
+.feriados-panel-footer-compact {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 24px;
+}
+
+.feriados-panel-footer-compact .btn-sm,
+.feriados-panel-footer-compact button {
+  padding: 7px 16px;
+  font-size: 0.85rem;
+  border-radius: 9px;
+}
+
+@media (max-height: 680px) {
+  .feriados-register-popup {
+    height: 92vh;
+    max-height: 92vh;
+  }
+  .feriados-emp-group {
+    max-height: 84px;
+  }
 }
 
 .feriados-popup-tab {
@@ -985,12 +1130,6 @@ button.stat-chip.feriados-nav-chip.is-active {
 .feriados-popup-tab.is-active {
   color: var(--sea-700);
   background: var(--sea-50);
-}
-
-.feriados-popup-calendar-list {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
 }
 
 .feriados-popup-form .full {
@@ -3023,4 +3162,398 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   .resumo-name-cell {
     min-width: 140px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FASE 2 — Identidade boutique hotel + navegação por abas
+   (off-white, areia, azul suave, verde petróleo, dourado discreto)
+   Sobrescreve a paleta e o layout (sidebar → abas + ribbon horizontal).
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --sea-900: #15403d;
+  --sea-800: #1f4f4f;
+  --sea-700: #2a5d5a;
+  --sea-500: #3f7d77;
+  --sea-200: #cfe0db;
+  --sea-100: #eef3ef;
+  --sand: #f7f4ee;
+  --ink: #2c2a26;
+  --muted: #8a817a;
+  --line: #e6ddcd;
+  --success: #2a7a5b;
+  --warning: #b8924a;
+  --danger: #b5524a;
+  --gold: #c2a25a;
+  --soft-blue: #6f93a8;
+  --shadow: 0 16px 40px rgba(31, 79, 79, 0.10);
+}
+
+body {
+  background: linear-gradient(160deg, #faf8f3 0%, #f1ece1 100%);
+  color: var(--ink);
+}
+
+/* Layout em coluna — sidebar removida */
+/* Cabeçalho fixo: só a área de conteúdo rola; topbar + abas + ribbon ficam sempre visíveis. */
+.app-shell {
+  margin-left: 0 !important;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 22px clamp(16px, 3vw, 34px) 36px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Barra superior: marca + abas de empresa + ações (fixa) */
+.topbar {
+  flex-shrink: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0;
+  padding: 12px clamp(16px, 3vw, 30px) 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(250, 248, 243, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 14px rgba(31, 79, 79, 0.05);
+}
+
+.topbar .brand {
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+
+.topbar .brand-mark {
+  background: var(--sea-800);
+  color: #f3ead2;
+  border: 1px solid var(--gold);
+}
+
+.topbar .brand-text strong {
+  color: var(--sea-800);
+}
+
+.topbar .brand-text small {
+  color: var(--muted);
+}
+
+.topbar-actions {
+  margin-bottom: 10px;
+}
+
+/* Abas de empresa (contexto único do sistema) */
+.company-tabs {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  align-self: flex-end;
+}
+
+.company-tab {
+  padding: 10px 24px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 13px 13px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.company-tab:hover {
+  color: var(--sea-800);
+  background: rgba(111, 147, 168, 0.12);
+}
+
+.company-tab.active {
+  background: var(--sand);
+  color: var(--sea-900);
+  box-shadow: inset 0 3px 0 var(--gold);
+}
+
+/* Menu horizontal estilo planilha */
+.module-ribbon {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+  flex-wrap: wrap;
+  padding: 0 clamp(10px, 3vw, 24px);
+  background: var(--sand);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ribbon-item {
+  padding: 11px 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.ribbon-item:hover {
+  color: var(--sea-800);
+  background: rgba(31, 79, 79, 0.05);
+}
+
+.ribbon-item.active {
+  color: var(--sea-900);
+  border-bottom-color: var(--gold);
+  background: linear-gradient(180deg, rgba(194, 162, 90, 0.12), transparent);
+}
+
+@media (max-width: 860px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+  .company-tabs {
+    order: 3;
+    width: 100%;
+    align-self: stretch;
+    overflow-x: auto;
+  }
+  .module-ribbon {
+    overflow-x: auto;
+  }
+}
+
+/* Módulo Dados da Empresa */
+.empresa-card {
+  max-width: 780px;
+}
+
+.empresa-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.empresa-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.empresa-form .field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.empresa-form .field input {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.empresa-form .field input:focus {
+  outline: none;
+  border-color: var(--sea-500);
+  box-shadow: 0 0 0 3px var(--sea-100);
+}
+
+.empresa-logo-row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.empresa-logo-frame {
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.empresa-logo-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.empresa-logo-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.empresa-logo-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.empresa-stats {
+  display: flex;
+  gap: 8px;
+}
+
+.empresa-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Dados da Empresa — campos agrupados + diagnóstico */
+.empresa-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  margin: 0;
+}
+
+.empresa-fieldset legend {
+  padding: 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--sea-800);
+}
+
+.empresa-diag {
+  margin: 10px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--sand);
+  padding: 8px 14px;
+}
+
+.empresa-diag > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--sea-900);
+}
+
+.empresa-diag-body {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.empresa-diag-body p {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.empresa-diag-body p span {
+  color: var(--muted);
+}
+
+.empresa-diag-issues {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.empresa-diag-ok {
+  margin: 4px 0 0;
+  color: var(--success);
+  font-size: 0.85rem;
+}
+
+/* ── Fase 2.1 — scroll horizontal do Resumo (Contador) e gerenciador de feriados ── */
+
+/* Permitir que itens de grid/flex encolham para o scroll interno funcionar */
+.module.active {
+  min-width: 0;
+}
+
+#contador,
+#contadorTabContent {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.resumo-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Barra de rolagem horizontal sempre visível no Resumo */
+.resumo-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+
+.resumo-scroll::-webkit-scrollbar-thumb {
+  background: var(--sea-200);
+  border-radius: 8px;
+}
+
+.resumo-scroll::-webkit-scrollbar-track {
+  background: var(--sand);
+}
+
+/* Modal de feriados — lista de feriados cadastrados (editar/excluir) */
+.feriados-manager-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  color: var(--sea-900);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feriados-manager-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--gold);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.feriados-manager-count {
+  text-align: center;
+  font-weight: 600;
+}
+
+.feriados-manager-table {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.feriados-manager-table table {
+  width: 100%;
+}
+
+.feriados-manager-table .actions {
+  white-space: nowrap;
+  text-align: right;
 }

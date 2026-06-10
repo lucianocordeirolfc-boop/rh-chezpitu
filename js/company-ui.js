@@ -20,55 +20,17 @@
   }
 
   /**
-   * Seletor de empresa no estilo Escala de Folga.
-   * @param {string} moduleId
-   * @param {{ allowAll?: boolean, selectId?: string, className?: string }} options
+   * Fase 2 — os seletores de empresa internos foram removidos.
+   * A empresa é definida pela ABA superior (AppData.getActiveCompany()).
+   * renderToolbar agora não desenha nada (mantido para compatibilidade dos módulos).
    */
-  function renderToolbar(moduleId, options = {}) {
-    const allowAll = Boolean(options.allowAll);
-    const selectId = options.selectId || SELECT_IDS[moduleId] || `${moduleId}PageCompany`;
-    const selected = AppData.getPageCompany(moduleId);
-    const companies = AppData.getCompanies();
-    const allValue = AppData.PAGE_COMPANY_ALL;
-
-    const optionsHtml = (allowAll
-      ? `<option value="${allValue}" ${AppData.isPageCompanyAll(selected) ? "selected" : ""}>Todas</option>`
-      : "") +
-      companies
-        .map(
-          (company) =>
-            `<option value="${esc(company)}" ${company === selected ? "selected" : ""}>${esc(company)}</option>`
-        )
-        .join("");
-
-    const extraClass = options.className ? ` ${options.className}` : "";
-
-    return `
-      <div class="page-company-toolbar${extraClass}" data-page-toolbar="${esc(moduleId)}">
-        <label class="module-company-select-label">Empresa
-          <select id="${esc(selectId)}" class="module-company-select" data-page-module="${esc(moduleId)}">
-            ${optionsHtml}
-          </select>
-        </label>
-      </div>
-    `;
+  function renderToolbar() {
+    return "";
   }
 
-  function bindToolbar(container, moduleId, onChange) {
-    if (!container) return;
-    const selectId = SELECT_IDS[moduleId] || `${moduleId}PageCompany`;
-    const select =
-      container.querySelector(`#${selectId}`) || container.querySelector(`[data-page-module="${moduleId}"]`);
-    if (!select) return;
-
-    if (select.dataset.pageBound === moduleId) return;
-    select.dataset.pageBound = moduleId;
-
-    select.addEventListener("change", () => {
-      AppData.setPageCompany(moduleId, select.value);
-      if (typeof onChange === "function") onChange(select.value);
-      else window.App?.renderCurrent?.();
-    });
+  /** Fase 2 — no-op: não há mais seletor interno para vincular. */
+  function bindToolbar() {
+    /* contexto de empresa vem da aba ativa */
   }
 
   /** @deprecated use renderToolbar */
