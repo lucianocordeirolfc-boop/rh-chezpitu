@@ -807,6 +807,128 @@
     return changed;
   }
 
+  /**
+   * SEED 2026 — Semana Santa, Tiradentes e São Jorge (Fase 3B).
+   * Esses feriados de abril/2026 não existiam na base e por isso nunca
+   * apareciam para vinculação manual de CO. O seed apenas DISPONIBILIZA os
+   * feriados (workedEmployees vazio): nenhum vínculo automático é criado e
+   * nenhum lançamento existente é alterado. Idempotente por conteúdo
+   * (data 2026 + nome normalizado, com variantes) e executado uma única vez
+   * por dispositivo (flag em localStorage).
+   */
+  const HOLIDAY_SEED_2026_FLAG = "chezPituHolidaySeed2026.v1";
+  const HOLIDAY_SEED_2026 = [
+    {
+      slug: "semana-santa",
+      name: "Semana Santa",
+      date: "2026-04-03",
+      type: "nacional",
+      aliases: [
+        "semana santa",
+        "sexta-feira santa",
+        "sexta feira santa",
+        "sexta-feira da paixao",
+        "sexta feira da paixao",
+        "paixao de cristo"
+      ]
+    },
+    {
+      slug: "tiradentes",
+      name: "Tiradentes",
+      date: "2026-04-21",
+      type: "nacional",
+      aliases: ["tiradentes", "dia de tiradentes"]
+    },
+    {
+      slug: "sao-jorge",
+      name: "São Jorge",
+      date: "2026-04-23",
+      type: "estadual",
+      aliases: ["sao jorge", "dia de sao jorge"]
+    }
+  ];
+
+  /** Variante do mesmo feriado em 2026 (qualquer data do ano, nome equivalente). */
+  function holidayMatchesSeed2026(holiday, seed) {
+    if (!holiday || !String(holiday.date || "").startsWith("2026")) return false;
+    const name = normalizeSearchText(holiday.name);
+    return seed.aliases.some((alias) => name === normalizeSearchText(alias));
+  }
+
+  function applyHolidaySeed2026(targetState) {
+    if (!targetState) return false;
+    let changed = false;
+
+    if (!Array.isArray(targetState.calendarHolidays)) targetState.calendarHolidays = [];
+    HOLIDAY_SEED_2026.forEach((seed) => {
+      if (targetState.calendarHolidays.some((holiday) => holidayMatchesSeed2026(holiday, seed))) return;
+      targetState.calendarHolidays.push({
+        id: `cal-seed-2026-${seed.slug}`,
+        date: seed.date,
+        name: seed.name,
+        type: seed.type,
+        companies: ["ambas"]
+      });
+      changed = true;
+    });
+
+    companyKeysFromState(targetState).forEach((company) => {
+      const block = targetState.companies?.[company];
+      if (!block) return;
+      if (!Array.isArray(block.holidays)) block.holidays = [];
+      HOLIDAY_SEED_2026.forEach((seed) => {
+        // Soft-deletados também contam como existentes: o seed nunca ressuscita
+        // um feriado que o usuário removeu de propósito.
+        if (block.holidays.some((holiday) => holidayMatchesSeed2026(holiday, seed))) return;
+        block.holidays.push({
+          id: `feriado-seed-2026-${seed.slug}-${normalizeSearchText(company).replace(/\s+/g, "-")}`,
+          name: seed.name,
+          date: seed.date,
+          workedEmployees: []
+        });
+        changed = true;
+      });
+    });
+
+    return changed;
+  }
+
+  function applyHolidaySeed2026IfNeeded() {
+    try {
+      if (localStorage.getItem(HOLIDAY_SEED_2026_FLAG)) return false;
+    } catch (_) {
+      /* storage indisponível: segue — o seed é idempotente por conteúdo */
+    }
+    const changed = applyHolidaySeed2026(state);
+    try {
+      localStorage.setItem(HOLIDAY_SEED_2026_FLAG, new Date().toISOString());
+    } catch (_) {
+      /* sem flag o seed continua seguro (idempotente por conteúdo) */
+    }
+    if (changed) saveState();
+    return changed;
+  }
+
+  /**
+   * Calendário no merge: o remoto prevalece quando existe, mas os seeds 2026
+   * locais não podem ser perdidos enquanto o remoto ainda não os recebeu
+   * (a flag local impediria um novo seed e os feriados sumiriam para sempre).
+   */
+  function mergeCalendarHolidaysPreservingSeeds(localList = [], remoteList = []) {
+    const base = (remoteList || []).length ? [...remoteList] : [...(localList || [])];
+    HOLIDAY_SEED_2026.forEach((seed) => {
+      const localSeed = (localList || []).find(
+        (holiday) => String(holiday?.id || "") === `cal-seed-2026-${seed.slug}`
+      );
+      if (!localSeed) return;
+      const exists = base.some(
+        (holiday) => holiday?.id === localSeed.id || holidayMatchesSeed2026(holiday, seed)
+      );
+      if (!exists) base.push(localSeed);
+    });
+    return base;
+  }
+
   function migrateVtStorage(targetState) {
     if (!targetState) return targetState;
     if (!targetState.valeTransporte) targetState.valeTransporte = createDefaultState().valeTransporte;
@@ -914,9 +1036,10 @@
         ...(local.pageFilters || {})
       },
       escalaSelectedYearMonth: local.escalaSelectedYearMonth || remote.escalaSelectedYearMonth || monthKey(),
-      calendarHolidays: (remote.calendarHolidays || []).length
-        ? remote.calendarHolidays
-        : local.calendarHolidays || [],
+      calendarHolidays: mergeCalendarHolidaysPreservingSeeds(
+        local.calendarHolidays,
+        remote.calendarHolidays
+      ),
       coverageAlerts: (remote.coverageAlerts || []).length ? remote.coverageAlerts : local.coverageAlerts || [],
       coveragePrincipalBindings: {
         ...(remote.coveragePrincipalBindings || {}),
@@ -1685,6 +1808,10 @@
       window.FirebaseSync.save(state);
     }
   }
+
+  // Seed 2026 (Semana Santa, Tiradentes, São Jorge): roda uma única vez por
+  // dispositivo, logo após o carregamento — antes de qualquer renderização.
+  applyHolidaySeed2026IfNeeded();
 
   function normalizeHolidayRecord(holiday) {
     if (!holiday || typeof holiday !== "object") return null;
@@ -2985,6 +3112,128 @@
     return getAvailableCoHolidayOptions(employeeId, coDate, options);
   }
 
+  /**
+   * AUDITORIA de consistência dos feriados (Fase 3B) — SOMENTE LEITURA.
+   * Não altera nenhum dado. Rode no console: AppData.auditHolidayConsistency()
+   *
+   * Verifica, por empresa:
+   *  - vínculos invisíveis para CO (feriado soft-deletado com pendência);
+   *  - vínculos anteriores à admissão (invisíveis no Histórico);
+   *  - status gravado divergente do status calculado;
+   *  - vínculos órfãos (employeeId inexistente na empresa);
+   *  - "Compensado" sem nenhuma data de compensação;
+   *  - duplicidades ativas (mesma data + nome normalizado);
+   *  - data divergente entre feriado da empresa e calendário (mesmo ano);
+   *  - feriados sem nenhum funcionário vinculado (informativo).
+   * E no calendário: mesmo feriado (variantes de nome) em datas diferentes
+   * no mesmo ano (risco de duplicidade futura).
+   */
+  function auditHolidayConsistency() {
+    const today = todayISO();
+    const report = {
+      generatedAt: new Date().toISOString(),
+      calendar: [],
+      companies: {},
+      totalIssues: 0
+    };
+
+    // Calendário global: nome equivalente em datas diferentes no mesmo ano.
+    const calendarByKey = new Map();
+    (state.calendarHolidays || []).forEach((holiday) => {
+      if (!holiday?.date || !holiday?.name) return;
+      const key = `${String(holiday.date).slice(0, 4)}|${normalizeSearchText(holiday.name)}`;
+      const knownDate = calendarByKey.get(key);
+      if (knownDate && knownDate !== holiday.date) {
+        report.calendar.push({
+          tipo: "datas-divergentes-calendario",
+          feriado: holiday.name,
+          datas: [knownDate, holiday.date]
+        });
+      } else if (!knownDate) {
+        calendarByKey.set(key, holiday.date);
+      }
+    });
+
+    getCompanies().forEach((company) => {
+      const data = getCompanyData(company);
+      const findings = {
+        invisiveisParaCo: [],
+        anterioresAdmissao: [],
+        statusDivergente: [],
+        vinculoOrfao: [],
+        compensadoSemData: [],
+        duplicadosAtivos: [],
+        dataDivergenteCalendario: [],
+        semFuncionarioVinculado: []
+      };
+      const employeeIds = new Set((data.employees || []).map((employee) => employee.id));
+      const activeByKey = new Map();
+
+      (data.holidays || []).forEach((holiday) => {
+        if (!holiday?.date || !holiday?.name) return;
+        const base = { feriado: holiday.name, data: holiday.date, id: holiday.id };
+        const worked = holiday.workedEmployees || [];
+
+        if (!holiday.isDeleted) {
+          const key = `${holiday.date}|${normalizeSearchText(holiday.name)}`;
+          if (activeByKey.has(key)) {
+            findings.duplicadosAtivos.push({ ...base, duplicaDe: activeByKey.get(key) });
+          } else {
+            activeByKey.set(key, holiday.id);
+          }
+
+          const yearKey = `${String(holiday.date).slice(0, 4)}|${normalizeSearchText(holiday.name)}`;
+          const calendarDate = calendarByKey.get(yearKey);
+          if (calendarDate && calendarDate !== holiday.date) {
+            findings.dataDivergenteCalendario.push({ ...base, dataCalendario: calendarDate });
+          }
+
+          if (!worked.length) findings.semFuncionarioVinculado.push(base);
+        }
+
+        worked.forEach((item) => {
+          if (!item) return;
+          const employee = (data.employees || []).find((entry) => entry.id === item.employeeId);
+          const who = { funcionarioId: item.employeeId || "", funcionario: employee?.name || "" };
+          const resolved = resolveWorkedHolidayStatus(item, holiday.date, today);
+
+          if (holiday.isDeleted && resolved.key !== "compensado") {
+            findings.invisiveisParaCo.push({ ...base, ...who, status: resolved.label });
+          }
+          if (!item.employeeId || !employeeIds.has(item.employeeId)) {
+            findings.vinculoOrfao.push({ ...base, ...who });
+            return;
+          }
+          if (employee?.admissionDate && holiday.date < employee.admissionDate) {
+            findings.anterioresAdmissao.push({ ...base, ...who, admissao: employee.admissionDate });
+          }
+          if (item.status && item.status !== resolved.label) {
+            findings.statusDivergente.push({
+              ...base,
+              ...who,
+              statusGravado: item.status,
+              statusCalculado: resolved.label
+            });
+          }
+          const hasAnyCompDate = Boolean(
+            item.compensationDate || item.scheduledCoDate || item.scaleCoDate
+          );
+          if (resolved.key === "compensado" && !hasAnyCompDate) {
+            findings.compensadoSemData.push({ ...base, ...who });
+          }
+        });
+      });
+
+      report.companies[company] = findings;
+      report.totalIssues += Object.entries(findings)
+        .filter(([name]) => name !== "semFuncionarioVinculado")
+        .reduce((sum, [, list]) => sum + list.length, 0);
+    });
+
+    report.totalIssues += report.calendar.length;
+    return report;
+  }
+
   function findOldestLinkableHolidayWorked(data, employeeId, preferredHolidayId, coDate = "") {
     const pending = getPendingCoHolidaysForEmployee(employeeId, coDate, { data });
 
@@ -3585,6 +3834,8 @@
     dedupeCalendarHolidays,
     validatePadroeiraBuziosIntegrity,
     correctPadroeiraBuziosAutomatically,
+    applyHolidaySeed2026,
+    auditHolidayConsistency,
     updateHoliday,
     removeWorkedEmployeeFromHoliday,
     removeVacation,

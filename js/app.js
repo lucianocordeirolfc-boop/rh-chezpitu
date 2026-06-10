@@ -230,6 +230,10 @@
       if (booted) return;
       booted = true;
       refreshScaleIntegrations();
+      // Integração retroativa: seed de abril/2026 não pôde chamar ScaleRules
+      // (carregado após data.js). Aqui é o primeiro ponto seguro pós-boot onde
+      // ScaleRules já existe. É idempotente: meses passados convergem na 1ª exec.
+      AppData.runScaleIntegrations(["2026-04"]);
       updateCompanyTabsUI();
       render("dashboard");
       initSync();

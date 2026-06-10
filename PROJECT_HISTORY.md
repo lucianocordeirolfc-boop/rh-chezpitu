@@ -2,6 +2,58 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06-10 — Fase 3B: Feriados de abril/2026 ausentes para vinculação de CO (CORRIGIDO)
+
+Problema:
+Semana Santa (03/04/2026), Tiradentes (21/04/2026) e São Jorge (23/04/2026)
+não apareciam no modal de vinculação de CO da Escala de Folga.
+
+Causa raiz:
+Esses feriados nunca foram cadastrados na base (nem em `state.calendarHolidays`
+nem em `companies[*].holidays`). O modal CO só exibe feriados em que o
+funcionário tem vínculo (`workedEmployees`), e o vínculo só pode existir se o
+feriado existir. Não havia filtro indevido nem marcação incorreta de
+compensado: os registros simplesmente não existiam.
+
+Correção (js/data.js):
+- Seed único `applyHolidaySeed2026IfNeeded()` (flag `chezPituHolidaySeed2026.v1`):
+  cria os 3 feriados no calendário global (`cal-seed-2026-*`, escopo "ambas") e
+  em cada empresa (`feriado-seed-2026-*`) com `workedEmployees` VAZIO — nenhum
+  vínculo automático, nenhuma pendência em massa. O usuário seleciona
+  manualmente no Controle de Feriados quem trabalhou; só então o feriado
+  aparece no modal CO daquele funcionário.
+- Idempotente por conteúdo: variantes de nome ("Sexta-feira Santa" ≈ "Semana
+  Santa") em 2026 não são duplicadas; registros existentes (inclusive
+  soft-deletados) nunca são alterados nem ressuscitados.
+- `mergeRemoteIntoLocal`: seeds locais do calendário sobrevivem ao merge com o
+  Firebase (antes, remoto não-vazio descartava o calendário local inteiro e a
+  flag impediria novo seed — feriados sumiriam para sempre).
+- Auditoria somente leitura `AppData.auditHolidayConsistency()`: detecta
+  vínculos invisíveis para CO, status divergente, vínculos órfãos,
+  "Compensado" sem data, duplicidades ativas, datas divergentes do calendário
+  e feriados sem vínculo.
+
+Arquivos:
+- js/data.js (+seed, +merge de calendário, +auditoria, exports)
+- index.html (bump de cache v=20260610)
+- scripts/test-seed-2026.mjs (15 testes — temporário, não versionar)
+
+Testes:
+- npm test → 47/47
+- npm run validate → 267 checks, 0 falhas (funcional + offline + dedup + quota)
+- seed 2026 → 15/15
+- auditoria (sintético) → 9/9
+- fluxo CO ponta a ponta → seed não cria vínculo; após seleção manual os 3
+  feriados aparecem Pendentes no modal CO
+
+Risco conhecido (comportamento pré-existente, NÃO alterado):
+`syncAutoHolidaysWorkedForMonth` cria vínculos automáticos ("Automático pela
+escala") para quem tem código "trabalhado" na escala quando o mês do feriado é
+recomputado (ex.: abrir a Escala em abril/2026). Código vazio conta como
+trabalhado — conferir a escala de abril antes de navegar até o mês.
+
+Status: ✅ CORRIGIDO E TESTADO. Sem commit/deploy (aguarda autorização).
+
 ## 2026-06 — QuotaExceededError no localStorage (CORRIGIDO)
 
 Problema:
