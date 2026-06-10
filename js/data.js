@@ -63,16 +63,8 @@
 
   const VT_WORKED_CODES = new Set(["", "MM", "TM", "NM", "MN", "TN", "NO", "MR", "TR", "NR"]);
 
-  /** Data local (não UTC) — toISOString viraria o dia às 21h no Brasil. */
-  function toLocalISODate(date) {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
   function todayISO() {
-    return toLocalISODate(new Date());
+    return new Date().toISOString().slice(0, 10);
   }
 
   function uid(prefix) {
@@ -82,14 +74,14 @@
   function addDays(isoDate, days) {
     const date = new Date(`${isoDate}T00:00:00`);
     date.setDate(date.getDate() + days);
-    return toLocalISODate(date);
+    return date.toISOString().slice(0, 10);
   }
 
   /** Primeiro dia do mês seguinte à data informada (regra para folga fixa). */
   function getNextMonthFirstDay(fromIso = todayISO()) {
     const date = new Date(`${fromIso}T00:00:00`);
     date.setMonth(date.getMonth() + 1, 1);
-    return toLocalISODate(date);
+    return date.toISOString().slice(0, 10);
   }
 
   function formatDateBR(isoDate) {
@@ -179,7 +171,7 @@
   }
 
   function monthKey(date = new Date()) {
-    return toLocalISODate(date).slice(0, 7);
+    return date.toISOString().slice(0, 7);
   }
 
   function getDaysInMonth(yearMonth) {
@@ -188,7 +180,7 @@
     const days = [];
 
     while (date.getMonth() === month - 1) {
-      days.push(toLocalISODate(date));
+      days.push(date.toISOString().slice(0, 10));
       date.setDate(date.getDate() + 1);
     }
 
@@ -629,23 +621,6 @@
     return next;
   }
 
-  /** União local+remoto dos feriados de calendário (não perde entradas criadas só de um lado). */
-  function mergeCalendarHolidayLists(localList, remoteList) {
-    const merged = [];
-    const seenIds = new Set();
-    const seenNameDate = new Set();
-    [...(remoteList || []), ...(localList || [])].forEach((holiday) => {
-      if (!holiday || typeof holiday !== "object" || !holiday.date) return;
-      const id = holiday.id || "";
-      const key = `${normalizeSearchText(holiday.name)}|${holiday.date}`;
-      if ((id && seenIds.has(id)) || seenNameDate.has(key)) return;
-      if (id) seenIds.add(id);
-      seenNameDate.add(key);
-      merged.push(holiday);
-    });
-    return merged.sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  }
-
   function mergeRemoteIntoLocal(localState, remoteState) {
     if (!localState) return finalizeIncomingState(remoteState);
     if (!remoteState) return finalizeIncomingState(localState);
@@ -663,7 +638,9 @@
         ...(local.pageFilters || {})
       },
       escalaSelectedYearMonth: local.escalaSelectedYearMonth || remote.escalaSelectedYearMonth || monthKey(),
-      calendarHolidays: mergeCalendarHolidayLists(local.calendarHolidays, remote.calendarHolidays),
+      calendarHolidays: (remote.calendarHolidays || []).length
+        ? remote.calendarHolidays
+        : local.calendarHolidays || [],
       coverageAlerts: (remote.coverageAlerts || []).length ? remote.coverageAlerts : local.coverageAlerts || [],
       coveragePrincipalBindings: {
         ...(remote.coveragePrincipalBindings || {}),
@@ -2554,89 +2531,8 @@
     });
   }
 
-  /**
-   * Feriados de 2026 que precisam ficar disponíveis para vincular funcionários
-   * pendentes de compensação (Pengold e Chez Pitu). Apenas ADICIONA quando o
-   * feriado ainda não existe — nunca altera ou remove lançamentos existentes.
-   */
-  const HOLIDAY_SEED_FLAG_KEY = "chezPituHolidaySeed2026.v1";
-  const HOLIDAY_SEEDS_2026 = [
-    {
-      slug: "semana-santa",
-      name: "Semana Santa",
-      date: "2026-04-03",
-      type: "nacional",
-      aliases: ["semana santa", "sexta-feira santa", "sexta feira santa", "sexta-feira da paixao", "paixao de cristo"]
-    },
-    { slug: "tiradentes", name: "Tiradentes", date: "2026-04-21", type: "nacional", aliases: ["tiradentes"] },
-    { slug: "sao-jorge", name: "São Jorge", date: "2026-04-23", type: "estadual", aliases: ["sao jorge", "dia de sao jorge"] }
-  ];
-
-  function holidayNameMatchesSeed(name, seed) {
-    const normalized = normalizeSearchText(name);
-    return seed.aliases.some((alias) => normalized === normalizeSearchText(alias));
-  }
-
-  function companySlug(company) {
-    return normalizeSearchText(company).replace(/[^a-z0-9]+/g, "-");
-  }
-
-  function seedComplianceHolidays2026() {
-    try {
-      if (localStorage.getItem(HOLIDAY_SEED_FLAG_KEY)) return false;
-    } catch (_) {
-      /* ignore */
-    }
-
-    let changed = false;
-    if (!Array.isArray(state.calendarHolidays)) state.calendarHolidays = [];
-
-    HOLIDAY_SEEDS_2026.forEach((seed) => {
-      const inCalendar = state.calendarHolidays.some(
-        (holiday) => String(holiday?.date || "").startsWith("2026") && holidayNameMatchesSeed(holiday?.name, seed)
-      );
-      if (!inCalendar) {
-        state.calendarHolidays.push({
-          id: `cal-seed-2026-${seed.slug}`,
-          date: seed.date,
-          name: seed.name,
-          type: seed.type,
-          companies: ["ambas"]
-        });
-        changed = true;
-      }
-
-      getCompanies().forEach((company) => {
-        const data = getCompanyData(company);
-        if (!data) return;
-        if (!Array.isArray(data.holidays)) data.holidays = [];
-        const exists = data.holidays.some(
-          (holiday) => String(holiday?.date || "").startsWith("2026") && holidayNameMatchesSeed(holiday?.name, seed)
-        );
-        if (exists) return;
-        data.holidays.push({
-          id: `feriado-seed-2026-${seed.slug}-${companySlug(company)}`,
-          name: seed.name,
-          date: seed.date,
-          workedEmployees: []
-        });
-        changed = true;
-      });
-    });
-
-    try {
-      localStorage.setItem(HOLIDAY_SEED_FLAG_KEY, todayISO());
-    } catch (_) {
-      /* ignore */
-    }
-
-    if (changed) saveState();
-    return changed;
-  }
-
   migrateEmployeeSources();
   purgeMockEmployees();
-  seedComplianceHolidays2026();
 
   window.AppData = {
     COMPANIES,

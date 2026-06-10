@@ -792,15 +792,10 @@
     if (existing) {
       workedEmployees.forEach((item) => {
         const prev = (existing.workedEmployees || []).find((row) => row.employeeId === item.employeeId);
-        if (!prev) {
+        if (prev) {
+          Object.assign(prev, item);
+        } else {
           existing.workedEmployees.push(item);
-          return;
-        }
-        // Lançamento já existente: só atualiza se uma nova data de compensação foi informada.
-        if (item.compensationDate) {
-          prev.compensationDate = item.compensationDate;
-          prev.scheduledCoDate = item.compensationDate;
-          AppData.syncWorkedEmployeeStatus(prev, existing.date);
         }
       });
       AppData.saveState();
