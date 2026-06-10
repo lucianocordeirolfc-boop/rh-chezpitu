@@ -188,6 +188,13 @@
     }, 0);
   }
 
+  /** Cabeçalho: botão que abre o Manual do Usuário em modal. */
+  function setupManualButton() {
+    const button = document.getElementById("openManual");
+    if (!button) return;
+    button.addEventListener("click", () => window.UserManual?.open());
+  }
+
   /** Cabeçalho: badge de versão com ambiente (ex.: "v2026.06.10.02 | PRODUÇÃO"). */
   function setupVersionBadge() {
     const badge = document.getElementById("appVersionBadge");
@@ -283,6 +290,7 @@
 
     setupCompanyTabs();
     setupRibbon();
+    setupManualButton();
     setupVersionBadge();
 
     // Fase 2 — propaga a empresa ativa (aba) para todo o sistema, sem apagar dados.
