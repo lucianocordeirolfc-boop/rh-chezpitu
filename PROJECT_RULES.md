@@ -1,5 +1,31 @@
 # PROJECT_RULES.md — Regras de Negócio RH Chez Pitu
 
+## Padrão visual / Cores (REGRA FIXA)
+
+O sistema segue o **padrão de cores oficial do Grupo Chez Pitu**: **navy + pêssego**.
+Fonte de verdade do padrão: `C:\Users\conta\projetos\chezpitu-firebase\hosting\rh`.
+Nunca reverter para a paleta antiga (verde-mar + dourado).
+
+Tokens oficiais (em `css/style.css`, bloco `:root` da Fase 2):
+- `--sea-900: #0e2148`
+- `--sea-800: #133169`  (navy principal da marca)
+- `--sea-700: #1d3f73`
+- `--sea-500: #2a5d8f`
+- `--sea-200: #c9d6ea`
+- `--sea-100: #eef2f8`
+- `--gold: #FFBC7D`     (pêssego — cor de destaque da marca)
+- `--soft-blue: #4FA8FF`
+- `--shadow: 0 16px 40px rgba(19, 49, 105, 0.12)`
+
+Chrome institucional (sempre escuro navy + destaque pêssego): `.topbar`, `.company-tab`,
+`.module-ribbon`, `.ribbon-item` usam navy `#102346`/`#15294F` com realce `#FFBC7D`.
+Conteúdo dos módulos e folhas de impressão permanecem claros.
+
+Proibido:
+- Substituir esses tokens por outras cores sem autorização.
+- Deixar `css/style.css` divergir do padrão de `chezpitu-firebase/hosting/rh`
+  (após qualquer deploy, conferir se as cores continuam navy + pêssego).
+
 ## Empresas
 
 Empresas do sistema:

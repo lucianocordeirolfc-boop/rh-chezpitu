@@ -105,6 +105,20 @@ A partir daí, o feriado fica disponível para compensação (código CO) na Esc
 
 > **Regras de segurança:** vincula apenas o funcionário escolhido (nunca todos). Se o funcionário já estiver vinculado àquele feriado, o sistema avisa e não cria duplicado.
 
+### Incluir um feriado anterior ao Corpus Christi (retroativo)
+Use quando precisar registrar um feriado de início do ano (ex.: **Ano Novo**, **Carnaval**, **Quarta-feira de Cinzas**, **Tiradentes**, **São Jorge**) — datas anteriores ao Corpus Christi.
+
+1. Em **Controle de Feriados**, clique em **+ Cadastrar feriado**.
+2. Informe **nome**, **data** (ex.: `01/01` para Ano Novo, `18/02` para Quarta-feira de Cinzas) e **tipo**.
+3. Clique em **Salvar feriado**. O feriado já aparece na lista da empresa ativa.
+4. Agora vincule quem trabalhou: clique em **+ Vincular funcionário a feriado**, escolha o **feriado** recém-criado e o **funcionário**, e clique em **Salvar vínculo**.
+
+> **Por que antes dava erro?** Em versões anteriores, ao recalcular a escala dos primeiros meses o sistema vinculava sozinho todos os funcionários a qualquer feriado retroativo, e depois acusava "funcionário já vinculado". Isso foi corrigido:
+> - meses **sem escala preenchida** (jan/fev/mar) **não** vinculam ninguém automaticamente;
+> - se existir um vínculo automático antigo, ao salvar o vínculo manual o sistema **confirma e converte para Manual** (não duplica e não apaga nada).
+>
+> Ano Novo (01/01), Quarta-feira de Cinzas (18/02), Semana Santa, Tiradentes (21/04) e São Jorge (23/04) de 2026 já vêm pré-cadastrados. **Carnaval (16–17/02)** e **Dia do Trabalho (01/05)**, se necessários, podem ser cadastrados manualmente pelo passo acima.
+
 ### Acompanhar a compensação
 A tabela "Histórico de feriados" mostra cada vínculo com:
 - status (Pendente, Agendado, Compensado, Vencido);
@@ -133,7 +147,7 @@ Tela com os lançamentos e o resumo para envio ao contador, sempre referente à 
 
 ## 10. Versão do sistema
 
-No canto superior direito aparece a versão atual, ex.: `v2026.06.10.02 | PRODUÇÃO`.
+No canto superior direito aparece a versão atual, ex.: `v2026.06.16.01 | PRODUÇÃO`.
 
 - **PRODUÇÃO** = site oficial na internet.
 - **LOCAL** = arquivo aberto direto no computador (uso de teste).

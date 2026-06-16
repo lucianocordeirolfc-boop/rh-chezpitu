@@ -71,6 +71,12 @@
        compensação (CO) na Escala daquele funcionário.</p>
     <p class="manual-note">Vincula apenas o funcionário escolhido (nunca todos). Se já existir vínculo,
        o sistema avisa e não cria duplicado.</p>
+    <p><strong>Incluir um feriado anterior ao Corpus Christi (retroativo):</strong> para datas do início do ano
+       (Ano Novo, Carnaval, Quarta-feira de Cinzas, Tiradentes, São Jorge), use <strong>+ Cadastrar feriado</strong>
+       informando a data (ex.: <code>01/01</code>, <code>18/02</code>) e depois <strong>+ Vincular funcionário a feriado</strong>.</p>
+    <p class="manual-note">Meses sem escala preenchida (jan/fev/mar) não vinculam ninguém automaticamente; se houver
+       vínculo automático antigo, ao salvar o manual o sistema confirma e converte para Manual, sem duplicar nem apagar.
+       Ano Novo, Quarta-feira de Cinzas, Semana Santa, Tiradentes e São Jorge de 2026 já vêm pré-cadastrados.</p>
     <p>A tabela "Histórico de feriados" mostra status (Pendente, Agendado, Compensado, Vencido), a barra de
        prazo (120 dias para compensar) e a data prevista. Use os filtros e as abas para localizar rapidamente.</p>
 

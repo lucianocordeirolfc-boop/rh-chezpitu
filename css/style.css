@@ -3332,12 +3332,14 @@ td.code-dom { background: #fff7e6; color: #b45309; }
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  --sea-900: #15403d;
-  --sea-800: #1f4f4f;
-  --sea-700: #2a5d5a;
-  --sea-500: #3f7d77;
-  --sea-200: #cfe0db;
-  --sea-100: #eef3ef;
+  /* Marca remapeada para o padrão do grupo: navy #133169 + pêssego #FFBC7D
+     (antes: verde-mar + dourado). Superfícies/linhas seguem claras p/ o conteúdo. */
+  --sea-900: #0e2148;
+  --sea-800: #133169;
+  --sea-700: #1d3f73;
+  --sea-500: #2a5d8f;
+  --sea-200: #c9d6ea;
+  --sea-100: #eef2f8;
   --sand: #f7f4ee;
   --ink: #2c2a26;
   --muted: #8a817a;
@@ -3345,9 +3347,9 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   --success: #2a7a5b;
   --warning: #b8924a;
   --danger: #b5524a;
-  --gold: #c2a25a;
-  --soft-blue: #6f93a8;
-  --shadow: 0 16px 40px rgba(31, 79, 79, 0.10);
+  --gold: #FFBC7D;
+  --soft-blue: #4FA8FF;
+  --shadow: 0 16px 40px rgba(19, 49, 105, 0.12);
 }
 
 body {
@@ -3718,3 +3720,20 @@ body {
   white-space: nowrap;
   text-align: right;
 }
+
+/* ════════ Chrome institucional — tema escuro navy + pêssego (padrão do grupo) ════════
+   Escurece só a barra superior + abas + ribbon (sempre visíveis), alinhando ao padrão
+   dos demais módulos. Conteúdo dos módulos e folhas de impressão seguem claros. */
+.topbar { background:#102346; box-shadow:0 2px 14px rgba(0,0,0,.28); border-bottom:2px solid #FFBC7D; }
+.topbar .brand { color:#EEF3FB; }
+.topbar .brand-mark { background:linear-gradient(135deg,#FFBC7D,#FFD3A3); color:#12294F; border:1px solid #FFBC7D; }
+.topbar .brand-text strong { color:#FFBC7D; }
+.topbar .brand-text small { color:#9AB0D0; }
+.logged-user-label { color:#C4D2E8; }
+.company-tab { color:#C4D2E8; border-color:#2C466F; }
+.company-tab:hover { color:#FFBC7D; background:rgba(255,188,125,.12); }
+.company-tab.active { background:#172C52; color:#FFBC7D; box-shadow:inset 0 3px 0 #FFBC7D; }
+.module-ribbon { background:#15294F; border-top:1px solid #2C466F; border-bottom:1px solid #2C466F; }
+.ribbon-item { color:#C4D2E8; }
+.ribbon-item:hover { color:#FFBC7D; background:rgba(255,188,125,.10); }
+.ribbon-item.active { color:#FFBC7D; border-bottom-color:#FFBC7D; background:linear-gradient(180deg,rgba(255,188,125,.14),transparent); }
