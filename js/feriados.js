@@ -674,7 +674,7 @@
       } else {
         window.App?.renderCurrent?.();
       }
-      window.App?.toast?.("Vínculo criado com sucesso.", "success");
+      window.App?.toast?.(result.message || "Vínculo criado com sucesso.", "success");
     });
 
     setTimeout(() => {
@@ -794,7 +794,7 @@
       close();
       if (container) refreshTable(container);
       window.App?.renderCurrent?.();
-      window.App?.toast?.("Vínculo criado com sucesso.", "success");
+      window.App?.toast?.(result.message || "Vínculo criado com sucesso.", "success");
     });
 
     setTimeout(() => {

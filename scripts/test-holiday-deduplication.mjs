@@ -250,6 +250,11 @@ function testAnoNovoMerge() {
   const data = AppData.getCompanyData("Chez Pitu");
   seedEmployee(data, "e-ana", "ANA LIMA", "Recepção", "Chez Pitu");
 
+  // Isola o teste do seed retroativo (Ano Novo 01/01/2026 é semeado no load):
+  // remove qualquer feriado pré-existente nesta data para medir apenas as
+  // duplicatas fabricadas abaixo.
+  data.holidays = data.holidays.filter((h) => h.date !== "2026-01-01");
+
   data.holidays.push(
     { id: "an-1", name: "Ano Novo", date: "2026-01-01", workedEmployees: [
       { employeeId: "e-ana", compensationDate: "", status: "Pendente" }

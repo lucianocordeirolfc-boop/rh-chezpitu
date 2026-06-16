@@ -2,6 +2,61 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06-15 — Feriados retroativos (anteriores ao Corpus Christi)
+
+Problema:
+Não era possível cadastrar/vincular feriados anteriores ao Corpus Christi
+(ex.: Ano Novo, Carnaval). Ao tentar vincular um funcionário (ex.: André Justo a
+"São Jorge 2/3" em 23/04), o sistema acusava "funcionário já está vinculado a
+este feriado", mesmo num feriado recém-criado.
+
+Causa raiz:
+- `syncAutoHolidaysWorkedForMonth` (js/scale-rules.js) auto-vincula todo
+  funcionário ativo a qualquer feriado num dia cujo código de escala conte como
+  "trabalhado". Dia SEM código retorna "" em `getScaleCode`, e
+  `isWorkedScaleCode("")` = true → dia vazio conta como trabalhado. Ao recomputar
+  a escala de abril, André (que trabalhou 23/04) era auto-vinculado a qualquer
+  feriado criado nessa data, antes do vínculo manual.
+- `addManualWorkedEmployee` (js/data.js) bloqueava qualquer employeeId já
+  presente em workedEmployees, inclusive os vínculos automáticos.
+- Risco já documentado (Fase 3B): meses sem escala (jan/fev/mar) podiam
+  auto-vincular TODOS os funcionários, pois dia vazio = trabalhado.
+
+Correção (decisões confirmadas com o usuário):
+1. addManualWorkedEmployee — UPSERT seguro (js/data.js): para vínculo existente
+   Pendente/Vencido (tipicamente automático), em vez de erro, confirma e converte
+   para origem "Manual" (autoCreated=false), preservando status/datas. Nada é
+   apagado nem duplicado. Agendado/Compensado continuam bloqueados (preserva
+   compensação). Retorna `{ ok, converted, message }`.
+2. Trava de auto-vínculo por mês (js/scale-rules.js): novo `monthHasScaleData` —
+   `syncAutoHolidaysWorkedForMonth` só roda em meses com escala REAL preenchida
+   (manualScale com código, ou férias/ausência no mês). Meses retroativos sem
+   escala (jan/fev/mar) não auto-vinculam ninguém. Abril/maio/junho (com folgas/
+   códigos) seguem funcionando, inclusive feriado trabalhado de dia vazio.
+3. Seed retroativo (js/data.js): HOLIDAY_SEED_2026 ganhou Ano Novo (2026-01-01) e
+   Quarta-feira de Cinzas (2026-02-18); flag bumpada v2 → v3. Idempotente por
+   conteúdo, escopo "ambas", workedEmployees vazio (ninguém auto-vinculado).
+   Sexta-feira Santa/Tiradentes/São Jorge já existiam — não duplicados.
+4. Modais de vínculo (js/feriados.js) exibem result.message (informa conversão).
+
+Arquivos:
+- js/data.js (addManualWorkedEmployee upsert; HOLIDAY_SEED_2026 +2 itens, flag v3)
+- js/scale-rules.js (monthHasScaleData + guard + export)
+- js/feriados.js (toast usa result.message nos dois modais)
+- js/version.js + index.html (cache v=20260615.01)
+- scripts/test-holiday-deduplication.mjs (isola teste Ano Novo do seed)
+- scripts/verify-feriados-retroativos.mjs (NOVO — homologação, não versionar)
+
+Testes:
+- npm test → 47/47
+- npm run validate → funcional 183/183, offline 15/15, dedup 44/44, quota 25/25
+- verify-feriados-retroativos.mjs → 24/24 (seed, trava por mês, conversão
+  automático→Manual sem duplicar, bloqueio preserva Agendado/Compensado)
+
+Pendência: commit/push/deploy aguardando autorização (regra CLAUDE.md). Carnaval
+(16-17/02) e Dia do Trabalho (01/05) NÃO entraram no seed (não selecionados) —
+podem ser adicionados depois ao HOLIDAY_SEED_2026 ou cadastrados manualmente.
+
 ## 2026-06-10 — Fase 3C: Vínculo manual funcionário × feriado + Controle de versão visível
 
 ### Parte 1 — Botão global "+ Vincular funcionário a feriado"

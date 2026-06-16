@@ -278,6 +278,43 @@
     );
   }
 
+  /**
+   * O mês/empresa tem escala REALMENTE preenchida?
+   * Considera-se "com escala" quando existe ao menos um lançamento manual de
+   * escala (manualScale) com código não vazio dentro do mês, OU férias/ausência
+   * que toquem o mês.
+   *
+   * Motivo: em getScaleCode, dia sem código retorna "" e "" conta como
+   * trabalhado. Sem esta trava, abrir um mês retroativo SEM escala (jan/fev/mar)
+   * auto-vincularia TODOS os funcionários ativos a TODOS os feriados do mês.
+   * Meses já operados (abril/maio/junho) têm folgas/códigos lançados e seguem
+   * com auto-vínculo normal. Feriado trabalhado de dia vazio nesses meses
+   * continua sendo auto-vinculado, pois o mês como um todo tem escala.
+   */
+  function monthHasScaleData(yearMonth, data) {
+    const ym = String(yearMonth || "");
+    if (!ym) return false;
+
+    const manual = data.manualScale || {};
+    for (const key of Object.keys(manual)) {
+      const datePart = String(key).split("|")[1] || "";
+      if (!datePart.startsWith(`${ym}-`)) continue;
+      const entry = manual[key];
+      const code = entry && typeof entry === "object" ? entry.code : entry;
+      if (String(code || "").trim()) return true;
+    }
+
+    const touchesMonth = (start, end) => {
+      const s = String(start || "").slice(0, 7);
+      const e = String(end || start || "").slice(0, 7);
+      return (s && s <= ym && ym <= (e || s)) || s === ym || e === ym;
+    };
+    if ((data.vacations || []).some((v) => touchesMonth(v.startDate, v.endDate))) return true;
+    if ((data.absences || []).some((a) => touchesMonth(a.startDate, a.endDate))) return true;
+
+    return false;
+  }
+
   function syncAutoHolidaysWorkedForMonth(yearMonth, state, options = {}) {
     let created = 0;
     const targetCompanies = options.companies?.length ? options.companies : AppData.COMPANIES;
@@ -285,6 +322,9 @@
     targetCompanies.forEach((company) => {
       const data = AppData.getCompanyData(company);
       const days = AppData.getDaysInMonth(yearMonth);
+
+      // Trava: não auto-vincular feriado em meses sem escala preenchida.
+      if (!monthHasScaleData(yearMonth, data)) return;
 
       (data.employees || [])
         .filter((employee) => isEmployeeActive(employee))
@@ -462,6 +502,7 @@
     requiresCoverageSubstitution,
     getCoveragePrincipalStatus,
     computeCoverageAlertsForMonth,
+    monthHasScaleData,
     recomputeScaleIntegrations,
     getCoverageAlertsForMonth,
     getCoverageAlertCount,

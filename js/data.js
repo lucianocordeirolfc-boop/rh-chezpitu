@@ -816,8 +816,31 @@
    * (data 2026 + nome normalizado, com variantes) e executado uma única vez
    * por dispositivo (flag em localStorage).
    */
-  const HOLIDAY_SEED_2026_FLAG = "chezPituHolidaySeed2026.v2";
+  const HOLIDAY_SEED_2026_FLAG = "chezPituHolidaySeed2026.v3";
   const HOLIDAY_SEED_2026 = [
+    {
+      slug: "ano-novo",
+      name: "Ano Novo",
+      date: "2026-01-01",
+      type: "nacional",
+      aliases: [
+        "ano novo",
+        "confraternizacao universal",
+        "confraternizacao",
+        "reveillon"
+      ]
+    },
+    {
+      slug: "quarta-cinzas",
+      name: "Quarta-feira de Cinzas",
+      date: "2026-02-18",
+      type: "facultativo",
+      aliases: [
+        "quarta-feira de cinzas",
+        "quarta feira de cinzas",
+        "cinzas"
+      ]
+    },
     {
       slug: "semana-santa",
       name: "Semana Santa",
@@ -2952,9 +2975,29 @@
     const existing = (holiday.workedEmployees || []).find((item) => item.employeeId === employeeId);
     if (existing) {
       const resolved = resolveWorkedHolidayStatus(existing, holiday.date);
+      // Compensação real em andamento: nada a fazer, preserva o lançamento.
       if (resolved.key === "compensado") return { ok: false, error: `${emp.name} já tem este feriado compensado.` };
       if (resolved.key === "agendado") return { ok: false, error: `${emp.name} já tem compensação agendada para este feriado.` };
-      return { ok: false, error: `${emp.name} já está vinculado a este feriado.` };
+
+      // Pendente/Vencido: normalmente é um vínculo AUTOMÁTICO antigo (origem
+      // "Automático pela escala") criado ao recomputar a escala. Em vez de
+      // bloquear o cadastro retroativo, confirma e converte para Manual,
+      // preservando status/datas/compensação. Não apaga nem recria nada —
+      // apenas reclassifica a origem ("retira o vínculo antigo com cuidado").
+      const wasAuto =
+        existing.autoCreated === true || normalizeSearchText(existing.origin).includes("automatico");
+      existing.origin = "Manual";
+      existing.autoCreated = false;
+      if (existing.compensationDate === undefined) existing.compensationDate = "";
+      syncWorkedEmployeeStatus(existing, holiday.date);
+      if (options.save !== false) saveState();
+      return {
+        ok: true,
+        converted: wasAuto,
+        message: wasAuto
+          ? `${emp.name} já tinha vínculo automático com este feriado. Vínculo confirmado e convertido para Manual.`
+          : `${emp.name} já estava vinculado (Pendente). Vínculo confirmado.`
+      };
     }
 
     if (!holiday.workedEmployees) holiday.workedEmployees = [];
