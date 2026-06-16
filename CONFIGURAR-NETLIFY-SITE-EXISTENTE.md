@@ -1,3 +1,7 @@
+> ⚠️ **OBSOLETO — não usar.** O sistema migrou do Netlify para o **Firebase
+> Hosting** (projeto `chez-pitu-rh`). Para publicar, siga **`DEPLOY.md`**.
+> Este guia permanece apenas como referência histórica da hospedagem anterior.
+
 # Configurar deploy automático — site Netlify **já existente**
 
 **Site em produção:** [https://rh-chezpitu.netlify.app/](https://rh-chezpitu.netlify.app/)

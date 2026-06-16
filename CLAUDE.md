@@ -71,8 +71,12 @@ Antes de commit:
 ## Deploy
 
 Deploy oficial:
-- GitHub main
-- Netlify
+- GitHub main (versionamento)
+- Firebase Hosting (produção: chez-pitu-rh.web.app e chez-pitu-rh.firebaseapp.com)
+
+Publicação: `npm run deploy` (roda bump-cache + `firebase deploy --only hosting`).
+Config em `firebase.json` / `.firebaserc` (projeto chez-pitu-rh).
+Não usamos mais Netlify (arquivos netlify.* mantidos apenas como histórico/obsoleto).
 
 Antes de deploy:
 - testar localmente

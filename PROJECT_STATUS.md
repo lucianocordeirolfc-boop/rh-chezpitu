@@ -3,8 +3,8 @@
 ## Ambiente
 
 GitHub: OK
-Netlify: OK
-Firebase: OK
+Firebase Hosting: OK (produção: chez-pitu-rh.web.app / chez-pitu-rh.firebaseapp.com)
+Firebase (Auth/Database): OK
 Cursor: OK
 
 ## Status Geral

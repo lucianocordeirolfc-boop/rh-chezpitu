@@ -1,3 +1,8 @@
+# ============================================================================
+# OBSOLETO — não usar. O deploy do sistema migrou para Firebase Hosting
+# (projeto chez-pitu-rh). Veja firebase.json / .firebaserc e DEPLOY.md.
+# Mantido apenas como referência histórica da hospedagem anterior (Netlify).
+# ============================================================================
 [build]
   publish = "."
   # Site estático — sem comando de build (HTML/JS/CSS na raiz)

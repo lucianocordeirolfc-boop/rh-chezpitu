@@ -2,6 +2,34 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06-16 — Migração de hospedagem: Netlify → Firebase Hosting
+
+Decisão:
+O site passou a ser publicado **diretamente no Firebase Hosting** (projeto
+`chez-pitu-rh`, o mesmo já usado para Auth e Realtime Database). Não usamos mais
+Netlify. Produção responde em `chez-pitu-rh.web.app` e `chez-pitu-rh.firebaseapp.com`.
+
+Alterações:
+- `js/data.js` — `detectEnvironment()` agora marca PRODUÇÃO para hosts
+  `*.web.app` / `*.firebaseapp.com` (antes era `*.netlify.app`). O fallback para
+  qualquer host não-local já era PRODUÇÃO, então não há regressão de comportamento.
+- `package.json` — scripts `deploy*` passam a usar `firebase` (`firebase deploy
+  --only hosting`, `hosting:channel:deploy preview`, `--non-interactive` no CI).
+  devDependency `netlify-cli` → `firebase-tools`.
+- `firebase.json` (NOVO) — hosting com `public: "."`, rewrite SPA → `/index.html`
+  e os mesmos headers de segurança/cache do antigo `netlify.toml`. Deploy é
+  `--only hosting`; regras do Database (`database.rules.json`) NÃO são enviadas
+  por este fluxo (evita sobrescrever regras de produção sem intenção).
+- `.firebaserc` (NOVO) — projeto default `chez-pitu-rh`.
+- `.gitignore` — ignora `.firebase/` e `firebase-debug.log`.
+- Docs atualizados: `CLAUDE.md` (Deploy), `DEPLOY.md` (reescrito p/ Firebase),
+  `PROJECT_STATUS.md`, `MANUAL_USUARIO.md` (acesso → chez-pitu-rh.web.app).
+- Mantidos como OBSOLETO (banner no topo, não usar): `netlify.toml`,
+  `CONFIGURAR-NETLIFY-SITE-EXISTENTE.md`, `scripts/deploy.ps1`.
+
+Pendência: push/deploy aguardando autorização. Após `npm install` (troca de
+dependência) e `firebase login`, publicar com `npm run deploy`.
+
 ## 2026-06-15 — Feriados retroativos (anteriores ao Corpus Christi)
 
 Problema:
@@ -515,6 +543,10 @@ Validação:
 Observação de comportamento existente: normalizeWorkedEmployeeRefs descarta workedEmployees cujo employeeId não corresponde a funcionário cadastrado na empresa.
 
 ## 2026-05 — Deploy
+
+> ⚠️ Atualizado em 2026-06-16: a hospedagem migrou para **Firebase Hosting**.
+> Ver entrada "Migração de hospedagem" no topo deste arquivo e `DEPLOY.md`.
+> O registro abaixo reflete o estado da época (Netlify).
 
 Projeto conectado:
 - GitHub: lucianocordeirolfc-boop/rh-chezpitu

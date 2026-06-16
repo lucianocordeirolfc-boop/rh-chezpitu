@@ -2,7 +2,7 @@
 
 Guia rápido e objetivo para o uso diário do sistema de Gestão de Pessoal.
 
-Acesso: **https://rh-chezpitu.netlify.app**
+Acesso: **https://chez-pitu-rh.web.app**
 
 ---
 

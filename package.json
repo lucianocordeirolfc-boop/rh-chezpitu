@@ -9,11 +9,11 @@
     "test:dedup": "node scripts/test-holiday-deduplication.mjs",
     "test:quota": "node scripts/test-storage-quota.mjs",
     "validate": "node scripts/run-functional-validation.mjs && node scripts/test-offline-recovery.mjs && node scripts/test-holiday-deduplication.mjs && node scripts/test-storage-quota.mjs",
-    "deploy:preview": "netlify deploy --dir .",
-    "deploy": "npm run bump-cache && netlify deploy --prod --dir .",
-    "deploy:ci": "netlify deploy --prod --dir ."
+    "deploy:preview": "firebase hosting:channel:deploy preview",
+    "deploy": "npm run bump-cache && firebase deploy --only hosting",
+    "deploy:ci": "firebase deploy --only hosting --non-interactive"
   },
   "devDependencies": {
-    "netlify-cli": "^23.5.0"
+    "firebase-tools": "^13.0.0"
   }
 }

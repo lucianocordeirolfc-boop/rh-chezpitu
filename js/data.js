@@ -954,14 +954,15 @@
 
   /**
    * Detecta o ambiente de execução a partir da URL.
-   * file:// ou localhost → LOCAL; *.netlify.app → PRODUÇÃO.
+   * file:// ou localhost → LOCAL; Firebase Hosting
+   * (*.web.app / *.firebaseapp.com) → PRODUÇÃO.
    */
   function detectEnvironment() {
     if (typeof window === "undefined" || !window.location) return "LOCAL";
     const loc = window.location;
     if (loc.protocol === "file:") return "LOCAL";
     const host = loc.hostname || "";
-    if (/netlify\.app$/i.test(host)) return "PRODUÇÃO";
+    if (/(web\.app|firebaseapp\.com)$/i.test(host)) return "PRODUÇÃO";
     if (host === "localhost" || host === "127.0.0.1" || host === "") return "LOCAL";
     return "PRODUÇÃO";
   }

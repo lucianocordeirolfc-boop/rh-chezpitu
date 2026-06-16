@@ -1,3 +1,9 @@
+# =============================================================================
+# OBSOLETO — não usar. O deploy migrou para o Firebase Hosting.
+# Publique com:  npm run deploy   (bump-cache + firebase deploy --only hosting)
+# Detalhes em DEPLOY.md. Script mantido apenas como referência histórica.
+# =============================================================================
+
 # Deploy manual para o Netlify (site já vinculado com "netlify link")
 # Uso: .\scripts\deploy.ps1
 # Requer: npm install (na raiz do projeto)
