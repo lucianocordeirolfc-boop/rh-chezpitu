@@ -18,7 +18,7 @@
 
   // Preenchidos automaticamente por scripts/bump-cache.js (não editar à mão).
   var BUILD_BRANCH = "main";
-  var BUILD_COMMIT = "e26564f";
+  var BUILD_COMMIT = "d349eb1";
   var BUILD_DATE = "2026-06-16";
 
   var info = {
