@@ -2964,6 +2964,27 @@
     return true;
   }
 
+  /**
+   * Descreve um vínculo (workedEmployee) de forma legível para a UI, para que,
+   * quando o cadastro manual encontrar um vínculo já existente, seja possível
+   * mostrar EXATAMENTE onde ele está (feriado, data, status, origem e data de
+   * compensação) em vez de um bloqueio sem explicação.
+   */
+  function describeWorkedLink(holiday, item) {
+    const resolved = resolveWorkedHolidayStatus(item, holiday.date);
+    return {
+      holidayId: holiday.id,
+      holidayName: holiday.name,
+      holidayDate: holiday.date,
+      employeeId: item.employeeId,
+      status: resolved.label,
+      statusKey: resolved.key,
+      origin: item.origin || (item.autoCreated ? "Automático pela escala" : "Manual"),
+      compensationDate: String(item.compensationDate || item.scheduledCoDate || "").trim(),
+      isDeleted: Boolean(holiday.isDeleted)
+    };
+  }
+
   function addManualWorkedEmployee(holidayId, employeeId, options = {}) {
     const company = options.company || getPrimaryPageCompany("feriados");
     const data = getCompanyData(company);
@@ -2976,9 +2997,34 @@
     const existing = (holiday.workedEmployees || []).find((item) => item.employeeId === employeeId);
     if (existing) {
       const resolved = resolveWorkedHolidayStatus(existing, holiday.date);
-      // Compensação real em andamento: nada a fazer, preserva o lançamento.
-      if (resolved.key === "compensado") return { ok: false, error: `${emp.name} já tem este feriado compensado.` };
-      if (resolved.key === "agendado") return { ok: false, error: `${emp.name} já tem compensação agendada para este feriado.` };
+
+      // Vínculo confirmado manualmente pelo usuário SEMPRE deve aparecer no
+      // Histórico do Controle de Feriados, mesmo que a data do feriado seja
+      // anterior à admissão registrada (caso clássico dos feriados retroativos,
+      // ex.: André Justo). historyOverride libera a trava de admissão sem apagar
+      // nem recriar nada. Ver isWorkedEntryVisibleInHistory.
+      existing.historyOverride = true;
+
+      // Compensação real em andamento: NÃO converte nem reabre (preserva a
+      // compensação). Mas garante visibilidade no Histórico e devolve os
+      // detalhes do vínculo para a UI oferecer "Ver vínculo existente".
+      if (resolved.key === "compensado" || resolved.key === "agendado") {
+        syncWorkedEmployeeStatus(existing, holiday.date);
+        if (options.save !== false) saveState();
+        return {
+          ok: false,
+          blocked: true,
+          code: resolved.key,
+          existing: describeWorkedLink(holiday, existing),
+          error:
+            resolved.key === "compensado"
+              ? `${emp.name} já tem este feriado compensado.`
+              : `${emp.name} já tem compensação agendada para este feriado.`,
+          message:
+            `O vínculo de ${emp.name} já existe como ${resolved.label} e agora aparece no ` +
+            `Histórico do Controle de Feriados. Por estar ${resolved.label}, não é oferecido no modal CO da Escala.`
+        };
+      }
 
       // Pendente/Vencido: normalmente é um vínculo AUTOMÁTICO antigo (origem
       // "Automático pela escala") criado ao recomputar a escala. Em vez de
@@ -2995,9 +3041,10 @@
       return {
         ok: true,
         converted: wasAuto,
+        existing: describeWorkedLink(holiday, existing),
         message: wasAuto
-          ? `${emp.name} já tinha vínculo automático com este feriado. Vínculo confirmado e convertido para Manual.`
-          : `${emp.name} já estava vinculado (Pendente). Vínculo confirmado.`
+          ? `${emp.name} já tinha vínculo automático com este feriado. Vínculo confirmado, convertido para Manual e visível no Histórico.`
+          : `${emp.name} já estava vinculado (Pendente). Vínculo confirmado e visível no Histórico.`
       };
     }
 
@@ -3007,7 +3054,8 @@
       status: "Pendente",
       origin: "Manual",
       compensationDate: "",
-      autoCreated: false
+      autoCreated: false,
+      historyOverride: true
     });
 
     if (options.save !== false) saveState();
@@ -3130,6 +3178,15 @@
   function isWorkedEntryVisibleInHistory(holiday, item, data) {
     if (!holiday || holiday.isDeleted) return false;
     if (!item || !item.employeeId) return false;
+    // Vínculo confirmado manualmente pelo usuário sempre é visível: ele afirmou
+    // explicitamente que o funcionário trabalhou neste feriado retroativo, então
+    // a trava de admissão (pensada para vínculos automáticos/legados) não se
+    // aplica. Vínculos automáticos (origem "Automático pela escala", sem
+    // historyOverride) continuam ocultos quando anteriores à admissão.
+    const isManualConfirmed =
+      item.historyOverride === true ||
+      (item.autoCreated === false && normalizeSearchText(item.origin) === "manual");
+    if (isManualConfirmed) return true;
     const emp = (data?.employees || []).find((entry) => entry.id === item.employeeId);
     if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return false;
     return true;
@@ -3487,8 +3544,10 @@
 
     (data.holidays || []).forEach((holiday) => {
       (holiday.workedEmployees || []).forEach((item) => {
-        const emp = data.employees.find((e) => e.id === item.employeeId);
-        if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return;
+        // Mesma visibilidade do Histórico do Controle de Feriados (não diverge
+        // dos cards): exclui soft-deletados/sem employeeId/anteriores à admissão,
+        // mas conta vínculos manuais confirmados (historyOverride).
+        if (!isWorkedEntryVisibleInHistory(holiday, item, data)) return;
 
         const resolved = resolveWorkedHolidayStatus(item, holiday.date, today);
         if (resolved.key === "pendente") stats.pending += 1;

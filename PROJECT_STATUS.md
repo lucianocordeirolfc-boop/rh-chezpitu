@@ -9,17 +9,20 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** Fase 3A (Segurança Operacional)
-**Data:** 2026-06-01
-**Status:** ✅ ESTÁVEL - Pronto para Produção
+**Versão:** 20260617.02 (Impressão Escala 1 página + logo por CNPJ)
+**Data:** 2026-06-17
+**Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
 
-Data: 30/05/2026
-Commit: f604fe9
+Data: 17/06/2026
+Versão: 20260617.02 (Firebase Hosting — chez-pitu-rh)
 
-**Próximo deploy recomendado:** Depois de aprovação da Fase 3A
-(Implementado localmente, 245/245 testes passando, aguardando aprovação)
+Inclui: impressão da Escala em 1 página A4 (auto-fit), correção da coluna larga
+(remoção da faixa repetida), logo por CNPJ via Firebase, vínculo manual de
+feriados retroativos e infraestrutura de continuidade `.claude/`.
+
+**Próximo deploy recomendado:** conforme novas demandas.
 
 ## Módulos
 

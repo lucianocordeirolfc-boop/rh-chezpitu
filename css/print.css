@@ -473,6 +473,9 @@
     visibility: hidden !important;
   }
 
+  /* Escala em UMA única página A4 paisagem via auto-fit (ver escala-print.css):
+     a área é reduzida por transform: scale() para caber inteira; o container é
+     travado em 210mm e clipa apenas a sobra do box original. */
   body.printing-scale {
     width: 297mm !important;
     height: 210mm !important;

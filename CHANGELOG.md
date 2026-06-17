@@ -1,3 +1,12 @@
+2026-06-17 — Impressão da Escala (1 página + logo por CNPJ), vínculo manual e continuidade
+- [NOVO] Impressão da Escala em 1 única página A4 paisagem (auto-fit por escala) — applyPrintFitScale
+- [CORREÇÃO] Coluna "Funcionários" larga demais / grade deslocada: removida a faixa repetida que quebrava o table-layout: fixed
+- [MELHORIA] Coluna de nomes estreitada (38→26 / 34→23 / 30→20 mm) e nome em 1 linha com reticências
+- [NOVO] Logo da empresa carregado por CNPJ no Firebase antes da impressão (ensureLogoForActiveCompany), com normalização e fallback
+- [CORREÇÃO] Vínculo manual de feriados retroativos: bloqueio passa a revelar o vínculo existente (Histórico + modal CO)
+- [NOVO] Infraestrutura de continuidade de sessão (.claude/project-state.md, session-recovery.md e comandos)
+- Versão 20260617.02 — npm test 47/47, validate OK, homologação impressão 55/55, vínculo 31/31, feriados 24/24
+
 2026-06-01 — Fase 3A-2: Correção Feriados Duplicados
 - [CORREÇÃO] Feriados duplicados consolidados (mesma data + nome)
 - [CORREÇÃO] Syncronização automática verifica per-feriado (não genérico)

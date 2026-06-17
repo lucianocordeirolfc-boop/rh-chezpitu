@@ -2,6 +2,49 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06-17 — Impressão da Escala em 1 página, logo por CNPJ, vínculo manual e infra de continuidade
+
+Frente de trabalho com quatro entregas (versão `20260617.02`):
+
+**1. Impressão da Escala em 1 única página A4 paisagem (auto-fit).**
+- `js/escala.js` — nova `applyPrintFitScale`: mede a altura real do conteúdo no
+  momento da impressão e aplica `transform: scale()` somente em `@media print`;
+  o container é travado em 210mm. Garante 1 folha sem cortar funcionários, em
+  qualquer tamanho de quadro (quadros pequenos ficam em escala 1.0).
+- `css/escala-print.css` / `css/print.css` — `@media print` da escala passou de
+  fluxo multipágina para página única (container 210mm / `overflow: hidden`).
+
+**2. Correção da coluna "Funcionários" larga demais / grade deslocada (causa raiz).**
+- A **faixa repetida** (`scale-print-repeat-band`, `<th colspan>` como 1ª linha do
+  `<thead>`) quebrava o `table-layout: fixed`: em layout fixo as larguras vêm da 1ª
+  linha, e uma célula com `colspan` não define largura por coluna, jogando a tabela
+  para o modo conteúdo (coluna de nomes ~554px, dias ~18px). A faixa só servia para
+  repetir cabeçalho em multipágina — obsoleta com 1 página. **Removida**
+  (`js/escala.js`). Resultado: razão nome/dia caiu de ~30× para 2,2–3,0; grade
+  preenche 100%. Coluna de nomes estreitada (38→26 / 34→23 / 30→20 mm por densidade)
+  e nome em 1 linha com reticências (`text-overflow: ellipsis`).
+
+**3. Logo da empresa por CNPJ na impressão.**
+- `js/escala.js` — `ensureLogoForActiveCompany`: o logo (`companyInfo.logoDataUrl`,
+  mesmo mecanismo do Cadastro/VT) some quando o cache local degrada por cota; agora
+  é buscado direto no Firebase (`sistemaRH/empresas`), casando por CNPJ normalizado
+  (com/sem máscara), antes da prévia/impressão, e espelhado em memória (sem
+  persistir). Ausente: `console.warn`, sem placeholder gigante.
+
+**4. Vínculo manual de feriados retroativos (revelar vínculo existente).**
+- `js/data.js`, `js/feriados.js`, `js/dashboard.js` — ao bloquear duplicidade, o
+  sistema passa a revelar o vínculo existente (feriado/data/status/origem/
+  compensação) com diálogo "Ver vínculo existente"; vínculo manual confirmado
+  aparece no Histórico e no modal CO (`historyOverride`).
+
+**5. Infraestrutura de continuidade de sessão.**
+- `.claude/project-state.md`, `.claude/session-recovery.md` e comandos
+  `.claude/commands/{recuperar-projeto,atualizar-estado,retomar-contexto}.md`.
+
+Testes: `npm test` 47/47 · `npm run validate` OK · homologação de impressão 55/55,
+vínculo 31/31, feriados retroativos 24/24 (scripts `scripts/verify-*.mjs`,
+homologação não versionada).
+
 ## 2026-06-16 — Migração de hospedagem: Netlify → Firebase Hosting
 
 Decisão:

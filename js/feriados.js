@@ -597,6 +597,92 @@
     }, 0);
   }
 
+  /**
+   * Foca o Histórico do Controle de Feriados exatamente no vínculo existente
+   * (mesmo feriado + mesmo funcionário), para o usuário ver onde ele está.
+   */
+  function focusExistingLink(existing) {
+    filterState.quickView = "registros";
+    filterState.status = "todos";
+    filterState.prazo = "todos";
+    filterState.search = "";
+    filterState.department = "todos";
+    filterState.compDateFrom = "";
+    filterState.compDateTo = "";
+    filterState.holidayId = existing.holidayId || "todos";
+    filterState.employeeId = existing.employeeId || "todos";
+    window.App?.renderCurrent?.();
+  }
+
+  /**
+   * Diálogo "Vínculo já existente": mostra onde o vínculo está (feriado, data,
+   * status, origem, compensação) e oferece "Ver vínculo existente" (foca o
+   * Histórico). Substitui o antigo bloqueio sem explicação.
+   */
+  function showExistingLinkDialog(existing, note) {
+    document.getElementById("existingLinkDialog")?.remove();
+    const fmt = (d) => (d ? formatDateBR(d) : "—");
+
+    const picker = document.createElement("div");
+    picker.id = "existingLinkDialog";
+    picker.className = "co-holiday-picker";
+    picker.innerHTML = `
+      <p class="co-picker-title">Vínculo já existente</p>
+      <p class="co-picker-hint">Este funcionário já está vinculado a este feriado. Vínculo atual:</p>
+      <ul style="list-style:none;margin:12px 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:0.85rem">
+        <li><strong>Feriado:</strong> ${esc(existing.holidayName)}</li>
+        <li><strong>Data trabalhada:</strong> ${esc(fmt(existing.holidayDate))}</li>
+        <li><strong>Status:</strong> ${esc(existing.status)}</li>
+        <li><strong>Origem:</strong> ${esc(existing.origin)}</li>
+        <li><strong>Compensação:</strong> ${esc(fmt(existing.compensationDate))}</li>
+      </ul>
+      ${note ? `<p style="font-size:0.8rem;color:var(--text-muted,#888);margin:0 0 6px">${esc(note)}</p>` : ""}
+      <div class="co-picker-actions">
+        <button id="existingLinkClose" class="secondary btn-sm" type="button">Fechar</button>
+        <button id="existingLinkView" class="primary btn-sm" type="button">Ver vínculo existente</button>
+      </div>
+    `;
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    const wrapper = document.createElement("div");
+    wrapper.className = "modal-center";
+    wrapper.appendChild(picker);
+    backdrop.appendChild(wrapper);
+    document.body.appendChild(backdrop);
+
+    const close = () => backdrop.remove();
+    picker.querySelector("#existingLinkClose").addEventListener("click", close);
+    picker.querySelector("#existingLinkView").addEventListener("click", () => {
+      close();
+      focusExistingLink(existing);
+    });
+  }
+
+  /**
+   * Trata o retorno de addManualWorkedEmployee de forma única para os 3 pontos
+   * de vínculo manual:
+   *  - ok:true  → fecha modal, atualiza tabela e mostra toast (já visível no Histórico).
+   *  - bloqueado com detalhes (Agendado/Compensado) → diálogo "Ver vínculo existente".
+   *  - erro genérico → alerta.
+   */
+  function handleManualLinkResult(result, { container, close } = {}) {
+    if (result?.ok) {
+      close?.();
+      if (container) refreshTable(container);
+      else window.App?.renderCurrent?.();
+      window.App?.toast?.(result.message || "Vínculo criado com sucesso.", "success");
+      return;
+    }
+    if (result?.existing) {
+      close?.();
+      if (container) refreshTable(container);
+      showExistingLinkDialog(result.existing, result.message || result.error);
+      return;
+    }
+    alert(result?.error || "Não foi possível criar o vínculo.");
+  }
+
   function showAddWorkedEmployeeModal(holidayId, container) {
     document.getElementById("addWorkedEmployeePicker")?.remove();
 
@@ -664,17 +750,7 @@
         return;
       }
       const result = AppData.addManualWorkedEmployee(holidayId, employeeId, { company });
-      if (!result.ok) {
-        alert(result.error);
-        return;
-      }
-      close();
-      if (container) {
-        refreshTable(container);
-      } else {
-        window.App?.renderCurrent?.();
-      }
-      window.App?.toast?.(result.message || "Vínculo criado com sucesso.", "success");
+      handleManualLinkResult(result, { container, close });
     });
 
     setTimeout(() => {
@@ -787,14 +863,7 @@
         return;
       }
       const result = AppData.addManualWorkedEmployee(holidayId, employeeId, { company });
-      if (!result.ok) {
-        alert(result.error);
-        return;
-      }
-      close();
-      if (container) refreshTable(container);
-      window.App?.renderCurrent?.();
-      window.App?.toast?.(result.message || "Vínculo criado com sucesso.", "success");
+      handleManualLinkResult(result, { container, close });
     });
 
     setTimeout(() => {

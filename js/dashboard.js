@@ -8,8 +8,9 @@
       const dueDate = AppData.getHolidayCompensationDueDate(holiday.date);
       return holiday.workedEmployees
         .filter((item) => {
-          const emp = data.employees.find((e) => e.id === item.employeeId);
-          if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return false;
+          // Mesma base do Histórico do Controle de Feriados (cards não divergem
+          // das tabelas); respeita vínculo manual confirmado (historyOverride).
+          if (!AppData.isWorkedEntryVisibleInHistory(holiday, item, data)) return false;
           const resolved = AppData.resolveWorkedHolidayStatus(item, holiday.date);
           return resolved.key === "pendente" || resolved.key === "agendado";
         })

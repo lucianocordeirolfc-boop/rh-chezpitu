@@ -448,6 +448,60 @@
     };
   }
 
+  // Só tenta o Firebase uma vez por empresa/sessão quando o logo não está em cache.
+  const _logoFetchTried = {};
+
+  function normalizeCnpj(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  /**
+   * Garante o logo da empresa ativa antes da impressão. O logo é salvo em
+   * `companyInfo.logoDataUrl` (mesmo mecanismo do restante do sistema), mas o
+   * cache local pode tê-lo removido em modo de degradação de cota. Aqui buscamos
+   * direto no Firebase (sistemaRH/empresas), casando por CNPJ normalizado (com ou
+   * sem máscara), e espelhamos em memória — sem persistir no localStorage.
+   * Retorna o dataURL do logo (ou "" se não houver).
+   */
+  async function ensureLogoForActiveCompany() {
+    const company = getViewCompany();
+    const data = AppData.getCompanyData(company);
+    if (!data) return "";
+    const info = data.companyInfo || (data.companyInfo = {});
+    if (info.logoDataUrl) return info.logoDataUrl;       // já disponível localmente
+    if (_logoFetchTried[company]) return "";             // já tentou nesta sessão
+
+    _logoFetchTried[company] = true;
+    try {
+      if (!window.FirebaseSync?.isReady?.() || !window.firebaseDB) {
+        console.warn(`[Escala] Firebase indisponível: logo de "${company}" não carregado.`);
+        return "";
+      }
+      const snap = await window.firebaseDB.ref("sistemaRH/empresas").once("value");
+      const empresas = snap.val() || {};
+      const wantedCnpj = normalizeCnpj(info.cnpj);
+
+      // 1) casa pelo nome da empresa ativa; 2) senão, pelo CNPJ normalizado.
+      let rec = empresas[company];
+      if ((!rec || !rec.logoDataUrl) && wantedCnpj) {
+        rec = Object.values(empresas).find(
+          (e) => e && e.logoDataUrl && normalizeCnpj(e.cnpj || e.CNPJ) === wantedCnpj
+        ) || rec;
+      }
+
+      const logo = (rec && rec.logoDataUrl) || "";
+      if (logo) {
+        info.logoDataUrl = logo; // espelha em memória (NÃO chama saveState)
+      } else {
+        console.warn(`[Escala] Logo não encontrado no Firebase para "${company}" (CNPJ ${info.cnpj || "—"}).`);
+      }
+      return logo;
+    } catch (error) {
+      console.warn("[Escala] Falha ao buscar logo no Firebase:", error);
+      return "";
+    }
+  }
+
   function companyClass() {
     const name = getViewCompany() || "";
     return "scale-company-" + name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -668,7 +722,7 @@
               })
               .join("");
             return `<tr><th class="print-employee-name">
-              ${displayName(employee.name)}
+              <span class="print-emp-name-text">${displayName(employee.name)}</span>
               ${employee.defaultShift ? `<small class="print-emp-shift">${esc(employee.defaultShift)}</small>` : ""}
             </th>${cells}</tr>`;
           })
@@ -717,7 +771,9 @@
             <div class="scale-print-table-wrap">
             <table class="scale-print-table">
               ${renderPrintColgroup(days)}
-              <thead><tr><th>Funcionários</th>${headerDays}</tr></thead>
+              <thead>
+                <tr><th>Funcionários</th>${headerDays}</tr>
+              </thead>
               <tbody>${rows}</tbody>
             </table>
             </div>
@@ -874,6 +930,55 @@
     if (notesField && notesPrint) notesPrint.textContent = notesField.value || "";
   }
 
+  // Auto-fit: garante que a escala caiba em UMA única página A4 paisagem.
+  // Mede a altura real do conteúdo (liberando a trava de 210mm da pré-visualização)
+  // e calcula um fator de escala para que o quadro inteiro — grade completa, todos
+  // os funcionários, observações, assinatura, legenda e instruções — caiba na folha,
+  // sem cortar ninguém e sem gerar 2ª página. O fator vai para a variável CSS
+  // --scale-print-fit, consumida apenas em @media print (a tela não é afetada).
+  function applyPrintFitScale(printContainer) {
+    const area = printContainer?.querySelector(".scale-print-area");
+    if (!area) return;
+
+    const MM = 96 / 25.4; // px por mm @96dpi
+    const pageW = 297 * MM;
+    const pageH = 210 * MM;
+    const safety = 6; // folga anti-corte (px) para arredondamentos do navegador
+
+    // Libera a trava de altura/overflow da prévia para medir o conteúdo natural.
+    const prev = {
+      height: area.style.height,
+      minHeight: area.style.minHeight,
+      maxHeight: area.style.maxHeight,
+      overflow: area.style.overflow,
+      transform: area.style.transform
+    };
+    area.style.height = "auto";
+    area.style.minHeight = "0";
+    area.style.maxHeight = "none";
+    area.style.overflow = "visible";
+    area.style.transform = "none";
+
+    const contentH = area.scrollHeight;
+    const contentW = area.scrollWidth;
+
+    // Restaura o estado original (a escala é aplicada via CSS var, só na impressão).
+    area.style.height = prev.height;
+    area.style.minHeight = prev.minHeight;
+    area.style.maxHeight = prev.maxHeight;
+    area.style.overflow = prev.overflow;
+    area.style.transform = prev.transform;
+
+    const scale = Math.min(
+      1,
+      contentH > 0 ? (pageH - safety) / contentH : 1,
+      contentW > 0 ? pageW / contentW : 1
+    );
+
+    area.style.setProperty("--scale-print-fit", String(scale));
+    printContainer.style.setProperty("--scale-print-fit", String(scale));
+  }
+
   function printScale(container) {
     syncPrintStaticFields(container);
 
@@ -895,6 +1000,9 @@
     pageStyle.id = "scale-print-page-override";
     pageStyle.textContent = "@page { size: A4 landscape; margin: 0; }";
     document.head.appendChild(pageStyle);
+
+    // Calcula o fator de auto-fit ANTES de marcar o body para impressão.
+    applyPrintFitScale(printContainer);
 
     document.body.classList.add("printing-scale");
 
@@ -1368,14 +1476,16 @@
       exportExcel(employees, days, data);
     });
 
-    container.querySelector("#previewScalePrint").addEventListener("click", () => {
+    container.querySelector("#previewScalePrint").addEventListener("click", async () => {
       scaleState.previewVisible = true;
+      await ensureLogoForActiveCompany();
       renderCurrent(container);
       container.querySelector(".scale-print-preview-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
-    container.querySelector("#printScale").addEventListener("click", () => {
+    container.querySelector("#printScale").addEventListener("click", async () => {
       scaleState.previewVisible = true;
+      await ensureLogoForActiveCompany();
       renderCurrent(container);
       printScale(container);
     });

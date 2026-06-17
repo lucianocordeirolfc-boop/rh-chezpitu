@@ -282,7 +282,7 @@
 }
 
 .scale-print-table col.print-col-name {
-  width: 38mm;
+  width: 26mm;
 }
 
 .scale-print-table col.print-col-day {
@@ -310,9 +310,9 @@
 .scale-print-table th:first-child,
 .scale-print-table td:first-child,
 .scale-print-table th.print-employee-name {
-  width: 38mm;
-  min-width: 38mm;
-  max-width: 38mm;
+  width: 26mm;
+  min-width: 26mm;
+  max-width: 26mm;
   padding: 0.6mm 1mm;
   color: #06364a;
   text-align: left;
@@ -352,13 +352,30 @@
 .scale-print-table .print-employee-name {
   font-weight: 700;
   text-align: left;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  hyphens: auto;
   font-size: 6pt;
   line-height: 1.1;
   vertical-align: middle;
+  overflow: hidden;
+}
+
+/* Nome em UMA linha com truncamento elegante (reticências). Não quebra em
+   várias linhas; o horário fica abaixo, em linha própria. */
+.scale-print-table .print-emp-name-text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scale-print-table .print-emp-shift {
+  display: block;
+  margin-top: 0.2mm;
+  color: #6d8290;
+  font-size: 5pt;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scale-print-table th.print-day-sunday,
@@ -517,13 +534,13 @@
 .scale-print-density-compact .scale-print-table th:first-child,
 .scale-print-density-compact .scale-print-table td:first-child,
 .scale-print-density-compact .scale-print-table th.print-employee-name {
-  width: 34mm;
-  min-width: 34mm;
-  max-width: 34mm;
+  width: 23mm;
+  min-width: 23mm;
+  max-width: 23mm;
 }
 
 .scale-print-density-compact .scale-print-table col.print-col-name {
-  width: 34mm;
+  width: 23mm;
 }
 
 .scale-print-density-compact .scale-print-footer {
@@ -554,14 +571,14 @@
 .scale-print-density-dense .scale-print-table th:first-child,
 .scale-print-density-dense .scale-print-table td:first-child,
 .scale-print-density-dense .scale-print-table th.print-employee-name {
-  width: 30mm;
-  min-width: 30mm;
-  max-width: 30mm;
+  width: 20mm;
+  min-width: 20mm;
+  max-width: 20mm;
   font-size: 5.2pt;
 }
 
 .scale-print-density-dense .scale-print-table col.print-col-name {
-  width: 30mm;
+  width: 20mm;
 }
 
 .scale-print-density-dense .scale-print-table .sector-divider-print {
@@ -690,12 +707,19 @@
 }
 
 @media print {
+  /* Impressão da escala em UMA ÚNICA página A4 paisagem (auto-fit).
+     O JS (printScale → applyPrintFitScale) mede a altura real do conteúdo e
+     define a variável --scale-print-fit; aqui a área é reduzida por
+     transform: scale() para caber inteira na folha — grade completa, todos os
+     funcionários, observações, assinatura, legenda e instruções — sem cortar
+     ninguém e sem 2ª página. O container é travado em 210mm e clipa apenas a
+     sobra do box original (o conteúdo visível já cabe graças à escala). */
   body.printing-scale,
   body.printing-scale html {
     width: 297mm !important;
     height: 210mm !important;
     min-width: 297mm !important;
-    min-height: 210mm !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
@@ -703,12 +727,11 @@
   }
 
   body.printing-scale #scalePrintContainer {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
+    position: static !important;
     width: 297mm !important;
     height: 210mm !important;
+    min-height: 0 !important;
+    max-height: 210mm !important;
     margin: 0 auto !important;
     padding: 0 !important;
     overflow: hidden !important;
@@ -717,22 +740,20 @@
   }
 
   body.printing-scale #scalePrintContainer .scale-print-area {
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    display: block !important;
     width: 297mm !important;
-    height: 210mm !important;
-    min-height: 210mm !important;
-    max-height: 210mm !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     margin: 0 !important;
-    padding: 3.5mm 4mm !important;
+    padding: 3mm 4mm !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    transform: none !important;
+    transform: scale(var(--scale-print-fit, 1)) !important;
+    transform-origin: top left !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -740,18 +761,63 @@
   body.printing-scale .scale-print-header-corporate {
     display: grid !important;
     grid-template-columns: 1.2fr 1.35fr 0.75fr !important;
+    margin-bottom: 1.5mm !important;
+    padding-bottom: 1.5mm !important;
+  }
+
+  /* Cabeçalho compacto na impressão: título e logo menores reduzem a sobrecarga
+     vertical fixa, deixando mais altura para a grade (menos escala = mais legível). */
+  body.printing-scale .scale-print-title h2 {
+    font-size: 15pt !important;
+    margin: 0 0 1mm !important;
+  }
+
+  body.printing-scale .scale-print-logo-frame,
+  body.printing-scale .scale-print-logo-slot {
+    width: 30mm !important;
+    height: 11mm !important;
+  }
+
+  body.printing-scale .scale-print-logo-img {
+    max-width: 30mm !important;
+    max-height: 11mm !important;
+  }
+
+  body.printing-scale .scale-print-legal-name {
+    font-size: 8.4pt !important;
+  }
+
+  body.printing-scale .scale-print-month-display {
+    font-size: 9.5pt !important;
+  }
+
+  /* O wrap base tem overflow:hidden (corte na tela); na impressão precisa fluir. */
+  body.printing-scale .scale-print-table-wrap {
+    overflow: visible !important;
+    min-height: 0 !important;
   }
 
   body.printing-scale .scale-print-table {
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
     break-inside: auto;
     page-break-inside: auto;
+  }
+
+  /* Cabeçalho da tabela (linha de dias) como grupo de cabeçalho. */
+  body.printing-scale .scale-print-table thead {
+    display: table-header-group !important;
   }
 
   body.printing-scale .scale-print-table tr {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* Não deixar um título de setor órfão no rodapé da página. */
+  body.printing-scale .scale-print-table .sector-row-print {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   body.printing-scale .scale-print-density-dense .scale-print-footer,
@@ -784,20 +850,23 @@
 
   body.printing-scale .scale-print-notes-print {
     display: block !important;
-    min-height: 16mm;
-    max-height: 20mm;
+    min-height: 12mm;
+    max-height: 16mm;
     overflow: hidden;
     padding-top: 1mm;
     border-top: 0.25mm solid #cfe3ea;
   }
 
+  /* Rodapé compacto: reduz a sobrecarga vertical fixa para caber mais
+     funcionários por página A4 e evitar 2ª página quase vazia em quadros
+     pequenos. Quadros grandes continuam paginando normalmente. */
   body.printing-scale .scale-print-footer {
-    margin-top: 2mm !important;
+    margin-top: 1.5mm !important;
     gap: 4mm !important;
   }
 
   body.printing-scale .scale-print-bottom {
-    margin-top: 2mm !important;
+    margin-top: 1.5mm !important;
     gap: 3mm !important;
   }
 
@@ -813,7 +882,7 @@
     align-items: center !important;
     justify-content: center !important;
     overflow: hidden !important;
-    min-height: 20mm !important;
+    min-height: 14mm !important;
     background: #ffffff !important;
     isolation: isolate !important;
   }
@@ -830,8 +899,8 @@
   body.printing-scale .scale-print-logo-img {
     width: 100% !important;
     height: 100% !important;
-    max-width: 36mm !important;
-    max-height: 14mm !important;
+    max-width: 30mm !important;
+    max-height: 11mm !important;
     object-fit: contain !important;
   }
 
