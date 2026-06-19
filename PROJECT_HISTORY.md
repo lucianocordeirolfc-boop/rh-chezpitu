@@ -2,6 +2,47 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+## 2026-06-19 — Logo das empresas via Firebase Storage (permanente)
+
+Frente de trabalho (versão `20260618.02`, commits `da18e28` + carimbo `fb5afae`).
+Mudança de origem do logo das empresas: de RTDB (`sistemaRH/empresas`) para
+**Firebase Storage** (`logos/{CNPJ}/<arquivo>`), tornando-o **permanente** e
+visível em todos os módulos que já leem `companyInfo.logoDataUrl`.
+
+**1. Resolução do logo no Storage por CNPJ.**
+- `js/firebase-sync.js` — novo `resolveLogoUrlByCnpj(cnpj, company)`: lista a
+  pasta `logos/{CNPJ}/` (somente dígitos) e retorna a URL de download da 1ª
+  imagem (`png/jpg/jpeg/webp`), independente do nome do arquivo. Trata
+  `storage/unauthorized` emitindo no console a regra de leitura necessária.
+  Retorna `""` quando não encontra / sem permissão / SDK ausente. Exportado na API.
+
+**2. Importação automática e persistência no boot.**
+- `js/app.js` — `importCompanyLogos()` no boot: para cada empresa sem logo, busca
+  no Storage por CNPJ e **persiste** via `AppData.updateCompanyLogo` (grava no
+  RTDB). Idempotente — empresas que já têm logo são ignoradas.
+
+**3. Escala usa Storage e persiste o logo.**
+- `js/escala.js` — `ensureLogoForActiveCompany` reescrito: em vez de só espelhar
+  em memória, agora busca via `resolveLogoUrlByCnpj` e persiste com
+  `updateCompanyLogo`. Novo `waitForImages()` aguarda a logo (URL externa do
+  Storage) carregar antes do `window.print()` (timeout de segurança de 2s).
+
+**4. Vale-transporte aguarda a logo antes de imprimir.**
+- `js/vale-transporte.js` — antes de `window.print()`, espera as imagens da área
+  de impressão carregarem (timeout 2s) para não imprimir sem o logo.
+
+**5. SDK de Storage no index.html.**
+- `index.html` — inclui `firebase-storage-compat.js`; `?v=` atualizado para
+  `20260618.02`.
+
+**Pré-requisito de infra:** regra de leitura publicada no Firebase Storage
+(`match /logos/{cnpj}/{arquivo=**} { allow read: if request.auth != null; }`),
+senão a resolução cai em `storage/unauthorized`.
+
+**Testes:** `npm test` 47/47, `npm run validate` 25/25. Validado no preview pelo
+usuário (logos das duas empresas, impressão Escala + Vale-transporte). Deploy em
+produção (`chez-pitu-rh.web.app`) e push para `main` autorizados e concluídos.
+
 ## 2026-06-17 — Impressão da Escala em 1 página, logo por CNPJ, vínculo manual e infra de continuidade
 
 Frente de trabalho com quatro entregas (versão `20260617.02`):

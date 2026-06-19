@@ -8,12 +8,26 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260617.01` (exibida como `v2026.06.17.01`) — fonte: `js/version.js`
+- **Versão atual:** `20260618.02` (exibida como `v2026.06.18.02`) — fonte: `js/version.js`
 - **Branch atual:** `main`
-- **Último commit:** `b3aaea5` — chore: carimbo de build em version.js (cor navy + pêssego)
-- **Status geral:** 🟡 DESENVOLVIMENTO — há alterações locais **não commitadas** aguardando validação/autorização
+- **Último commit:** `fb5afae` — chore: carimbo de build em version.js (commit da18e28)
+- **Status geral:** 🟢 EM PRODUÇÃO — frente do logo via Storage commitada, pushada e
+  deployada (`chez-pitu-rh.web.app`). Working tree limpo (exceto `scripts/verify-*.mjs`,
+  não versionados por convenção).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+- ✅ **Logo das empresas via Firebase Storage (permanente)** — origem do logo
+  migrada de RTDB (`sistemaRH/empresas`) para Storage (`logos/{CNPJ}/<arquivo>`).
+  `FirebaseSync.resolveLogoUrlByCnpj` lista a pasta e pega a 1ª imagem; `app.js`
+  importa e persiste no boot (`importCompanyLogos`); `escala.js` persiste via
+  `updateCompanyLogo` e aguarda a imagem com `waitForImages` antes de imprimir;
+  `vale-transporte.js` aguarda imagens antes do `print()`. `index.html` carrega
+  `firebase-storage-compat`. Versão `20260618.02`. Commits `da18e28` + `fb5afae`.
+  Testes: npm test 47/47, validate 25/25. **Em produção.**
+  Pré-requisito: regra de leitura `logos/{cnpj}/...` publicada no Storage.
+
+### Frente anterior (já em produção)
 
 - ✅ **Vínculo manual de feriados retroativos** — bloqueio passou a revelar o vínculo
   existente (feriado/data/status/origem/compensação), com diálogo "Ver vínculo
@@ -45,29 +59,24 @@
 
 ## Próximas tarefas
 
-1. Validar 2 PDFs (Chez Pitu e Pengold, Junho/2026) no navegador/preview:
-   1 página, grade rente ao dia 01, logo real carregada.
-2. Após aprovação: autorizar commit/push/deploy.
+- (nenhuma pendência aberta nesta frente — concluída e em produção)
 
 ## Pendências de validação
 
-- ⏳ Teste de impressão pelo usuário no preview (Junho/2026, ambas as empresas):
-  1 página, sem corte, espaço nome↔dia 01 reduzido, logo correta.
-- Preview ativo: `https://chez-pitu-rh--preview-f7atcmwq.web.app` (expira 2026-06-24).
+- ✅ Validado pelo usuário no preview (`20260618.02`): logos das duas empresas
+  carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
 
-- ⛔ **Nada commitado/pushado/deployado em produção.** Aguardando aprovação do
-  usuário. Deploy oficial: `npm run deploy` (GitHub main + Firebase Hosting).
+- ✅ **Commitado, pushado (`main`) e deployado em produção** (`chez-pitu-rh.web.app`).
+- ⚠️ Infra: garantir que a regra de leitura `logos/{cnpj}/...` permaneça publicada
+  no Firebase Storage (Console → Storage → Regras).
 
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-M  css/escala-print.css   M  css/print.css      M  index.html
-M  js/dashboard.js        M  js/data.js         M  js/escala.js
-M  js/feriados.js         M  js/version.js
+(working tree limpo)
 ?? scripts/verify-*.mjs (homologação — não versionar)
-?? scripts/_diag-print.mjs (diagnóstico temporário — remover ao concluir)
 ```
 
 ---
@@ -101,3 +110,19 @@ M  js/feriados.js         M  js/version.js
   impressão 55/55, npm test 47/47, validate ok, vínculo 31/31, feriados 24/24.
   Removido `scripts/_diag-print.mjs` (diagnóstico concluído).
 - **Próximo passo:** Validar 2 PDFs no preview; aguardar autorização de commit/deploy.
+
+### CHECKPOINT
+- **Data:** 2026-06-19
+- **Versão:** 20260618.02
+- **Branch:** main
+- **Commits:** `da18e28` (feat logo via Storage) + `fb5afae` (carimbo de build)
+- **Arquivos alterados:** js/firebase-sync.js (resolveLogoUrlByCnpj) · js/app.js
+  (importCompanyLogos no boot) · js/escala.js (ensureLogoForActiveCompany via
+  Storage + persiste; waitForImages) · js/vale-transporte.js (aguarda imagens) ·
+  index.html (firebase-storage-compat; ?v=) · js/version.js
+- **Resumo:** Logo das empresas migrado de RTDB para Firebase Storage
+  (`logos/{CNPJ}/`), tornando-o permanente e visível em todos os módulos.
+  Validado no preview pelo usuário. Testes npm test 47/47, validate 25/25.
+  Commit, push (`main`) e deploy em produção (`chez-pitu-rh.web.app`) concluídos.
+- **Próximo passo:** Nenhuma pendência aberta. Garantir que a regra de leitura
+  do Storage (`logos/{cnpj}/...`) permaneça publicada no Console.
