@@ -375,6 +375,83 @@ if (window.firebase && firebase.apps.length) {
     listening = false;
   }
 
+  function onlyDigits(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  const LOGO_IMAGE_RE = /\.(png|jpe?g|webp)$/i;
+
+  function logoPermissionRule(digits) {
+    return [
+      `[Logo] ERRO DE PERMISSÃO ao ler logos/${digits}/.`,
+      "Regra necessária no Firebase Storage (Console → Storage → Regras):",
+      "  rules_version = '2';",
+      "  service firebase.storage {",
+      "    match /b/{bucket}/o {",
+      "      match /logos/{cnpj}/{arquivo=**} {",
+      "        allow read: if request.auth != null;",
+      "      }",
+      "    }",
+      "  }"
+    ].join("\n");
+  }
+
+  /**
+   * Resolve a URL de download da logo da empresa a partir do Firebase Storage, na
+   * estrutura real `logos/{CNPJ}/<arquivo>`: lista a pasta do CNPJ (somente dígitos)
+   * e pega o PRIMEIRO arquivo de imagem (png/jpg/jpeg/webp), independente do nome.
+   * Emite logs `[Logo] ...`. Retorna "" quando não encontra / sem permissão / SDK
+   * ausente. Apenas leitura.
+   */
+  function resolveLogoUrlByCnpj(cnpj, company) {
+    const digits = onlyDigits(cnpj);
+    console.info(`[Logo] Empresa: ${company || "—"}`);
+    console.info(`[Logo] CNPJ: ${digits || "—"}`);
+
+    if (!digits) {
+      console.warn("[Logo] CNPJ ausente — não é possível localizar a pasta no Storage.");
+      return Promise.resolve("");
+    }
+    if (!window.firebase || typeof window.firebase.storage !== "function") {
+      console.warn("[Logo] SDK de Storage indisponível (firebase-storage não carregado).");
+      return Promise.resolve("");
+    }
+
+    const folder = `logos/${digits}`;
+    return window.firebase
+      .storage()
+      .ref(folder)
+      .listAll()
+      .then((listing) => {
+        const items = listing.items || [];
+        const image = items.find((item) => LOGO_IMAGE_RE.test(item.name));
+
+        if (!image) {
+          if (items.length) {
+            console.warn(`[Logo] Pasta ${folder}/ encontrada, mas sem imagem png/jpg/jpeg/webp (${items.length} arquivo(s)).`);
+          } else {
+            console.warn(`[Logo] Pasta ${folder}/ vazia ou inexistente — nenhuma imagem para a empresa "${company || ""}".`);
+          }
+          return "";
+        }
+
+        console.info(`[Logo] Pasta encontrada: ${folder}/`);
+        console.info(`[Logo] Arquivo encontrado: ${image.name}`);
+        return image.getDownloadURL().then((url) => {
+          console.info(`[Logo] Download URL: ${url}`);
+          return url;
+        });
+      })
+      .catch((error) => {
+        if (error && error.code === "storage/unauthorized") {
+          console.error(logoPermissionRule(digits));
+        } else {
+          console.warn(`[Logo] Falha ao listar ${folder}/ no Storage:`, error);
+        }
+        return "";
+      });
+  }
+
   window.FirebaseSync = {
     init,
     isReady,
@@ -385,6 +462,7 @@ if (window.firebase && firebase.apps.length) {
     startSync,
     stopSync,
     firebaseToState,
-    stateToFirebase
+    stateToFirebase,
+    resolveLogoUrlByCnpj
   };
 })();

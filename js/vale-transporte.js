@@ -428,7 +428,31 @@
         alert(validationMessage(validation));
         return;
       }
-      window.print();
+      // Aguarda a logo (URL do Storage) carregar antes de imprimir; não trava se falhar.
+      const area = container.querySelector(".vt-print-area");
+      const pending = [...(area?.querySelectorAll("img") || [])].filter(
+        (img) => !(img.complete && img.naturalWidth > 0)
+      );
+      if (!pending.length) {
+        window.print();
+        return;
+      }
+      let left = pending.length;
+      let printed = false;
+      const go = () => {
+        if (printed) return;
+        printed = true;
+        window.print();
+      };
+      pending.forEach((img) => {
+        const tick = () => {
+          left -= 1;
+          if (left <= 0) go();
+        };
+        img.addEventListener("load", tick, { once: true });
+        img.addEventListener("error", tick, { once: true });
+      });
+      window.setTimeout(go, 2000);
     });
 
     bindDeductionInputs(container, yearMonth);

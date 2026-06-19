@@ -448,56 +448,36 @@
     };
   }
 
-  // Só tenta o Firebase uma vez por empresa/sessão quando o logo não está em cache.
+  // Só tenta o Storage uma vez por empresa/sessão quando o logo não está disponível.
   const _logoFetchTried = {};
 
-  function normalizeCnpj(value) {
-    return String(value || "").replace(/\D/g, "");
-  }
-
   /**
-   * Garante o logo da empresa ativa antes da impressão. O logo é salvo em
-   * `companyInfo.logoDataUrl` (mesmo mecanismo do restante do sistema), mas o
-   * cache local pode tê-lo removido em modo de degradação de cota. Aqui buscamos
-   * direto no Firebase (sistemaRH/empresas), casando por CNPJ normalizado (com ou
-   * sem máscara), e espelhamos em memória — sem persistir no localStorage.
-   * Retorna o dataURL do logo (ou "" se não houver).
+   * Garante o logo da empresa ativa antes da prévia/impressão. O logo é salvo em
+   * `companyInfo.logoDataUrl` (mesmo mecanismo do restante do sistema). Quando
+   * ausente, busca a imagem na pasta `logo/` do Firebase Storage pelo CNPJ
+   * (FirebaseSync.resolveLogoUrlByCnpj) e PERSISTE via updateCompanyLogo, tornando
+   * o logo permanente e visível em todos os módulos. Retorna a URL/dataURL (ou "").
    */
   async function ensureLogoForActiveCompany() {
     const company = getViewCompany();
     const data = AppData.getCompanyData(company);
     if (!data) return "";
     const info = data.companyInfo || (data.companyInfo = {});
-    if (info.logoDataUrl) return info.logoDataUrl;       // já disponível localmente
+    if (info.logoDataUrl) return info.logoDataUrl;       // já disponível
     if (_logoFetchTried[company]) return "";             // já tentou nesta sessão
 
     _logoFetchTried[company] = true;
     try {
-      if (!window.FirebaseSync?.isReady?.() || !window.firebaseDB) {
-        console.warn(`[Escala] Firebase indisponível: logo de "${company}" não carregado.`);
-        return "";
+      const cnpj = AppData.resolveCompanyCnpj ? AppData.resolveCompanyCnpj(info) : info.cnpj;
+      const url = await window.FirebaseSync?.resolveLogoUrlByCnpj?.(cnpj, company);
+      if (url) {
+        AppData.updateCompanyLogo(url, company); // persiste (RTDB) + atualiza estado
+        console.info(`[Logo] Logo gravada em companyInfo.logoDataUrl (empresa "${company}").`);
+        return url;
       }
-      const snap = await window.firebaseDB.ref("sistemaRH/empresas").once("value");
-      const empresas = snap.val() || {};
-      const wantedCnpj = normalizeCnpj(info.cnpj);
-
-      // 1) casa pelo nome da empresa ativa; 2) senão, pelo CNPJ normalizado.
-      let rec = empresas[company];
-      if ((!rec || !rec.logoDataUrl) && wantedCnpj) {
-        rec = Object.values(empresas).find(
-          (e) => e && e.logoDataUrl && normalizeCnpj(e.cnpj || e.CNPJ) === wantedCnpj
-        ) || rec;
-      }
-
-      const logo = (rec && rec.logoDataUrl) || "";
-      if (logo) {
-        info.logoDataUrl = logo; // espelha em memória (NÃO chama saveState)
-      } else {
-        console.warn(`[Escala] Logo não encontrado no Firebase para "${company}" (CNPJ ${info.cnpj || "—"}).`);
-      }
-      return logo;
+      return "";
     } catch (error) {
-      console.warn("[Escala] Falha ao buscar logo no Firebase:", error);
+      console.warn("[Escala] Falha ao buscar logo no Storage:", error);
       return "";
     }
   }
@@ -1016,9 +996,37 @@
     window.addEventListener("afterprint", cleanupPrint);
 
     window.setTimeout(() => {
-      window.print();
-      window.setTimeout(cleanupPrint, 500);
+      // Garante que a logo (URL externa do Storage) esteja carregada antes do print.
+      waitForImages(printContainer, 2000).then(() => {
+        window.print();
+        window.setTimeout(cleanupPrint, 500);
+      });
     }, 200);
+  }
+
+  // Aguarda todas as imagens do nó terminarem de carregar (com timeout de segurança).
+  function waitForImages(root, timeoutMs) {
+    const imgs = [...(root?.querySelectorAll("img") || [])];
+    const pending = imgs.filter((img) => !(img.complete && img.naturalWidth > 0));
+    if (!pending.length) return Promise.resolve();
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        resolve();
+      };
+      let left = pending.length;
+      const tick = () => {
+        left -= 1;
+        if (left <= 0) finish();
+      };
+      pending.forEach((img) => {
+        img.addEventListener("load", tick, { once: true });
+        img.addEventListener("error", tick, { once: true });
+      });
+      window.setTimeout(finish, timeoutMs); // não trava a impressão se algo falhar
+    });
   }
 
   function bindPrintFields(container) {

@@ -297,6 +297,40 @@
     AppData.setActiveCompany(AppData.getActiveCompany(), { save: false });
     updateCompanyTabsUI();
 
+    // Importa as logos do Firebase Storage (pasta logo/, arquivo nomeado pelo CNPJ)
+    // para companyInfo.logoDataUrl quando a empresa ainda não tem logo. Torna o
+    // logo PERMANENTE (salvo no RTDB via updateCompanyLogo) e visível em todos os
+    // módulos que já leem companyInfo.logoDataUrl (Escala, Vale-transporte, etc.).
+    // Idempotente: empresas que já têm logo são ignoradas.
+    const importCompanyLogos = () => {
+      if (!window.FirebaseSync?.resolveLogoUrlByCnpj || !window.FirebaseSync?.isReady?.()) return;
+      const companies = AppData.getCompanies?.() || [];
+      Promise.all(
+        companies.map((company) => {
+          const data = AppData.getCompanyData(company);
+          const info = data?.companyInfo;
+          if (!info || info.logoDataUrl) return Promise.resolve(false);
+          const cnpj = AppData.resolveCompanyCnpj ? AppData.resolveCompanyCnpj(info) : info.cnpj;
+          if (!cnpj) return Promise.resolve(false);
+          return window.FirebaseSync.resolveLogoUrlByCnpj(cnpj, company).then((url) => {
+            if (url) {
+              AppData.updateCompanyLogo(url, company);
+              console.info(`[Logo] Logo gravada em companyInfo.logoDataUrl (empresa "${company}").`);
+              return true;
+            }
+            return false;
+          });
+        })
+      )
+        .then((results) => {
+          if (results.some(Boolean)) {
+            updateCompanyTabsUI();
+            renderCurrent();
+          }
+        })
+        .catch((error) => console.warn("[Logo] Falha ao importar logos do Storage:", error));
+    };
+
     let booted = false;
     const boot = () => {
       if (booted) return;
@@ -309,6 +343,7 @@
       updateCompanyTabsUI();
       render("dashboard");
       initSync();
+      importCompanyLogos();
     };
 
     if (window.FirebaseSync?.init()) {
