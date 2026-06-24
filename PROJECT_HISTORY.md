@@ -2,6 +2,46 @@
 
 Este arquivo registra decisões, bugs recorrentes e correções importantes.
 
+> **Regra de registro obrigatório:** toda alteração de melhoria/correção que
+> chega a commit deve ser registrada neste arquivo (entrada datada no topo)
+> ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
+> histórico".
+
+## 2026-06-24 — Contador: horas até 200:00, máscara, total no Resumo e regra de proteção
+
+Frente de trabalho na aba **Informações Contador** (commits `3d65563` +
+carimbo `ebf0089`; build `2026-06-24`, cache exibida `20260618.02`).
+
+**1. Campos de horas aceitam de 00:00 até 200:00.**
+- `js/contador.js` — Hora Extra e Ad. Noturno deixam de usar `<input type="time">`
+  (que limitava a 23:59) e passam a digitação livre `HH:MM`. Nova `normalizeHora`
+  valida/normaliza (00:00–200:00; rejeita `200:01`, minutos > 59 e texto inválido).
+  Validação no submit do pop-up: valor inválido exibe aviso e não salva.
+
+**2. Máscara automática do ":" ao digitar (`maskHora`).**
+- `js/contador.js` — os 2 últimos dígitos viram minutos e o restante (até 3) vira
+  horas: `1030` → `10:30`, `20000` → `200:00`, `030` → `0:30`. Se o usuário digitar
+  o `:`, a posição é respeitada. Normalização final no `blur`. Inputs marcados com
+  `.hora-input`; dica de uso no campo.
+
+**3. Totalizador no rodapé do Resumo (tela e impressão/PDF).**
+- `js/contador.js` — `computeTotals` + `horaToMinutes`/`minutesToHora`: `<tfoot>`
+  com linha **Total** somando cada coluna (horas em `HH:MM`, sem teto na soma;
+  valores em R$), sobre os funcionários exibidos.
+- `css/style.css` — `.resumo-total-row`/`.resumo-total-cell` (total sticky no
+  rodapé, na tela) e `.resumo-print-total` (rodapé fixo na impressão).
+
+**4. Regra fixa: proteção de lançamentos existentes.**
+- `PROJECT_RULES.md` — nenhuma melhoria/refatoração/migração pode apagar, excluir
+  ou alterar lançamento já efetuado; mudanças de formato valem só para novos
+  lançamentos/edições do usuário; exceção única é a ação explícita do usuário na
+  UI (editar/excluir com confirmação). Valores antigos seguem válidos e somam ok.
+
+**Testes:** `npm test` 47/47; `npm run validate` (funcional 183, offline 15,
+dedup 44, quota 25) sem erros; testes unitários de `normalizeHora`, `maskHora` e
+soma de horas OK. Push para `main` e deploy em produção
+(`chez-pitu-rh.web.app`) autorizados e concluídos.
+
 ## 2026-06-19 — Logo das empresas via Firebase Storage (permanente)
 
 Frente de trabalho (versão `20260618.02`, commits `da18e28` + carimbo `fb5afae`).

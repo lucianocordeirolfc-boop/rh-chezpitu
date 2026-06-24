@@ -67,6 +67,8 @@ Antes de commit:
 - rodar npm run validate
 - informar arquivos alterados
 - informar riscos restantes
+- registrar a alteração em PROJECT_HISTORY.md (obrigatório e automático —
+  ver PROJECT_RULES.md → "Registro obrigatório no histórico")
 
 ## Deploy
 

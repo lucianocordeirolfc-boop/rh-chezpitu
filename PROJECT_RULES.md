@@ -207,6 +207,26 @@ Exceção única: exclusão ou edição explícita feita pelo próprio usuário 
 interface (botões de editar/excluir), sempre com confirmação. Nenhuma rotina
 automática pode descartar dados sem ação direta do usuário.
 
+## Registro obrigatório no histórico (REGRA FIXA)
+
+Toda alteração de melhoria, correção, refatoração ou nova funcionalidade que
+chegar a commit DEVE ser registrada em `PROJECT_HISTORY.md`, automaticamente,
+como parte do fluxo de trabalho — sem depender de pedido do usuário.
+
+Procedimento padrão a cada entrega:
+
+1. Adicionar uma entrada datada (`## AAAA-MM-DD — <título>`) no topo do
+   `PROJECT_HISTORY.md`, logo abaixo do cabeçalho.
+2. Descrever: o que mudou, arquivos afetados, motivo/causa raiz, testes
+   executados e commits relacionados.
+3. Fazer esse registro ANTES ou no MESMO commit das alterações (nunca deixar
+   o histórico defasado em relação ao código já commitado).
+4. Nunca apagar nem reescrever entradas antigas do histórico — apenas
+   acrescentar novas (o histórico é append-only).
+
+Esta regra vale para todas as sessões e para qualquer agente que trabalhe no
+projeto.
+
 ## Dashboard
 
 Dashboard deve usar a mesma base oficial dos módulos.
