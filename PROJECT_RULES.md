@@ -186,6 +186,27 @@ Deve respeitar:
 
 PDF e impressão devem usar os mesmos filtros exibidos na tela.
 
+### Lançamentos do Contador
+
+Campos de horas (Hora Extra e Ad. Noturno) usam digitação livre no formato
+`HH:MM`, aceitando de `00:00` até `200:00`. Não usar mais lista suspensa
+(`input type="time"`), que limitava a 23:59.
+
+## Proteção de lançamentos existentes (REGRA FIXA)
+
+Qualquer alteração de melhoria, refatoração, migração ou correção:
+
+- NUNCA pode apagar, excluir ou alterar um lançamento já efetuado.
+- NUNCA pode resetar, limpar ou sobrescrever a base de lançamentos existente.
+- Deve preservar integralmente o histórico já salvo (localStorage e Firebase).
+- Mudanças de formato/validação (ex.: campos de horas) aplicam-se apenas a
+  novos lançamentos e edições feitas pelo próprio usuário, mantendo os valores
+  antigos legíveis e válidos.
+
+Exceção única: exclusão ou edição explícita feita pelo próprio usuário na
+interface (botões de editar/excluir), sempre com confirmação. Nenhuma rotina
+automática pode descartar dados sem ação direta do usuário.
+
 ## Dashboard
 
 Dashboard deve usar a mesma base oficial dos módulos.

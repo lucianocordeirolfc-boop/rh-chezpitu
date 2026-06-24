@@ -10,6 +10,77 @@
     { key: "vales",          label: "Vales (R$)",             type: "number" }
   ];
 
+  // Normaliza um campo de horas no formato HH:MM aceitando de 00:00 até 200:00.
+  // Aceita entradas como "8", "8:30", "120:00", "200:00". Retorna a string
+  // normalizada "HH:MM" ou null quando o valor for inválido.
+  var HORA_MAXIMA = 200;
+  function normalizeHora(raw) {
+    if (raw == null) return "00:00";
+    var s = String(raw).trim();
+    if (!s) return "00:00";
+    var m = s.match(/^(\d{1,3})(?::(\d{1,2}))?$/);
+    if (!m) return null;
+    var h = parseInt(m[1], 10);
+    var min = m[2] != null ? parseInt(m[2], 10) : 0;
+    if (isNaN(h) || isNaN(min)) return null;
+    if (min > 59) return null;
+    if (h > HORA_MAXIMA || (h === HORA_MAXIMA && min > 0)) return null;
+    return String(h).padStart(2, "0") + ":" + String(min).padStart(2, "0");
+  }
+
+  // Máscara de digitação para campos de horas. Insere o ":" automaticamente:
+  // os 2 últimos dígitos viram minutos e o restante (até 3 dígitos) vira horas.
+  // Ex.: "1030" -> "10:30", "20000" -> "200:00", "030" -> "0:30".
+  // Se o usuário digitar o ":" manualmente, a posição dele é respeitada.
+  function maskHora(value) {
+    var s = String(value || "");
+    if (s.indexOf(":") >= 0) {
+      var parts = s.split(":");
+      var hh = parts[0].replace(/\D/g, "").slice(0, 3);
+      var mm = parts.slice(1).join("").replace(/\D/g, "").slice(0, 2);
+      return hh + ":" + mm;
+    }
+    var digits = s.replace(/\D/g, "");
+    if (digits.length <= 2) return digits;
+    digits = digits.slice(0, 5);
+    return digits.slice(0, digits.length - 2) + ":" + digits.slice(-2);
+  }
+
+  // Converte "HH:MM" (ou só horas) em minutos; usado para somar totais.
+  function horaToMinutes(val) {
+    var s = String(val || "").trim();
+    if (!s) return 0;
+    var m = s.match(/^(\d{1,4})(?::(\d{1,2}))?$/);
+    if (!m) return 0;
+    return parseInt(m[1], 10) * 60 + (m[2] != null ? parseInt(m[2], 10) : 0);
+  }
+
+  function minutesToHora(total) {
+    if (!total) return "—";
+    var h = Math.floor(total / 60);
+    var mm = total % 60;
+    return h + ":" + String(mm).padStart(2, "0");
+  }
+
+  // Soma cada coluna sobre os funcionários exibidos: horas em HH:MM, valores em R$.
+  function computeTotals(employees, lancMap) {
+    var totals = {};
+    LANCAMENTO_FIELDS.forEach(function (f) {
+      var acc = 0;
+      employees.forEach(function (emp) {
+        var lanc = lancMap[emp.id];
+        if (!lanc) return;
+        if (f.type === "time") {
+          acc += horaToMinutes(lanc[f.key]);
+        } else {
+          acc += parseFloat(lanc[f.key]) || 0;
+        }
+      });
+      totals[f.key] = f.type === "time" ? minutesToHora(acc) : formatMoney(acc);
+    });
+    return totals;
+  }
+
   function getLancamentos(company, yearMonth) {
     var data = AppData.getCompanyData(company);
     if (!data.contadorLancamentos) data.contadorLancamentos = {};
@@ -147,9 +218,11 @@
     var fieldsHTML = LANCAMENTO_FIELDS.map(function (f) {
       var val = lancamento ? (lancamento[f.key] || "") : "";
       if (f.type === "time") {
-        var timeVal = val || "00:00";
+        var timeVal = val || "";
         return '<label class="popup-field">' + f.label +
-          '<input type="time" name="' + f.key + '" value="' + timeVal + '">' +
+          '<input type="text" inputmode="numeric" class="hora-input" name="' + f.key + '" value="' + timeVal + '"' +
+          ' placeholder="HH:MM (até 200:00)" title="Digite os minutos no final — ex.: 1030 = 10:30, 20000 = 200:00" maxlength="6" autocomplete="off">' +
+          '<span class="popup-hint">Digite os números (minutos no final): 1030 = 10:30 — máximo 200:00</span>' +
           '</label>';
       }
       return '<label class="popup-field">' + f.label +
@@ -189,6 +262,17 @@
 
     function closePopup() { popup.remove(); }
 
+    // Máscara de digitação dos campos de horas (insere ":" automaticamente).
+    form.querySelectorAll(".hora-input").forEach(function (input) {
+      input.addEventListener("input", function () {
+        input.value = maskHora(input.value);
+      });
+      input.addEventListener("blur", function () {
+        var norm = normalizeHora(input.value);
+        if (norm !== null) input.value = norm;
+      });
+    });
+
     document.getElementById("popupClose").addEventListener("click", closePopup);
     document.getElementById("popupCancel").addEventListener("click", closePopup);
     popup.addEventListener("click", function (e) {
@@ -204,14 +288,25 @@
       }
 
       var record = { employeeId: empId };
+      var erroCampo = null;
       LANCAMENTO_FIELDS.forEach(function (f) {
         var input = form.querySelector('[name="' + f.key + '"]');
         if (f.type === "time") {
-          record[f.key] = input ? (input.value || "00:00") : "00:00";
+          var norm = normalizeHora(input ? input.value : "");
+          if (norm === null) {
+            if (!erroCampo) erroCampo = f.label;
+            return;
+          }
+          record[f.key] = norm;
         } else {
           record[f.key] = input ? parseFloat(input.value) || 0 : 0;
         }
       });
+
+      if (erroCampo) {
+        App.toast('Valor inválido em "' + erroCampo + '". Use o formato HH:MM (de 00:00 até 200:00).', "warning");
+        return;
+      }
 
       // Fase 2 — empresa definida pela aba ativa, nunca por seletor do pop-up.
       var targetCompany = AppData.getActiveCompany();
@@ -223,7 +318,7 @@
       employeeSelect.value = "";
       LANCAMENTO_FIELDS.forEach(function (f) {
         var input = form.querySelector('[name="' + f.key + '"]');
-        if (input) input.value = f.type === "time" ? "00:00" : "0";
+        if (input) input.value = f.type === "time" ? "" : "0";
       });
     });
   }
@@ -272,6 +367,12 @@
       return '<tr>' + cells + '</tr>';
     }).join("");
 
+    var totals = computeTotals(employees, lancMap);
+    var totalCells = '<td class="resumo-name-cell resumo-total-label">Total</td>';
+    LANCAMENTO_FIELDS.forEach(function (f) {
+      totalCells += '<td class="resumo-data-cell resumo-total-cell">' + totals[f.key] + '</td>';
+    });
+
     return '<div class="resumo-grid-header">' +
       '<div class="resumo-grid-title"><h3>' + App.escapeHTML(company) + '</h3></div>' +
       logoHTML +
@@ -280,6 +381,7 @@
       '<table class="data-table resumo-table">' +
         '<thead><tr>' + headerCells + '</tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
+        '<tfoot><tr class="resumo-total-row">' + totalCells + '</tr></tfoot>' +
       '</table>' +
     '</div>';
   }
@@ -315,6 +417,13 @@
       return '<tr>' + cells + '</tr>';
     }).join("");
 
+    var totals = computeTotals(employees, lancMap);
+    var totalCells = '<td class="resumo-print-name resumo-print-total-label">Total</td>';
+    LANCAMENTO_FIELDS.forEach(function (f) {
+      totalCells += '<td>' + totals[f.key] + '</td>';
+    });
+    var totalRow = '<tr class="resumo-print-total">' + totalCells + '</tr>';
+
     var logoHTML = info.logoDataUrl
       ? '<img src="' + info.logoDataUrl + '" alt="Logo" class="resumo-print-logo">'
       : '';
@@ -337,6 +446,7 @@
       '<table class="resumo-print-table">' +
         '<thead><tr>' + headerCells + '</tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
+        '<tfoot>' + totalRow + '</tfoot>' +
       '</table>' +
     '</div>';
   }
