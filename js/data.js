@@ -556,7 +556,10 @@
         selectedYearMonth: monthKey(),
         discountValues: {},
         deductionDays: {}
-      }
+      },
+      // Registro de exclusões (tombstones) por coleção/empresa: { id: deletedAt }.
+      // Permite propagar exclusões entre PCs sem ressuscitar registros no merge.
+      tombstones: { employees: {}, vacations: {}, absences: {} }
     };
   }
 
@@ -628,6 +631,101 @@
       if (winner) meta[key] = winner;
     });
     return { values, meta };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TOMBSTONES (exclusões) — propagam exclusões entre PCs com segurança.
+  //
+  // Modelo: registro paralelo `state.tombstones[colecao][empresa][id] = deletedAt`
+  // (ms). O registro real é REMOVIDO do array (comportamento atual preservado);
+  // o tombstone evita que o merge com outro PC o ressuscite. Resolução por versão:
+  //   - exclusão vence quando deletedAt >= updatedAt do registro sobrevivente;
+  //   - edição/recriação posterior vence quando updatedAt > deletedAt (e o
+  //     tombstone é então descartado — "edição depois da exclusão prevalece").
+  // União de tombstones por id usa o MAIOR deletedAt (a exclusão mais recente).
+  // Cobre coleções por id (funcionários, férias, ausências). Feriados usam
+  // soft-delete próprio (isDeleted) e propagam via newer-wins de mergeHolidayLists.
+  // ─────────────────────────────────────────────────────────────────────────
+  const TOMBSTONE_COLLECTIONS = ["employees", "vacations", "absences"];
+
+  function ensureTombstoneStore(targetState) {
+    if (!targetState.tombstones || typeof targetState.tombstones !== "object") {
+      targetState.tombstones = {};
+    }
+    TOMBSTONE_COLLECTIONS.forEach((col) => {
+      if (!targetState.tombstones[col] || typeof targetState.tombstones[col] !== "object") {
+        targetState.tombstones[col] = {};
+      }
+    });
+    return targetState.tombstones;
+  }
+
+  /** Marca uma exclusão (só na ação do usuário). Mantém sempre o deletedAt maior. */
+  function recordTombstone(collection, company, id, when = Date.now()) {
+    if (!collection || !company || !id) return;
+    const store = ensureTombstoneStore(state);
+    if (!store[collection]) store[collection] = {};
+    if (!store[collection][company]) store[collection][company] = {};
+    const prev = Number(store[collection][company][id]) || 0;
+    store[collection][company][id] = Math.max(prev, Number(when) || Date.now());
+  }
+
+  /** União de dois registros de tombstones; por id mantém o deletedAt mais recente. */
+  function mergeTombstoneStores(localTomb = {}, remoteTomb = {}) {
+    const merged = {};
+    const cols = new Set([
+      ...TOMBSTONE_COLLECTIONS,
+      ...Object.keys(localTomb || {}),
+      ...Object.keys(remoteTomb || {})
+    ]);
+    cols.forEach((col) => {
+      const out = {};
+      const companies = new Set([
+        ...Object.keys(localTomb?.[col] || {}),
+        ...Object.keys(remoteTomb?.[col] || {})
+      ]);
+      companies.forEach((company) => {
+        const lc = localTomb?.[col]?.[company] || {};
+        const rc = remoteTomb?.[col]?.[company] || {};
+        const ids = {};
+        new Set([...Object.keys(lc), ...Object.keys(rc)]).forEach((id) => {
+          const t = Math.max(Number(lc[id]) || 0, Number(rc[id]) || 0);
+          if (t) ids[id] = t;
+        });
+        if (Object.keys(ids).length) out[company] = ids;
+      });
+      merged[col] = out;
+    });
+    return merged;
+  }
+
+  /**
+   * Aplica os tombstones aos arrays já mesclados: remove registros excluídos e
+   * descarta tombstones obsoletos (quando o registro foi reeditado/recriado
+   * depois da exclusão — updatedAt maior que deletedAt). Idempotente.
+   */
+  function applyTombstonesToState(targetState) {
+    const store = ensureTombstoneStore(targetState);
+    TOMBSTONE_COLLECTIONS.forEach((col) => {
+      Object.keys(store[col] || {}).forEach((company) => {
+        const tombs = store[col][company] || {};
+        const block = targetState.companies?.[company];
+        if (!block || !Array.isArray(block[col])) return;
+        block[col] = block[col].filter((record) => {
+          const id = record?.id;
+          if (!id) return true;
+          const deletedAt = Number(tombs[id]) || 0;
+          if (!deletedAt) return true;
+          const updatedAt = Number(record.updatedAt) || 0;
+          if (updatedAt > deletedAt) {
+            // Recriado/reeditado após a exclusão → ressuscita e descarta o tombstone.
+            delete tombs[id];
+            return true;
+          }
+          return false; // exclusão vence
+        });
+      });
+    });
   }
 
   function mergeEmployeesById(localArr = [], remoteArr = []) {
@@ -1106,6 +1204,10 @@
       normalizeCompanyHolidays(next.companies[company]);
     });
 
+    // Exclusões (tombstones): remove registros excluídos e poda tombstones obsoletos.
+    ensureTombstoneStore(next);
+    applyTombstonesToState(next);
+
     // Proteção dos dados da empresa: restaura do backup se vazio; atualiza backup se válido.
     recoverCompanyInfoForState(next);
 
@@ -1178,7 +1280,9 @@
         // Metadados de versão por chave (employeeId|aaaa-mm) p/ resolução newer-wins.
         discountValuesMeta: {},
         deductionDaysMeta: {}
-      }
+      },
+      // União das exclusões dos dois lados (deletedAt mais recente por id).
+      tombstones: mergeTombstoneStores(local.tombstones, remote.tombstones)
     };
 
     const companyKeys = new Set([
@@ -1782,6 +1886,8 @@
       scaleCodeConfig: src.scaleCodeConfig || {},
       coveragePrincipalBindings: src.coveragePrincipalBindings || {},
       valeTransporte: { selectedYearMonth: src.valeTransporte?.selectedYearMonth || "" },
+      // Exclusões são minúsculas e críticas para o merge: preserva mesmo no lean.
+      tombstones: src.tombstones || {},
       companies: {} // dados operacionais vêm do Firebase
     };
   }
@@ -2580,6 +2686,16 @@
 
   function removeEmployeeFromCompany(company, id, shouldSave = true) {
     const data = getCompanyData(company);
+    const now = Date.now();
+    // Tombstones: o funcionário e, em cascata, suas férias e ausências — para que
+    // o merge com outro PC não ressuscite o funcionário nem registros órfãos.
+    recordTombstone("employees", company, id, now);
+    (data.vacations || []).forEach((vacation) => {
+      if (vacation.employeeId === id && vacation.id) recordTombstone("vacations", company, vacation.id, now);
+    });
+    (data.absences || []).forEach((absence) => {
+      if (absence.employeeId === id && absence.id) recordTombstone("absences", company, absence.id, now);
+    });
     data.employees = data.employees.filter((employee) => employee.id !== id);
     data.vacations = data.vacations.filter((vacation) => vacation.employeeId !== id);
     data.absences = (data.absences || []).filter((absence) => absence.employeeId !== id);
@@ -2625,8 +2741,10 @@
   }
 
   function removeVacation(id, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const resolvedCompany = company || getPrimaryPageCompany("ferias");
+    const data = getCompanyData(resolvedCompany);
     const vacation = data.vacations.find((item) => item.id === id);
+    if (vacation) recordTombstone("vacations", resolvedCompany, id);
     data.vacations = data.vacations.filter((item) => item.id !== id);
     if (vacation) runScaleIntegrations(monthsTouchedByRange(vacation.startDate, vacation.endDate));
     saveState();
@@ -2677,8 +2795,10 @@
   }
 
   function removeAbsence(id, company) {
-    const data = getCompanyData(company || getPrimaryPageCompany("ferias"));
+    const resolvedCompany = company || getPrimaryPageCompany("ferias");
+    const data = getCompanyData(resolvedCompany);
     const absence = (data.absences || []).find((item) => item.id === id);
+    if (absence) recordTombstone("absences", resolvedCompany, id);
     data.absences = (data.absences || []).filter((item) => item.id !== id);
     if (absence) runScaleIntegrations(monthsTouchedByRange(absence.startDate, absence.endDate));
     saveState();
@@ -2864,6 +2984,9 @@
     // Soft delete: marcar com deletedAt em vez de remover
     holiday.deletedAt = holiday.deletedAt || todayISO();
     holiday.isDeleted = true;
+    // Carimbo de versão para que o soft-delete VENÇA o merge entre PCs
+    // (mergeHolidayLists usa updatedAt como newer-wins do campo-base).
+    holiday.updatedAt = Date.now();
 
     saveState();
     return true;
@@ -2880,6 +3003,8 @@
 
     delete holiday.deletedAt;
     holiday.isDeleted = false;
+    // Restauração também precisa vencer o merge: carimba versão mais recente.
+    holiday.updatedAt = Date.now();
 
     saveState();
     return true;

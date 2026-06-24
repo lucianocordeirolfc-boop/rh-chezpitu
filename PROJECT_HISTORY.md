@@ -7,6 +7,53 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-06-24 — Tombstones (`deletedAt`): exclusões passam a se propagar entre PCs
+
+**Objetivo:** fechar a limitação registrada na entrada abaixo — exclusões não se
+propagavam (um registro apagado em um PC era "ressuscitado" pelo merge a partir de
+outro PC que ainda o tinha).
+
+**Causa raiz:** os merges por id (`mergeEmployeesById`, `mergeRecordsById`,
+`mergeLancamentosMaps`) e por chave (`mergeTimestampedMap`) fazem UNIÃO. Sem um
+marcador de exclusão, um registro removido de um lado sempre reaparecia do outro.
+
+**Correção — registro de exclusões (tombstones) por versão:**
+- `js/data.js`
+  - Novo `state.tombstones[colecao][empresa][id] = deletedAt` (ms). O registro
+    real continua sendo REMOVIDO do array (comportamento atual preservado — sem
+    tocar nas telas de leitura); o tombstone só impede a ressurreição no merge.
+  - Helpers `ensureTombstoneStore`, `recordTombstone`, `mergeTombstoneStores`
+    (união por id mantendo o `deletedAt` MAIOR) e `applyTombstonesToState`.
+  - Resolução por versão: a EXCLUSÃO vence quando `deletedAt >= updatedAt` do
+    registro sobrevivente; a EDIÇÃO/RECRIAÇÃO posterior vence quando
+    `updatedAt > deletedAt` (e o tombstone obsoleto é então descartado).
+  - `mergeRemoteIntoLocal` une os tombstones dos dois lados; `finalizeIncomingState`
+    aplica (remove excluídos / poda obsoletos) — cobre merge e load.
+  - Coleções por id cobertas: **funcionários, férias e ausências**. Excluir um
+    funcionário tomba EM CASCATA suas férias e ausências (evita órfãos).
+  - **Feriados** já usavam soft-delete (`isDeleted`); agora `removeHoliday`/
+    `restoreHoliday` carimbam `updatedAt` para que a exclusão/restauração VENÇA o
+    newer-wins de `mergeHolidayLists` e propague.
+  - Camada de persistência "lean" passa a preservar `tombstones` (minúsculos e
+    críticos para o merge).
+- `js/firebase-sync.js` — serializa/lê o nó `tombstones`.
+
+**Compatibilidade:** estados legados sem `tombstones` seguem normalmente (união
+sem remoções). RTDB descarta objetos vazios → leitura tolera `tombstones`
+ausente (`|| {}`).
+
+**Limitação remanescente (boundary documentado):** remoção de SUB-registros que
+seguem por união — vínculos de feriado (`workedEmployees`) e células de mapa
+(escala manual / VT zerada) — ainda não tem tombstone próprio. São edições de
+sub-item (parcialmente mitigadas pelos filtros de funcionário ativo) e ficam como
+próxima frente, se necessário.
+
+**Testes:** `npm test` 47/47 e `npm run validate` sem erros;
+`scripts/verify-tombstones-sync.mjs` 14/14 (exclusão de funcionário/férias/ausência,
+"edição depois da exclusão prevalece", união pelo `deletedAt` mais recente,
+soft-delete de feriado, cascata funcional e regressão sem tombstones);
+`verify-sync-newer-wins.mjs` 13/13 e `verify-contador-sync.mjs` 5/5 (sem regressão).
+
 ## 2026-06-24 — Sincronização instantânea (newer-wins) estendida a TODOS os módulos
 
 **Objetivo:** garantir que qualquer edição feita em um PC reflita automaticamente
