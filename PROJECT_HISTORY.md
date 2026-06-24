@@ -7,6 +7,40 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-06-24 — Sincronização em tempo real: lançamentos do Contador não refletiam em outros PCs
+
+**Problema (CRÍTICO):** lançamento de Ad. Noturno feito em um PC não aparecia em
+outro PC com o sistema aberto (nem após reload), quebrando a atualização
+instantânea esperada entre computadores.
+
+**Causa raiz:** `mergeLancamentosMaps` (em `js/data.js`), usada por
+`mergeRemoteIntoLocal`, preenchia o mapa por `employeeId` primeiro com o remoto e
+**depois sobrescrevia incondicionalmente com o local** ("prefere local"). No
+listener em tempo real do Firebase (`applyRemoteState(..., fromRemote=true)`), o
+PC que já tinha um lançamento antigo do funcionário **descartava** a edição
+recém-feita no outro PC. Esse "prefere local" é correto no bootstrap, mas errado
+para alterações remotas que acabaram de acontecer.
+
+**Correção (mínima, sem regressão):** resolução de conflito por versão
+(*newer-wins*), no mesmo padrão já usado em `companyInfo.updatedAt`.
+- `js/contador.js` — `saveLancamento` carimba `lancamento.updatedAt = Date.now()`
+  a cada gravação/edição.
+- `js/data.js` — `mergeLancamentosMaps` mantém o lançamento com `updatedAt` mais
+  recente. Em empate ou registros legados sem `updatedAt`, mantém o local
+  (comportamento anterior preservado). O `updatedAt` trafega íntegro no
+  round-trip do Firebase (`stateToFirebase`/`firebaseToState` copiam o objeto).
+
+**Testes:** `npm test` 47/47 e `npm run validate` (183 + 15 + 44 + 25) sem erros;
+nova verificação focada `scripts/verify-contador-sync.mjs` (5/5) cobre:
+remoto mais novo prevalece, local mais novo não é sobrescrito e legado sem
+`updatedAt` sem regressão.
+
+**Pendência / recomendação:** o mesmo padrão "prefere local" existe em
+`mergeRecordsById` (ausências/férias) e `mergeEmployeesById` (funcionários);
+edições simultâneas desses registros em PCs diferentes podem ter o mesmo atraso.
+Recomenda-se estender o carimbo `updatedAt` + *newer-wins* a esses merges em
+frente futura. (Exclusões ainda dependem de soft-delete/tombstone para propagar.)
+
 ## 2026-06-24 — Contador: horas até 200:00, máscara, total no Resumo e regra de proteção
 
 Frente de trabalho na aba **Informações Contador** (commits `3d65563` +

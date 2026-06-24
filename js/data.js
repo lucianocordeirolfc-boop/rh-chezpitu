@@ -1946,7 +1946,17 @@
       const remoteArr = Array.isArray(remoteMap[ym]) ? remoteMap[ym] : [];
       const byEmp = {};
       remoteArr.forEach((r) => { if (r.employeeId) byEmp[r.employeeId] = r; });
-      localArr.forEach((l) => { if (l.employeeId) byEmp[l.employeeId] = l; });
+      localArr.forEach((l) => {
+        if (!l.employeeId) return;
+        const current = byEmp[l.employeeId];
+        // Resolução de conflito por versão (newer-wins): mantém o lançamento com
+        // updatedAt mais recente. Quando o remoto é mais novo (edição feita em
+        // outro PC), ele prevalece — corrige a falta de sincronização instantânea.
+        // Em empate ou registros legados sem updatedAt, mantém o local (sem regressão).
+        if (!current || (l.updatedAt || 0) >= (current.updatedAt || 0)) {
+          byEmp[l.employeeId] = l;
+        }
+      });
       const arr = Object.values(byEmp);
       if (arr.length) merged[ym] = arr;
     });

@@ -93,6 +93,11 @@
     if (!data.contadorLancamentos) data.contadorLancamentos = {};
     if (!data.contadorLancamentos[yearMonth]) data.contadorLancamentos[yearMonth] = [];
 
+    // Carimbo de versão: permite que a sincronização em tempo real resolva
+    // conflitos por "mais recente vence" (ver mergeLancamentosMaps em data.js).
+    // Sem ele, o merge "prefere local" descartava a edição remota em outros PCs.
+    lancamento.updatedAt = Date.now();
+
     var existing = data.contadorLancamentos[yearMonth].findIndex(function (l) {
       return l.employeeId === lancamento.employeeId;
     });
