@@ -377,6 +377,7 @@
       absences: [],
       holidays: [],
       manualScale: {},
+      manualScaleMeta: {},
       contadorLancamentos: {}
     };
   }
@@ -592,13 +593,50 @@
     return { ...remoteMap, ...localMap };
   }
 
+  /**
+   * Resolução de conflito por versão (newer-wins) entre dois registros do mesmo
+   * id/chave. Vence o de `updatedAt` mais recente. Em empate ou registros legados
+   * sem `updatedAt`, mantém o LOCAL — preserva o comportamento anterior e garante
+   * que dados existentes (sem carimbo) não sejam perturbados pela sincronização.
+   */
+  function pickNewerRecord(local, remote) {
+    if (!remote) return local;
+    if (!local) return remote;
+    return (remote.updatedAt || 0) > (local.updatedAt || 0) ? remote : local;
+  }
+
+  /**
+   * Merge de mapa chave→valor (ex.: escala manual, descontos/valores de VT) com
+   * resolução por timestamp a partir de mapas de metadados paralelos (`*Meta`,
+   * que guardam o `updatedAt` de cada chave). Regras:
+   *  - chave nova em apenas um lado → propaga (união);
+   *  - chave nos dois lados → vence o `updatedAt` maior (newer-wins);
+   *  - empate ou sem meta (dados legados) → mantém o LOCAL (sem regressão).
+   * Retorna { values, meta } já mesclados. Exclusões não são propagadas (mesma
+   * política dos demais merges); metadados órfãos são ignorados no cálculo.
+   */
+  function mergeTimestampedMap(localMap = {}, remoteMap = {}, localMeta = {}, remoteMeta = {}) {
+    const values = { ...remoteMap, ...localMap };
+    const meta = {};
+    Object.keys(values).forEach((key) => {
+      const lt = Number(localMeta[key]) || 0;
+      const rt = Number(remoteMeta[key]) || 0;
+      const hasLocal = Object.prototype.hasOwnProperty.call(localMap, key);
+      const hasRemote = Object.prototype.hasOwnProperty.call(remoteMap, key);
+      if (hasLocal && hasRemote && rt > lt) values[key] = remoteMap[key];
+      const winner = Math.max(lt, rt);
+      if (winner) meta[key] = winner;
+    });
+    return { values, meta };
+  }
+
   function mergeEmployeesById(localArr = [], remoteArr = []) {
     const byId = {};
     remoteArr.forEach((employee) => {
       if (employee?.id) byId[employee.id] = employee;
     });
     localArr.forEach((employee) => {
-      if (employee?.id) byId[employee.id] = employee;
+      if (employee?.id) byId[employee.id] = pickNewerRecord(employee, byId[employee.id]);
     });
     return Object.values(byId);
   }
@@ -662,11 +700,19 @@
     return merged;
   }
 
+  function asObjectMap(value) {
+    return value && typeof value === "object" ? value : {};
+  }
+
   function normalizeValeTransporteBlock(parsedVt, defaultsVt) {
     return {
       selectedYearMonth: parsedVt?.selectedYearMonth || defaultsVt?.selectedYearMonth || monthKey(),
       discountValues: mergeDiscountValuesByCompany(defaultsVt, parsedVt),
-      deductionDays: mergeDeductionDaysByCompany(defaultsVt, parsedVt)
+      deductionDays: mergeDeductionDaysByCompany(defaultsVt, parsedVt),
+      // Preserva os metadados de versão (newer-wins) por empresa através do
+      // finalize/persistência — sem eles, a resolução de conflito do VT se perde.
+      discountValuesMeta: asObjectMap(parsedVt?.discountValuesMeta),
+      deductionDaysMeta: asObjectMap(parsedVt?.deductionDaysMeta)
     };
   }
 
@@ -676,7 +722,7 @@
       if (record?.[idField]) byId[record[idField]] = record;
     });
     localArr.forEach((record) => {
-      if (record?.[idField]) byId[record[idField]] = record;
+      if (record?.[idField]) byId[record[idField]] = pickNewerRecord(record, byId[record[idField]]);
     });
     return Object.values(byId);
   }
@@ -1128,7 +1174,10 @@
           remote.valeTransporte?.selectedYearMonth ||
           monthKey(),
         discountValues: mergeDiscountValuesByCompany(local.valeTransporte, remote.valeTransporte),
-        deductionDays: mergeDeductionDaysByCompany(local.valeTransporte, remote.valeTransporte)
+        deductionDays: mergeDeductionDaysByCompany(local.valeTransporte, remote.valeTransporte),
+        // Metadados de versão por chave (employeeId|aaaa-mm) p/ resolução newer-wins.
+        discountValuesMeta: {},
+        deductionDaysMeta: {}
       }
     };
 
@@ -1143,19 +1192,41 @@
       const remoteCo = remote.companies?.[company] || {};
       const defaultBlock = defaults.companies[company] || createCompanyData(company);
 
-      merged.valeTransporte.deductionDays[company] = mergeRecordMapsPreferLocal(
-        mergeRecordMapsPreferLocal(
-          remote.valeTransporte?.deductionDays?.[company] || {},
-          remoteCo.vtDeductions || {}
-        ),
-        mergeRecordMapsPreferLocal(
-          local.valeTransporte?.deductionDays?.[company] || {},
-          localCo.vtDeductions || {}
-        )
+      // VT — descontos (dias): combina o legado vtDeductions (bloco da empresa) e
+      // resolve conflitos por timestamp (deductionDaysMeta). newer-wins por chave.
+      const remoteDeduction = mergeRecordMapsPreferLocal(
+        remote.valeTransporte?.deductionDays?.[company] || {},
+        remoteCo.vtDeductions || {}
       );
-      merged.valeTransporte.discountValues[company] = mergeRecordMapsPreferLocal(
+      const localDeduction = mergeRecordMapsPreferLocal(
+        local.valeTransporte?.deductionDays?.[company] || {},
+        localCo.vtDeductions || {}
+      );
+      const deductionMerge = mergeTimestampedMap(
+        localDeduction,
+        remoteDeduction,
+        local.valeTransporte?.deductionDaysMeta?.[company] || {},
+        remote.valeTransporte?.deductionDaysMeta?.[company] || {}
+      );
+      merged.valeTransporte.deductionDays[company] = deductionMerge.values;
+      merged.valeTransporte.deductionDaysMeta[company] = deductionMerge.meta;
+
+      // VT — valores (R$): newer-wins por chave via discountValuesMeta.
+      const discountMerge = mergeTimestampedMap(
+        local.valeTransporte?.discountValues?.[company] || {},
         remote.valeTransporte?.discountValues?.[company] || {},
-        local.valeTransporte?.discountValues?.[company] || {}
+        local.valeTransporte?.discountValuesMeta?.[company] || {},
+        remote.valeTransporte?.discountValuesMeta?.[company] || {}
+      );
+      merged.valeTransporte.discountValues[company] = discountMerge.values;
+      merged.valeTransporte.discountValuesMeta[company] = discountMerge.meta;
+
+      // Escala manual: newer-wins por chave (employeeId|data) via manualScaleMeta.
+      const manualScaleMerge = mergeTimestampedMap(
+        localCo.manualScale || {},
+        remoteCo.manualScale || {},
+        localCo.manualScaleMeta || {},
+        remoteCo.manualScaleMeta || {}
       );
 
       merged.companies[company] = {
@@ -1168,7 +1239,8 @@
           localCo.companyInfo
         ),
         employees: mergeEmployeesById(localCo.employees, remoteCo.employees),
-        manualScale: mergeRecordMapsPreferLocal(remoteCo.manualScale || {}, localCo.manualScale || {}),
+        manualScale: manualScaleMerge.values,
+        manualScaleMeta: manualScaleMerge.meta,
         holidays: mergeHolidayLists(localCo.holidays, remoteCo.holidays),
         vacations: mergeRecordsById(localCo.vacations, remoteCo.vacations),
         absences: mergeRecordsById(localCo.absences, remoteCo.absences),
@@ -1227,6 +1299,13 @@
     }
     if (!state.valeTransporte.deductionDays || typeof state.valeTransporte.deductionDays !== "object") {
       state.valeTransporte.deductionDays = {};
+    }
+    // Metadados de versão por chave (newer-wins na sincronização entre PCs).
+    if (!state.valeTransporte.discountValuesMeta || typeof state.valeTransporte.discountValuesMeta !== "object") {
+      state.valeTransporte.discountValuesMeta = {};
+    }
+    if (!state.valeTransporte.deductionDaysMeta || typeof state.valeTransporte.deductionDaysMeta !== "object") {
+      state.valeTransporte.deductionDaysMeta = {};
     }
     if (!state.valeTransporte.selectedYearMonth) {
       state.valeTransporte.selectedYearMonth = monthKey();
@@ -1320,6 +1399,7 @@
     const shouldSave = options.save !== false;
     const vt = ensureValeTransporteState();
     if (!vt.discountValues[company]) vt.discountValues[company] = {};
+    if (!vt.discountValuesMeta[company]) vt.discountValuesMeta[company] = {};
 
     const key = discountStorageKey(employeeId, yearMonth);
     const parsed = parseDiscountAmount(rawInput);
@@ -1329,6 +1409,7 @@
     } else {
       vt.discountValues[company][key] = parsed;
     }
+    stampMapMeta(vt.discountValuesMeta[company], vt.discountValues[company], key);
 
     if (shouldSave) saveState();
     return parsed;
@@ -1620,6 +1701,8 @@
     block.absences = Array.isArray(block.absences) ? block.absences : [];
     block.holidays = Array.isArray(block.holidays) ? block.holidays : [];
     block.manualScale = block.manualScale && typeof block.manualScale === "object" ? block.manualScale : {};
+    block.manualScaleMeta =
+      block.manualScaleMeta && typeof block.manualScaleMeta === "object" ? block.manualScaleMeta : {};
     block.contadorLancamentos =
       block.contadorLancamentos && typeof block.contadorLancamentos === "object" ? block.contadorLancamentos : {};
     delete block.vtDeductions;
@@ -1923,14 +2006,20 @@
         return;
       }
 
+      // Campos-base (nome/data) seguem newer-wins por updatedAt; em empate/legado
+      // mantém o existente (local entra primeiro). Os vínculos de funcionários
+      // (workedEmployees) continuam por UNIÃO + preservação — garante que CO e
+      // compensações lançadas em PCs diferentes coexistam, sem perda.
+      const base = (normalized.updatedAt || 0) > (existing.updatedAt || 0) ? normalized : existing;
+
       const employees = new Map();
       [...(existing.workedEmployees || []), ...(normalized.workedEmployees || [])].forEach((item) => {
         if (!item?.employeeId) return;
         const prev = employees.get(item.employeeId) || {};
         employees.set(item.employeeId, mergeWorkedEmployeeItems(prev, item));
       });
-      existing.workedEmployees = [...employees.values()];
-      map.set(normalized.id, existing);
+      base.workedEmployees = [...employees.values()];
+      map.set(normalized.id, base);
     }
 
     (localList || []).forEach(upsert);
@@ -1946,16 +2035,12 @@
       const remoteArr = Array.isArray(remoteMap[ym]) ? remoteMap[ym] : [];
       const byEmp = {};
       remoteArr.forEach((r) => { if (r.employeeId) byEmp[r.employeeId] = r; });
+      // Resolução de conflito por versão (newer-wins): mantém o lançamento com
+      // updatedAt mais recente. Quando o remoto é mais novo (edição feita em
+      // outro PC), ele prevalece — corrige a falta de sincronização instantânea.
+      // Em empate ou registros legados sem updatedAt, mantém o local (sem regressão).
       localArr.forEach((l) => {
-        if (!l.employeeId) return;
-        const current = byEmp[l.employeeId];
-        // Resolução de conflito por versão (newer-wins): mantém o lançamento com
-        // updatedAt mais recente. Quando o remoto é mais novo (edição feita em
-        // outro PC), ele prevalece — corrige a falta de sincronização instantânea.
-        // Em empate ou registros legados sem updatedAt, mantém o local (sem regressão).
-        if (!current || (l.updatedAt || 0) >= (current.updatedAt || 0)) {
-          byEmp[l.employeeId] = l;
-        }
+        if (l.employeeId) byEmp[l.employeeId] = pickNewerRecord(l, byEmp[l.employeeId]);
       });
       const arr = Object.values(byEmp);
       if (arr.length) merged[ym] = arr;
@@ -2478,6 +2563,9 @@
       throw new Error(`ID interno já utilizado em ${idClash.company}.`);
     }
 
+    // Carimbo de versão p/ sincronização newer-wins entre PCs (mergeEmployeesById).
+    normalized.updatedAt = Date.now();
+
     const index = data.employees.findIndex((item) => item.id === normalized.id);
     if (index >= 0) {
       data.employees[index] = normalized;
@@ -2523,13 +2611,15 @@
   function addVacation(vacation, company) {
     const data = getCompanyData(resolveCompanyForEmployeeWrite(vacation.employeeId, company, "ferias"));
     const employeeName = getEmployeeName(vacation.employeeId, data);
-    upsertVacationRange(
+    const target = upsertVacationRange(
       data,
       vacation.employeeId,
       vacation.startDate,
       vacation.endDate,
       String(vacation.note || "").trim() || employeeName
     );
+    // Carimbo de versão p/ sincronização newer-wins (só na escrita do usuário).
+    if (target) target.updatedAt = Date.now();
     runScaleIntegrations(monthsTouchedByRange(vacation.startDate, vacation.endDate));
     saveState();
   }
@@ -2555,6 +2645,7 @@
     existing.startDate = vacation.startDate;
     existing.endDate = vacation.endDate;
     existing.note = String(vacation.note || "").trim() || employeeName;
+    existing.updatedAt = Date.now();
 
     clearManualScaleCodeInRange(data, existing.employeeId, existing.startDate, existing.endDate, "FÉRIAS");
 
@@ -2578,7 +2669,8 @@
       startDate: absence.startDate,
       endDate: absence.endDate,
       cid: absence.cid || "",
-      note: absence.note || ""
+      note: absence.note || "",
+      updatedAt: Date.now()
     });
     runScaleIntegrations(monthsTouchedByRange(absence.startDate, absence.endDate));
     saveState();
@@ -2672,6 +2764,7 @@
     existing.endDate = absence.endDate;
     existing.cid = absence.cid || "";
     existing.note = absence.note || "";
+    existing.updatedAt = Date.now();
 
     const months = new Set([
       ...monthsTouchedByRange(oldStart, oldEnd),
@@ -2692,7 +2785,8 @@
       id: uid("feriado"),
       name,
       date,
-      workedEmployees: holiday.workedEmployees || []
+      workedEmployees: holiday.workedEmployees || [],
+      updatedAt: Date.now()
     });
     saveState();
   }
@@ -3115,6 +3209,7 @@
 
     holiday.name = nextName;
     holiday.date = nextDate;
+    holiday.updatedAt = Date.now();
     (holiday.workedEmployees || []).forEach((item) => syncWorkedEmployeeStatus(item, holiday.date));
 
     if (options.save !== false) {
@@ -3573,9 +3668,24 @@
     return stats;
   }
 
+  /**
+   * Carimba (ou remove) o metadado de versão de uma chave em um mapa `*Meta`,
+   * conforme a chave exista ou não no mapa de valores. Usado para resolução
+   * newer-wins por chave (escala manual e VT) na sincronização entre PCs.
+   */
+  function stampMapMeta(metaMap, valueMap, key) {
+    if (!metaMap) return;
+    if (Object.prototype.hasOwnProperty.call(valueMap || {}, key)) {
+      metaMap[key] = Date.now();
+    } else {
+      delete metaMap[key];
+    }
+  }
+
   function setManualScale(employeeId, date, code, linkedHolidayId, company) {
     const resolvedCompany = resolveCompanyForEmployeeWrite(employeeId, company, "escala");
     const data = getCompanyData(resolvedCompany);
+    if (!data.manualScaleMeta) data.manualScaleMeta = {};
     const key = `${employeeId}|${date}`;
     const previousCode = getPreviousManualScaleCode(data, employeeId, date);
     let coWarning = "";
@@ -3596,6 +3706,7 @@
       if (!linkedHolidayId) {
         coWarning = "Selecione o feriado pendente deste funcionário.";
         delete data.manualScale[key];
+        stampMapMeta(data.manualScaleMeta, data.manualScale, key);
         saveState();
         return { coWarning };
       }
@@ -3613,6 +3724,7 @@
       }
     }
 
+    stampMapMeta(data.manualScaleMeta, data.manualScale, key);
     runScaleIntegrations([date.slice(0, 7)]);
     saveState();
     return { coWarning };
@@ -3622,6 +3734,7 @@
     const company = resolveCompanyForEmployeeWrite(employeeId, options.company, "vale-transporte");
     const vt = ensureValeTransporteState();
     if (!vt.deductionDays[company]) vt.deductionDays[company] = {};
+    if (!vt.deductionDaysMeta[company]) vt.deductionDaysMeta[company] = {};
     const key = `${employeeId}|${yearMonth}`;
     const raw = String(days ?? "").trim();
 
@@ -3630,6 +3743,7 @@
     } else {
       vt.deductionDays[company][key] = Math.max(0, parseInt(raw, 10) || 0);
     }
+    stampMapMeta(vt.deductionDaysMeta[company], vt.deductionDays[company], key);
 
     if (options.save !== false) saveState();
   }

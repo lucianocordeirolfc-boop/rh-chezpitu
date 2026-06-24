@@ -75,7 +75,8 @@ if (window.firebase && firebase.apps.length) {
       vacations: [],
       absences: [],
       holidays: [],
-      manualScale: {}
+      manualScale: {},
+      manualScaleMeta: {}
     };
   }
 
@@ -83,6 +84,7 @@ if (window.firebase && firebase.apps.length) {
     const empresas = {};
     const funcionarios = {};
     const escalas = {};
+    const escalasMeta = {};
     const ferias = {};
     const feriados = {};
 
@@ -93,6 +95,7 @@ if (window.firebase && firebase.apps.length) {
       empresas[company] = block.companyInfo || defaultCompanyData(company).companyInfo;
       funcionarios[company] = block.employees || [];
       escalas[company] = block.manualScale || {};
+      escalasMeta[company] = block.manualScaleMeta || {};
       ferias[company] = {
         vacations: block.vacations || [],
         absences: block.absences || []
@@ -114,6 +117,7 @@ if (window.firebase && firebase.apps.length) {
       empresasHistory: state.companyInfoHistory || {},
       funcionarios,
       escalas,
+      escalasMeta,
       ferias,
       feriados,
       vtDescontos,
@@ -178,6 +182,7 @@ if (window.firebase && firebase.apps.length) {
         companyInfo: { ...base.companyInfo, ...(data.empresas?.[company] || {}) },
         employees: data.funcionarios?.[company] || [],
         manualScale: data.escalas?.[company] || {},
+        manualScaleMeta: data.escalasMeta?.[company] || {},
         vacations,
         absences,
         holidays: data.feriados?.[company] || [],

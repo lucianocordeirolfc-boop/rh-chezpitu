@@ -7,6 +7,53 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-06-24 — Sincronização instantânea (newer-wins) estendida a TODOS os módulos
+
+**Objetivo:** garantir que qualquer edição feita em um PC reflita automaticamente
+nos demais, em todos os módulos — não só no Contador.
+
+**Causa raiz (a mesma do item abaixo, generalizada):** todos os merges da
+sincronização (`mergeEmployeesById`, `mergeRecordsById`, `mergeRecordMapsPreferLocal`,
+`mergeHolidayLists`) preferiam o LOCAL incondicionalmente. No listener em tempo
+real, o PC que já tinha o registro descartava a edição recém-feita em outro PC.
+
+**Correção — resolução de conflito por versão (`updatedAt`, newer-wins):**
+- `js/data.js`
+  - Helpers genéricos `pickNewerRecord` e `mergeTimestampedMap` (mapa chave→valor
+    com metadados de versão paralelos `*Meta`).
+  - Registros com `id` agora vencem por `updatedAt`: **funcionários**
+    (`mergeEmployeesById`), **férias/ausências** (`mergeRecordsById`),
+    **lançamentos** (`mergeLancamentosMaps`) e **feriados** (`mergeHolidayLists`,
+    apenas nos campos-base nome/data; os vínculos `workedEmployees` continuam por
+    UNIÃO+preservação, mantendo CO/compensações de PCs diferentes).
+  - Mapas chave→valor com meta paralela e newer-wins por chave:
+    **escala manual** (`manualScaleMeta` no bloco da empresa) e
+    **Vale-transporte** (`deductionDaysMeta`/`discountValuesMeta` em `valeTransporte`).
+  - Carimbo de `updatedAt`/meta somente nas ESCRITAS DO USUÁRIO (upsertEmployee,
+    addVacation/updateVacation, addAbsence/updateAbsence, addHoliday/updateHoliday,
+    setManualScale, setVtDeduction, saveDiscountValue). Normalização/migração de
+    carga **não** recarimba — senão o local pareceria sempre "mais novo".
+  - `createCompanyData`/`normalizeCompanyBlock` inicializam `manualScaleMeta`;
+    `ensureValeTransporteState`/`normalizeValeTransporteBlock` preservam os metas
+    de VT no finalize/persistência.
+- `js/firebase-sync.js` — novo nó `escalasMeta` (serializa/lê `manualScaleMeta`);
+  os metas de VT trafegam dentro de `valeTransporte` (salvo inteiro).
+
+**Compatibilidade:** em empate ou registros legados (sem `updatedAt`/meta), o
+LOCAL é mantido — comportamento idêntico ao anterior. A 1ª edição feita após o
+deploy já carimba a versão e passa a propagar corretamente, mesmo sobre dados
+antigos sem carimbo.
+
+**Limitação conhecida (pendência):** EXCLUSÕES ainda não se propagam entre PCs
+(não há tombstone); um registro apagado em um PC pode ser "ressuscitado" pelo
+merge a partir de outro PC que ainda o tenha. Vale para todos os módulos e já
+existia antes. Próxima frente: tombstones por `deletedAt`.
+
+**Testes:** `npm test` 47/47 e `npm run validate` (183+15+44+25) sem erros;
+`scripts/verify-sync-newer-wins.mjs` 13/13 (funcionários, ausências, férias,
+feriados+união, contador, escala manual e VT, incluindo casos legado e
+"local mais novo não é sobrescrito") e `verify-contador-sync.mjs` 5/5.
+
 ## 2026-06-24 — Sincronização em tempo real: lançamentos do Contador não refletiam em outros PCs
 
 **Problema (CRÍTICO):** lançamento de Ad. Noturno feito em um PC não aparecia em
