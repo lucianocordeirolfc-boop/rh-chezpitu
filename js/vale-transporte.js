@@ -232,7 +232,7 @@
           <div class="vt-sign-footer">
             <div class="vt-signature-block">
               <div class="vt-signature-line" aria-hidden="true"></div>
-              <span class="vt-signature-label">Assinatura do funcionário</span>
+              <span class="vt-signature-label">${esc(receipt.employee.name)}</span>
             </div>
             <p class="vt-date-line">Data: ____ / ____ / ______</p>
           </div>

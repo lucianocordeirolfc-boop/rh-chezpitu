@@ -7,6 +7,64 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-07-02 — Inativar funcionário na escala + ajustes de layout (VT impresso e assinatura da Escala)
+
+**Objetivo:** melhorias específicas solicitadas, sem apagar dados nem alterar
+regras de negócio.
+
+**1. Funcionário inativo na Escala de Folga (vermelho no passado, oculto no futuro).**
+- O campo **Status (Ativo/Inativo)** no pop-up de cadastro (`js/funcionarios.js`)
+  e o filtro de relatórios (`isEmployeeActive` em Dashboard, Contador e
+  Vale-transporte) **já existiam** — não foram recriados.
+- Causa: `getFilteredEmployees` (`js/escala.js`) removia TODO funcionário inativo
+  da escala, inclusive em meses passados.
+- Correção (`js/escala.js`): funcionário inativo **não aparece em escala futura**;
+  nos meses em que ainda fazia parte da empresa continua aparecendo, marcado com
+  `_isInactive` e renderizado em **vermelho + tachado** (tela e impressão) para
+  indicar que não faz mais parte da empresa. Nenhum dado é apagado; a inclusão é
+  só de exibição (não afeta integrações nem relatórios).
+- Estilos: `.scale-row-inactive` (`css/style.css`, tela) e
+  `.scale-print-row-inactive` (`css/escala-print.css`, impressão).
+- **Melhoria 1 — data de saída (`deactivatedAt`):** `upsertEmployee` (`js/data.js`)
+  carimba a data no dia da transição Ativo→Inativo, preserva enquanto seguir
+  inativo e limpa ao reativar. A Escala passa a exibir o inativo **apenas até o
+  mês do `deactivatedAt`** (nunca em meses posteriores à saída). Registros legados
+  sem data usam o mês corrente como limite. O campo persiste no localStorage e no
+  Firebase (employees serializados por inteiro) e trafega no merge newer-wins.
+- **Melhoria 2 — somente-leitura em meses passados:** linhas de inativo em meses
+  anteriores ao corrente ficam com os `<select>` `disabled` (`js/escala.js`,
+  classe `.scale-row-locked` em `css/style.css`), evitando edição acidental da
+  escala de quem já saiu. O mês corrente (saída) segue editável.
+
+**2. Recibo de VT impresso: observação de desconto do mês anterior não aparecia.**
+- Causa: `.vt-declaration-box` (`css/print.css`) tinha `max-height: 28mm` +
+  `overflow: hidden`. Na tela o recibo cresce com o conteúdo; na impressão o
+  recibo tem altura fixa e a caixa era espremida, cortando a observação
+  "(X dias com direito, menos Y dia de desconto do mês anterior)".
+- Correção (`css/print.css`, só em `@media print`): `max-height: none` na caixa
+  da declaração, liberando a altura para o texto completo aparecer. Layout de
+  tela inalterado.
+
+**3. Recibo de VT: rótulo da assinatura passa a ser o nome do funcionário.**
+- `js/vale-transporte.js`: `"Assinatura do funcionário"` → `${esc(receipt.employee.name)}`.
+
+**4. Escala impressa: bloco de assinatura.**
+- `js/escala.js`: removida a frase `"Responsável pela empresa"`
+  (`.scale-print-sign-role`), mantendo apenas o nome do responsável.
+- `css/escala-print.css`: `.scale-print-sign-name` ganhou `margin-top: 5mm` para
+  descer o nome dentro do mesmo retângulo (nada fora do retângulo foi alterado).
+
+**Arquivos:** `js/escala.js`, `js/vale-transporte.js`, `js/data.js`,
+`js/funcionarios.js` (sem alteração — apenas confirmado), `css/print.css`,
+`css/escala-print.css`, `css/style.css`.
+
+**Testes:** `npm test` 47/47 e `npm run validate` (funcional + offline + dedup +
+quota) sem falhas; `scripts/verify-inativo-escala.mjs` 12/12 (carimbo/preservação/
+limpeza de `deactivatedAt` e regra de visibilidade da Escala).
+
+**Deploy:** commit/push/deploy autorizados pelo usuário; bump de cache aplicado
+via `npm run bump-cache` no fluxo de `npm run deploy`.
+
 ## 2026-06-24 — Tombstones (`deletedAt`): exclusões passam a se propagar entre PCs
 
 **Objetivo:** fechar a limitação registrada na entrada abaixo — exclusões não se

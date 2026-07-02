@@ -187,7 +187,7 @@
 }
 
 .scale-print-sign-name {
-  margin: 0;
+  margin: 5mm 0 0;
   color: #06364a;
   font-size: 9.5pt;
   font-weight: 700;
@@ -365,6 +365,19 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Funcionário inativo na escala impressa (meses passados): nome em vermelho para
+   indicar que não faz mais parte da empresa. */
+.scale-print-table tr.scale-print-row-inactive .print-employee-name,
+.scale-print-table tr.scale-print-row-inactive .print-emp-name-text {
+  color: #c0392b !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.scale-print-table tr.scale-print-row-inactive .print-emp-name-text {
+  text-decoration: line-through;
 }
 
 .scale-print-table .print-emp-shift {

@@ -2172,6 +2172,25 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   letter-spacing: 0;
 }
 
+/* Funcionário inativo em escala passada/atual: destaque em vermelho para indicar
+   que atualmente não faz mais parte da empresa (nunca aparece em escala futura). */
+.scale-table-compact tr.scale-row-inactive .employee-name-only,
+.scale-table-compact tr.scale-row-inactive .emp-name-text {
+  color: #c0392b;
+}
+
+.scale-table-compact tr.scale-row-inactive .emp-name-text {
+  text-decoration: line-through;
+  text-decoration-color: rgba(192, 57, 43, 0.6);
+}
+
+/* Meses passados de funcionário inativo: escala somente-leitura (sem edição). */
+.scale-table-compact tr.scale-row-locked .scale-select {
+  cursor: not-allowed;
+  pointer-events: none;
+  background: transparent;
+}
+
 .col-head-main {
   display: block;
   font-size: 0.7rem;

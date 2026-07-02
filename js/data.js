@@ -2669,6 +2669,17 @@
       throw new Error(`ID interno já utilizado em ${idClash.company}.`);
     }
 
+    // Data de inativação: registra o dia em que o funcionário saiu para que a
+    // Escala o exiba apenas até o mês em que deixou a empresa (não em meses
+    // posteriores). Preserva a data original enquanto seguir inativo; ao reativar
+    // (status Ativo) o campo simplesmente não é recriado — fica limpo.
+    if (normalized.status === "Inativo") {
+      const stillInactive =
+        existing && String(existing.status || "").trim().toLowerCase() === "inativo";
+      normalized.deactivatedAt =
+        stillInactive && existing.deactivatedAt ? existing.deactivatedAt : todayISO();
+    }
+
     // Carimbo de versão p/ sincronização newer-wins entre PCs (mergeEmployeesById).
     normalized.updatedAt = Date.now();
 

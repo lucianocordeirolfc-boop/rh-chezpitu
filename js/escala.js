@@ -183,6 +183,16 @@
     return AppData.isEmployeeActive(employee);
   }
 
+  // Funcionário inativo aparece na escala só até o mês em que saiu da empresa
+  // (mês do `deactivatedAt`); nunca em meses posteriores nem futuros. Registros
+  // legados sem data usam o mês corrente como limite (comportamento anterior).
+  function inactiveVisibleForMonth(employee, yearMonth) {
+    const currentYearMonth = AppData.todayISO().slice(0, 7);
+    const deactivatedMonth = String(employee.deactivatedAt || "").slice(0, 7);
+    const limitMonth = deactivatedMonth || currentYearMonth;
+    return yearMonth <= limitMonth;
+  }
+
   function normalizeName(value) {
     return String(value || "")
       .trim()
@@ -224,14 +234,21 @@
   function getFilteredEmployees(data) {
     const search = normalizeSearch(scaleState.search);
 
+    // Funcionário inativo NÃO aparece em escala futura, nem em meses posteriores
+    // à sua saída. Nos meses em que ainda fazia parte da empresa (até o mês do
+    // `deactivatedAt`) continua aparecendo, marcado em vermelho (_isInactive).
     const rows = (data.employees || [])
-      .filter((employee) => isActiveEmployee(employee))
+      .filter((employee) => isActiveEmployee(employee) || inactiveVisibleForMonth(employee, scaleState.yearMonth))
       .filter((employee) => scaleState.department === "todos" || employee.department === scaleState.department)
       .filter((employee) => {
         if (!search) return true;
         return [employee.name, employee.role, employee.department].some((field) => normalizeSearch(field).includes(search));
       })
-      .map((employee) => ({ ...employee, _scaleCompany: getViewCompany() }));
+      .map((employee) => ({
+        ...employee,
+        _scaleCompany: getViewCompany(),
+        _isInactive: !isActiveEmployee(employee)
+      }));
 
     getPrincipalEmployeesExtra().forEach((employee) => {
       if (employee._scaleCompany !== getViewCompany()) return;
@@ -553,6 +570,9 @@
   function renderScaleTable(data, employees, days, alertLookups) {
     const holidayDates = getHolidayDates(data);
     const { alertDays, alertCells } = alertLookups || { alertDays: new Set(), alertCells: new Set() };
+    // Meses passados são somente-leitura para funcionários inativos: evita edição
+    // acidental da escala de quem não faz mais parte da empresa.
+    const isPastMonth = scaleState.yearMonth < AppData.todayISO().slice(0, 7);
 
     if (!employees.length) {
       return `<div class="empty-state"><strong>Nenhum funcionário ativo.</strong><span>Cadastre funcionários ativos ou ajuste os filtros para gerar a escala.</span></div>`;
@@ -594,6 +614,7 @@
           .map((employee) => {
             const employeeData = getScaleDataForEmployee(employee, data);
             const scaleCompany = employee._scaleCompany || getViewCompany();
+            const lockRow = Boolean(employee._isInactive) && isPastMonth;
             const cells = days
               .map((day) => {
                 const cell = getScaleCell(employee, day, employeeData);
@@ -616,7 +637,7 @@
 
                 return `
                   <td class="scale-cell ${codeClass(code)} ${dayClasses} ${cell.isManual ? "manual-cell" : ""} ${cell.absenceConflict ? "absence-conflict-cell" : ""}" title="${esc(title)}">
-                    <select class="scale-select" data-employee="${employee.id}" data-date="${day}" data-scale-company="${esc(scaleCompany)}" aria-label="Escala de ${esc(employee.name)} em ${day}">
+                    <select class="scale-select" data-employee="${employee.id}" data-date="${day}" data-scale-company="${esc(scaleCompany)}" aria-label="Escala de ${esc(employee.name)} em ${day}"${lockRow ? " disabled" : ""}>
                       ${codeOptions(code, cell.isManual)}
                     </select>
                     <span class="scale-cell-code">${esc(displayCode(code))}</span>
@@ -631,8 +652,8 @@
               : "";
 
             return `
-              <tr>
-                <th class="employee-sticky employee-name-only" title="${esc(employee.name)}">
+              <tr class="${employee._isInactive ? "scale-row-inactive" : ""}${lockRow ? " scale-row-locked" : ""}">
+                <th class="employee-sticky employee-name-only" title="${esc(employee.name)}${employee._isInactive ? (lockRow ? " (inativo — somente leitura)" : " (inativo)") : ""}">
                   <span class="emp-name-text">${displayName(employee.name)}</span>
                   ${companyTag}
                   ${employee.defaultShift ? `<small class="emp-shift-label">${esc(employee.defaultShift)}</small>` : ""}
@@ -701,7 +722,7 @@
                 return `<td class="${codeClass(code)} ${isSunday ? "print-day-sunday" : ""} ${isHoliday ? "print-day-holiday" : ""}">${esc(printCode(code))}</td>`;
               })
               .join("");
-            return `<tr><th class="print-employee-name">
+            return `<tr class="${employee._isInactive ? "scale-print-row-inactive" : ""}"><th class="print-employee-name">
               <span class="print-emp-name-text">${displayName(employee.name)}</span>
               ${employee.defaultShift ? `<small class="print-emp-shift">${esc(employee.defaultShift)}</small>` : ""}
             </th>${cells}</tr>`;
@@ -769,7 +790,6 @@
                 <div class="scale-print-sign-block">
                   <div class="scale-print-sign-line" aria-hidden="true"></div>
                   ${companyInfo.responsibleName ? `<p class="scale-print-sign-name">${displayName(companyInfo.responsibleName)}</p>` : '<p class="scale-print-sign-name scale-print-sign-name-empty">&nbsp;</p>'}
-                  <p class="scale-print-sign-role">Responsável pela empresa</p>
                 </div>
               </div>
             </section>

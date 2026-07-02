@@ -469,6 +469,14 @@
     grid-template-columns: repeat(3, 1fr) !important;
   }
 
+  /* Recibo VT: na impressão o recibo tem altura fixa e a caixa da declaração
+     ficava espremida (max-height 28mm + overflow hidden), cortando a observação
+     "(X dias com direito, menos Y dia de desconto do mês anterior)". Liberar a
+     altura permite que o texto completo apareça — só na versão impressa. */
+  .vt-declaration-box {
+    max-height: none !important;
+  }
+
   .vt-receipt-placeholder {
     visibility: hidden !important;
   }
