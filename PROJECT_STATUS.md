@@ -9,15 +9,16 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260702.01 (Inativar funcionário na Escala + ajustes recibo VT)
+**Versão:** 20260702.02 (Inativar funcionário na Escala + ajustes/correção recibo VT)
 **Data:** 2026-07-02
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
 
 Data: 02/07/2026
-Versão: 20260702.01 (Firebase Hosting — chez-pitu-rh)
-Commits: de920d9 (feat) + d3458f1 (carimbo de build)
+Versão: 20260702.02 (Firebase Hosting — chez-pitu-rh)
+Commits: 93ac50a (fix descrição VT impressa) + ed58f07 (carimbo) — sobre
+de920d9/d3458f1 (feat inativar/VT) e 7bbd3db (docs)
 
 Inclui: funcionário inativo aparece na Escala em vermelho/tachado apenas até o
 mês da saída (`deactivatedAt`) e oculto em escala futura; meses passados de

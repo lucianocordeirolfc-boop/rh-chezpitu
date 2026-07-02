@@ -8,9 +8,9 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260702.01` (exibida como `v2026.07.02.01`) — fonte: `js/version.js`
+- **Versão atual:** `20260702.02` (exibida como `v2026.07.02.02`) — fonte: `js/version.js`
 - **Branch atual:** `main`
-- **Último commit:** `d3458f1` — chore: carimbo de build em version.js (commit de920d9)
+- **Último commit:** `ed58f07` — chore: carimbo de build em version.js (commit 93ac50a)
 - **Status geral:** 🟢 EM PRODUÇÃO — frente "inativar funcionário na Escala + ajustes
   de recibo VT" commitada, pushada e deployada (`chez-pitu-rh.web.app`). Working tree
   limpo (exceto `scripts/verify-*.mjs`, não versionados por convenção).
@@ -26,10 +26,14 @@
   (Dashboard/Contador/VT) já filtravam inativos — não recriados. Estilos:
   `.scale-row-inactive` / `.scale-row-locked` (`css/style.css`),
   `.scale-print-row-inactive` (`css/escala-print.css`).
-- ✅ **Recibo VT impresso — observação de desconto não cortava mais** —
-  `.vt-declaration-box` recebeu `max-height: none` só em `@media print`
-  (`css/print.css`); na tela o recibo cresce, na impressão a altura fixa espremia
-  a caixa e cortava "(X dias com direito, menos Y dia de desconto do mês anterior)".
+- ✅ **Recibo VT impresso — descrição não é mais cortada no topo** (v `20260702.02`) —
+  causa raiz confirmada por PDF headless do Chrome (CSS real): no recibo de altura
+  fixa, `.vt-receipt-body` alinhava ao rodapé (`justify-content: flex-end`) e
+  `.vt-declaration-box` tinha `min-height: 18mm`, estourando o espaço e cortando o
+  TOPO da descrição. Correção só em `@media print` (`css/print.css`): declaração
+  ao topo (`flex-start`) e caixa com altura do conteúdo (`flex: 0 0 auto;
+  min-height: 0; max-height: none`). Tela inalterada. (1ª tentativa só com
+  `max-height: none` foi insuficiente.)
 - ✅ **Recibo VT — rótulo da assinatura = nome do funcionário** (`js/vale-transporte.js`).
 - ✅ **Escala impressa — assinatura** — removida a frase "Responsável pela empresa";
   nome do responsável descido `5mm` no retângulo (`js/escala.js`, `css/escala-print.css`).

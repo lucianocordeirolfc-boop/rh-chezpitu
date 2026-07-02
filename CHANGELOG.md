@@ -1,3 +1,9 @@
+2026-07-02 (b) — Correção do recibo VT impresso: descrição cortada no topo
+- [CORREÇÃO] Recibo VT impresso: a descrição abaixo dos campos (incl. observação de desconto do mês anterior) era cortada no topo. Causa: caixa da declaração com min-height 18mm + body alinhado ao rodapé (flex-end) estourava o espaço e o overflow cortava as primeiras linhas
+- Correção só em @media print: declaração alinhada ao topo (flex-start) e caixa com altura do conteúdo (flex 0 0 auto; min-height 0; max-height none)
+- Validado por PDF headless do Chrome usando o CSS real (2 recibos, com e sem desconto) — descrição completa
+- Versão 20260702.02 — commits 93ac50a (fix) + ed58f07 (carimbo). Push main + deploy Firebase Hosting concluídos
+
 2026-07-02 — Inativar funcionário na Escala + ajustes de recibo VT e assinatura da Escala
 - [NOVO] Funcionário inativo aparece na Escala em vermelho/tachado apenas até o mês da saída (deactivatedAt), oculto em escala futura
 - [NOVO] upsertEmployee carimba/preserva/limpa deactivatedAt (Ativo→Inativo→Ativo) — persiste em localStorage e Firebase
