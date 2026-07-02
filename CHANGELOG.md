@@ -1,3 +1,14 @@
+2026-07-02 — Inativar funcionário na Escala + ajustes de recibo VT e assinatura da Escala
+- [NOVO] Funcionário inativo aparece na Escala em vermelho/tachado apenas até o mês da saída (deactivatedAt), oculto em escala futura
+- [NOVO] upsertEmployee carimba/preserva/limpa deactivatedAt (Ativo→Inativo→Ativo) — persiste em localStorage e Firebase
+- [MELHORIA] Meses passados de funcionário inativo ficam somente-leitura (selects disabled) — evita edição acidental
+- [CORREÇÃO] Recibo VT impresso: liberada a altura da caixa da declaração (@media print) para não cortar a observação "menos X dia de desconto do mês anterior"
+- [MELHORIA] Recibo VT: rótulo da assinatura passa a exibir o nome do funcionário
+- [MELHORIA] Escala impressa: removida a frase "Responsável pela empresa"; nome do responsável descido no retângulo de assinatura
+- Arquivos: js/data.js, js/escala.js, js/vale-transporte.js, css/print.css, css/style.css, css/escala-print.css
+- Versão 20260702.01 — commits de920d9 (feat) + d3458f1 (carimbo) — npm test 47/47, validate OK, verify-inativo-escala 12/12
+- Push main e deploy Firebase Hosting (chez-pitu-rh.web.app) concluídos
+
 2026-06-17 — Impressão da Escala (1 página + logo por CNPJ), vínculo manual e continuidade
 - [NOVO] Impressão da Escala em 1 única página A4 paisagem (auto-fit por escala) — applyPrintFitScale
 - [CORREÇÃO] Coluna "Funcionários" larga demais / grade deslocada: removida a faixa repetida que quebrava o table-layout: fixed

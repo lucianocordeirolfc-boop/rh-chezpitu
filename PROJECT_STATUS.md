@@ -9,18 +9,25 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260617.02 (Impressão Escala 1 página + logo por CNPJ)
-**Data:** 2026-06-17
+**Versão:** 20260702.01 (Inativar funcionário na Escala + ajustes recibo VT)
+**Data:** 2026-07-02
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
 
-Data: 17/06/2026
-Versão: 20260617.02 (Firebase Hosting — chez-pitu-rh)
+Data: 02/07/2026
+Versão: 20260702.01 (Firebase Hosting — chez-pitu-rh)
+Commits: de920d9 (feat) + d3458f1 (carimbo de build)
 
-Inclui: impressão da Escala em 1 página A4 (auto-fit), correção da coluna larga
-(remoção da faixa repetida), logo por CNPJ via Firebase, vínculo manual de
-feriados retroativos e infraestrutura de continuidade `.claude/`.
+Inclui: funcionário inativo aparece na Escala em vermelho/tachado apenas até o
+mês da saída (`deactivatedAt`) e oculto em escala futura; meses passados de
+inativo somente-leitura; recibo VT impresso não corta mais a observação de
+desconto do mês anterior; rótulo da assinatura do VT usa o nome do funcionário;
+escala impressa sem a frase "Responsável pela empresa" (nome descido no
+retângulo).
+
+**Cache-busting:** todos os `?v=` do index.html em `20260702.01` — usuários
+recebem a nova versão automaticamente no próximo carregamento (Ctrl+F5 força).
 
 **Próximo deploy recomendado:** conforme novas demandas.
 
@@ -42,6 +49,9 @@ Dashboard: OK
 
 **Offline Recovery Tests:**
 - npm run test:offline: 15/15 ✓
+
+**Homologação da frente atual (não versionada):**
+- scripts/verify-inativo-escala.mjs: 12/12 ✓ (deactivatedAt + visibilidade na Escala)
 
 **Total:** 245/245 testes passando ✅
 

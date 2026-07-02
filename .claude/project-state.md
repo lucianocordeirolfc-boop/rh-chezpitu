@@ -8,26 +8,42 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260618.02` (exibida como `v2026.06.18.02`) — fonte: `js/version.js`
+- **Versão atual:** `20260702.01` (exibida como `v2026.07.02.01`) — fonte: `js/version.js`
 - **Branch atual:** `main`
-- **Último commit:** `fb5afae` — chore: carimbo de build em version.js (commit da18e28)
-- **Status geral:** 🟢 EM PRODUÇÃO — frente do logo via Storage commitada, pushada e
-  deployada (`chez-pitu-rh.web.app`). Working tree limpo (exceto `scripts/verify-*.mjs`,
-  não versionados por convenção).
+- **Último commit:** `d3458f1` — chore: carimbo de build em version.js (commit de920d9)
+- **Status geral:** 🟢 EM PRODUÇÃO — frente "inativar funcionário na Escala + ajustes
+  de recibo VT" commitada, pushada e deployada (`chez-pitu-rh.web.app`). Working tree
+  limpo (exceto `scripts/verify-*.mjs`, não versionados por convenção).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
 
-- ✅ **Logo das empresas via Firebase Storage (permanente)** — origem do logo
-  migrada de RTDB (`sistemaRH/empresas`) para Storage (`logos/{CNPJ}/<arquivo>`).
-  `FirebaseSync.resolveLogoUrlByCnpj` lista a pasta e pega a 1ª imagem; `app.js`
-  importa e persiste no boot (`importCompanyLogos`); `escala.js` persiste via
-  `updateCompanyLogo` e aguarda a imagem com `waitForImages` antes de imprimir;
-  `vale-transporte.js` aguarda imagens antes do `print()`. `index.html` carrega
-  `firebase-storage-compat`. Versão `20260618.02`. Commits `da18e28` + `fb5afae`.
-  Testes: npm test 47/47, validate 25/25. **Em produção.**
-  Pré-requisito: regra de leitura `logos/{cnpj}/...` publicada no Storage.
+- ✅ **Inativar funcionário na Escala + data de saída (`deactivatedAt`)** —
+  `upsertEmployee` (`js/data.js`) carimba a data na transição Ativo→Inativo,
+  preserva enquanto inativo e limpa ao reativar. A Escala (`js/escala.js`) exibe
+  o inativo em **vermelho + tachado** (tela e impressão) apenas **até o mês da
+  saída** (legado sem data → até o mês corrente); nunca em escala futura. Meses
+  passados de inativo ficam **somente-leitura** (selects `disabled`). Relatórios
+  (Dashboard/Contador/VT) já filtravam inativos — não recriados. Estilos:
+  `.scale-row-inactive` / `.scale-row-locked` (`css/style.css`),
+  `.scale-print-row-inactive` (`css/escala-print.css`).
+- ✅ **Recibo VT impresso — observação de desconto não cortava mais** —
+  `.vt-declaration-box` recebeu `max-height: none` só em `@media print`
+  (`css/print.css`); na tela o recibo cresce, na impressão a altura fixa espremia
+  a caixa e cortava "(X dias com direito, menos Y dia de desconto do mês anterior)".
+- ✅ **Recibo VT — rótulo da assinatura = nome do funcionário** (`js/vale-transporte.js`).
+- ✅ **Escala impressa — assinatura** — removida a frase "Responsável pela empresa";
+  nome do responsável descido `5mm` no retângulo (`js/escala.js`, `css/escala-print.css`).
+- Versão `20260702.01`. Commits `de920d9` (feat) + `d3458f1` (carimbo). Testes:
+  npm test 47/47, validate OK, `verify-inativo-escala.mjs` 12/12. **Em produção.**
 
 ### Frente anterior (já em produção)
+
+- ✅ **Logo das empresas via Firebase Storage (permanente)** — origem do logo
+  migrada de RTDB (`sistemaRH/empresas`) para Storage (`logos/{CNPJ}/<arquivo>`).
+  `resolveLogoUrlByCnpj` lista a pasta e pega a 1ª imagem; `app.js` importa/persiste
+  no boot; `escala.js`/`vale-transporte.js` aguardam a imagem antes de imprimir.
+  Versão `20260618.02`. Commits `da18e28` + `fb5afae`. **Em produção.**
+  Pré-requisito: regra de leitura `logos/{cnpj}/...` publicada no Storage.
 
 - ✅ **Vínculo manual de feriados retroativos** — bloqueio passou a revelar o vínculo
   existente (feriado/data/status/origem/compensação), com diálogo "Ver vínculo
@@ -82,6 +98,24 @@
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT
+- **Data:** 2026-07-02
+- **Versão:** 20260702.01
+- **Branch:** main
+- **Commits:** `de920d9` (feat inativar/VT) + `d3458f1` (carimbo de build)
+- **Arquivos alterados:** js/data.js (deactivatedAt no upsertEmployee) · js/escala.js
+  (visibilidade por mês de saída, vermelho/tachado, somente-leitura em meses passados) ·
+  js/vale-transporte.js (assinatura = nome) · css/print.css (declaração VT sem teto na
+  impressão) · css/style.css (.scale-row-inactive/.scale-row-locked) · css/escala-print.css
+  (.scale-print-row-inactive + nome descido) · js/version.js · index.html (?v=)
+- **Resumo:** Funcionário inativo passa a aparecer na Escala em vermelho/tachado só
+  até o mês da saída (deactivatedAt) e some da escala futura; meses passados de inativo
+  ficam somente-leitura. Corrigido corte da observação de desconto no recibo VT impresso;
+  assinatura do VT usa o nome do funcionário; escala impressa sem "Responsável pela
+  empresa". Testes: npm test 47/47, validate OK, verify-inativo-escala 12/12.
+  Commit, push (main) e deploy (chez-pitu-rh.web.app) concluídos.
+- **Próximo passo:** Nenhuma pendência aberta. Validação visual em produção pelo usuário.
 
 ### CHECKPOINT
 - **Data:** 2026-06-17 18:20
