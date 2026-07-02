@@ -470,10 +470,19 @@
   }
 
   /* Recibo VT: na impressão o recibo tem altura fixa e a caixa da declaração
-     ficava espremida (max-height 28mm + overflow hidden), cortando a observação
-     "(X dias com direito, menos Y dia de desconto do mês anterior)". Liberar a
-     altura permite que o texto completo apareça — só na versão impressa. */
+     era alinhada ao rodapé (`.vt-receipt-body` com justify-content: flex-end) e
+     forçada a min-height 18mm. Como isso estourava o espaço disponível, o
+     `overflow: hidden` cortava o TOPO — justamente as primeiras linhas da
+     descrição (inclusive a observação de desconto do mês anterior). Correção só
+     na impressão: alinhar a declaração ao topo (logo abaixo dos campos), sem
+     min/max de altura, deixando a caixa com a altura do próprio conteúdo. */
+  .vt-receipt-body {
+    justify-content: flex-start !important;
+  }
+
   .vt-declaration-box {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
     max-height: none !important;
   }
 

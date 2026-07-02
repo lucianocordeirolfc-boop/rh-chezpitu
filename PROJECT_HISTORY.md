@@ -36,14 +36,20 @@ regras de negócio.
   classe `.scale-row-locked` em `css/style.css`), evitando edição acidental da
   escala de quem já saiu. O mês corrente (saída) segue editável.
 
-**2. Recibo de VT impresso: observação de desconto do mês anterior não aparecia.**
-- Causa: `.vt-declaration-box` (`css/print.css`) tinha `max-height: 28mm` +
-  `overflow: hidden`. Na tela o recibo cresce com o conteúdo; na impressão o
-  recibo tem altura fixa e a caixa era espremida, cortando a observação
-  "(X dias com direito, menos Y dia de desconto do mês anterior)".
-- Correção (`css/print.css`, só em `@media print`): `max-height: none` na caixa
-  da declaração, liberando a altura para o texto completo aparecer. Layout de
-  tela inalterado.
+**2. Recibo de VT impresso: descrição/observação abaixo dos campos não aparecia.**
+- Causa raiz (confirmada por PDF headless do Chrome com o CSS real): no recibo de
+  altura fixa da impressão, `.vt-receipt-body` usa `justify-content: flex-end`
+  (conteúdo alinhado ao rodapé) e `.vt-declaration-box` tinha `min-height: 18mm`.
+  Isso estourava o espaço disponível e, por estar alinhado ao rodapé, o
+  `overflow: hidden` cortava o **TOPO** — as primeiras linhas da descrição
+  (inclusive a observação "menos X dia de desconto do mês anterior").
+- Correção (`css/print.css`, só em `@media print`, versão `20260702.02`): alinhar
+  a declaração ao topo (`.vt-receipt-body { justify-content: flex-start }`) e
+  deixar a caixa com a altura do próprio conteúdo (`.vt-declaration-box { flex:
+  0 0 auto; min-height: 0; max-height: none }`). Layout de tela inalterado.
+  Validado com PDF gerado a partir do CSS real (2 recibos, com e sem desconto):
+  descrição completa e sem corte. (A 1ª tentativa — só `max-height: none` — foi
+  insuficiente; o corte real vinha do `min-height` + alinhamento ao rodapé.)
 
 **3. Recibo de VT: rótulo da assinatura passa a ser o nome do funcionário.**
 - `js/vale-transporte.js`: `"Assinatura do funcionário"` → `${esc(receipt.employee.name)}`.
