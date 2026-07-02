@@ -104,6 +104,21 @@
 ## Histórico de checkpoints
 
 ### CHECKPOINT
+- **Data:** 2026-07-02 (b)
+- **Versão:** 20260702.02
+- **Branch:** main
+- **Commits:** `93ac50a` (fix descrição VT impressa) + `ed58f07` (carimbo) + `0f710ea` (docs)
+- **Arquivos alterados:** css/print.css (declaração ao topo + altura pelo conteúdo,
+  só @media print) · js/version.js · index.html (?v=) · PROJECT_HISTORY.md ·
+  CHANGELOG.md · PROJECT_STATUS.md · .claude/project-state.md
+- **Resumo:** Corrigido o corte no TOPO da descrição do recibo VT impresso (causa:
+  min-height 18mm + body alinhado ao rodapé estourava o espaço). Validado por PDF
+  headless do Chrome com o CSS real. **Validado também pelo usuário em produção
+  ("agora tudo ok").** Push (main) e deploy (chez-pitu-rh.web.app) concluídos;
+  `?v=20260702.02` confirmado no ar.
+- **Próximo passo:** Nenhuma pendência aberta. Sessão encerrada.
+
+### CHECKPOINT
 - **Data:** 2026-07-02
 - **Versão:** 20260702.01
 - **Branch:** main
