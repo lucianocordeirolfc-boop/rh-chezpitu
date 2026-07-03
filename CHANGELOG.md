@@ -1,3 +1,11 @@
+2026-07-03 — Exclusão limitada a 24h + auditoria + botão Inativar/Reativar (Cadastro)
+- [NOVO] Regra: funcionário só pode ser EXCLUÍDO em até 24h após o cadastro; depois, apenas inativar. Carimbo imutável createdAt em upsertEmployee; canDeleteEmployee; bloqueio também em removeEmployee (camada de dados). Legado sem createdAt = não excluível
+- [NOVO] Trilha de auditoria (auditLog): registra quem/ação/quando para cadastro, inativação, reativação e exclusão. getAuditLog/getEmployeeAuditLog; teto 3000 eventos; desempate por seq. Persiste em localStorage (inclusive lean) e Firebase; merge entre PCs por mergeAuditLogs (união por id)
+- [NOVO] Botão "Auditoria" no rodapé da lista abre modal com Quando/Ação/Funcionário/Usuário (empresa da aba ativa)
+- [NOVO] Botão Inativar/Reativar direto na linha da lista — setEmployeeStatus altera só o status, preserva demais campos, ajusta deactivatedAt e registra auditoria (idempotente)
+- Arquivos: js/data.js, js/funcionarios.js, js/firebase-sync.js
+- Versão 20260703.01 — npm test 47/47, validate 25/25, verify-exclusao-24h 13/13, verify-auditoria-status 17/17
+
 2026-07-02 (b) — Correção do recibo VT impresso: descrição cortada no topo
 - [CORREÇÃO] Recibo VT impresso: a descrição abaixo dos campos (incl. observação de desconto do mês anterior) era cortada no topo. Causa: caixa da declaração com min-height 18mm + body alinhado ao rodapé (flex-end) estourava o espaço e o overflow cortava as primeiras linhas
 - Correção só em @media print: declaração alinhada ao topo (flex-start) e caixa com altura do conteúdo (flex 0 0 auto; min-height 0; max-height none)

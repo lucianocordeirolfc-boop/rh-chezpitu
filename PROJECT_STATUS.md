@@ -9,25 +9,24 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260702.02 (Inativar funcionário na Escala + ajustes/correção recibo VT)
-**Data:** 2026-07-02
+**Versão:** 20260703.01 (Exclusão 24h + auditoria + botão Inativar/Reativar no Cadastro)
+**Data:** 2026-07-03
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
 
-Data: 02/07/2026
-Versão: 20260702.02 (Firebase Hosting — chez-pitu-rh)
-Commits: 93ac50a (fix descrição VT impressa) + ed58f07 (carimbo) — sobre
-de920d9/d3458f1 (feat inativar/VT) e 7bbd3db (docs)
+Data: 03/07/2026
+Versão: 20260703.01 (Firebase Hosting — chez-pitu-rh)
 
-Inclui: funcionário inativo aparece na Escala em vermelho/tachado apenas até o
-mês da saída (`deactivatedAt`) e oculto em escala futura; meses passados de
-inativo somente-leitura; recibo VT impresso não corta mais a observação de
-desconto do mês anterior; rótulo da assinatura do VT usa o nome do funcionário;
-escala impressa sem a frase "Responsável pela empresa" (nome descido no
-retângulo).
+Inclui: **exclusão de funcionário permitida só nas primeiras 24h após o cadastro**
+(depois disso apenas inativar — `createdAt` imutável + `canDeleteEmployee`, bloqueio
+também em `removeEmployee`); **trilha de auditoria** (`auditLog`) registrando quem
+cadastrou/inativou/reativou/excluiu e quando, com modal "Auditoria" no rodapé da
+lista; **botão Inativar/Reativar** direto na linha da lista (`setEmployeeStatus`,
+preserva os demais campos e ajusta `deactivatedAt`). Auditoria persiste local
+(inclusive cache lean) e no Firebase, com merge por id entre PCs.
 
-**Cache-busting:** todos os `?v=` do index.html em `20260702.01` — usuários
+**Cache-busting:** todos os `?v=` do index.html em `20260703.01` — usuários
 recebem a nova versão automaticamente no próximo carregamento (Ctrl+F5 força).
 
 **Próximo deploy recomendado:** conforme novas demandas.

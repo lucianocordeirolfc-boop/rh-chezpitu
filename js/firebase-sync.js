@@ -129,6 +129,8 @@ if (window.firebase && firebase.apps.length) {
       valeTransporte: state.valeTransporte || {},
       // Exclusões (tombstones) para propagar remoções entre PCs sem ressuscitar.
       tombstones: state.tombstones || {},
+      // Trilha de auditoria (cadastro/inativação/reativação/exclusão).
+      auditLog: state.auditLog || [],
       contadorLancamentos
     };
   }
@@ -209,7 +211,8 @@ if (window.firebase && firebase.apps.length) {
       coverageAlerts: data.coverageAlerts || [],
       coveragePrincipalBindings: data.coveragePrincipalBindings || {},
       scaleCodeConfig: data.scaleCodeConfig || {},
-      tombstones: data.tombstones || {}
+      tombstones: data.tombstones || {},
+      auditLog: Array.isArray(data.auditLog) ? data.auditLog : []
     };
   }
 

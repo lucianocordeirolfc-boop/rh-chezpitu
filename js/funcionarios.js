@@ -898,7 +898,16 @@
         <td>${esc(AppData.formatVtCurrency(employee.vtDaily))}</td>
         <td class="actions">
           <button class="link-button" data-edit="${employee.id}" data-company="${esc(employee.company)}">Editar</button>
-          <button class="link-button danger" data-remove="${employee.id}" data-company="${esc(employee.company)}">Excluir</button>
+          ${
+            employee.status === "Ativo"
+              ? `<button class="link-button" data-inactivate="${employee.id}" data-company="${esc(employee.company)}">Inativar</button>`
+              : `<button class="link-button" data-reactivate="${employee.id}" data-company="${esc(employee.company)}">Reativar</button>`
+          }
+          ${
+            AppData.canDeleteEmployee(employee)
+              ? `<button class="link-button danger" data-remove="${employee.id}" data-company="${esc(employee.company)}">Excluir</button>`
+              : ""
+          }
         </td>
       </tr>
     `
@@ -916,6 +925,77 @@
     if (countEl) {
       countEl.textContent = `${filtered.length} funcionário(s)`;
     }
+  }
+
+  // ── Modal de auditoria ────────────────────────────────────────────────
+  const AUDIT_ACTION_META = {
+    cadastro: { label: "Cadastrou", cls: "success" },
+    inativacao: { label: "Inativou", cls: "muted" },
+    reativacao: { label: "Reativou", cls: "success" },
+    exclusao: { label: "Excluiu", cls: "danger" }
+  };
+
+  function formatAuditTimestamp(ms) {
+    if (!ms) return "—";
+    try {
+      return new Date(ms).toLocaleString("pt-BR", {
+        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+    } catch {
+      return "—";
+    }
+  }
+
+  function auditRows(entries) {
+    if (!entries.length) return `<tr><td colspan="4">Nenhum registro de auditoria.</td></tr>`;
+    return entries
+      .map((entry) => {
+        const meta = AUDIT_ACTION_META[entry.action] || { label: entry.action, cls: "muted" };
+        return `<tr>
+          <td>${esc(formatAuditTimestamp(entry.at))}</td>
+          <td><span class="pill ${meta.cls}">${esc(meta.label)}</span></td>
+          <td>${esc(entry.employeeName || "—")}</td>
+          <td>${esc(entry.user || "—")}</td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  function closeAuditPopup() {
+    document.getElementById("auditPopup")?.remove();
+  }
+
+  function openAuditPopup() {
+    closeAuditPopup();
+    const company = AppData.getActiveCompany();
+    const entries = AppData.getAuditLog({ company });
+    const overlay = document.createElement("div");
+    overlay.id = "auditPopup";
+    overlay.className = "popup-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = `
+      <div class="popup-card popup-card-employee">
+        <div class="popup-header">
+          <h3>Auditoria — ${esc(company)}</h3>
+          <button class="popup-close" id="auditPopupClose" type="button" aria-label="Fechar">✕</button>
+        </div>
+        <div class="popup-form">
+          <p class="footer-hint">Quem cadastrou, inativou, reativou ou excluiu funcionários (${entries.length} evento(s)). Mais recentes primeiro.</p>
+          ${tableXScrollWrap(`
+            <table class="table-premium">
+              <thead><tr><th>Quando</th><th>Ação</th><th>Funcionário</th><th>Usuário</th></tr></thead>
+              <tbody>${auditRows(entries)}</tbody>
+            </table>
+          `)}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#auditPopupClose").addEventListener("click", closeAuditPopup);
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) closeAuditPopup();
+    });
   }
 
   async function getImportPayload(container) {
@@ -1013,6 +1093,10 @@
       openEmployeePopup(container);
     });
 
+    container.querySelector("#btnOpenAudit")?.addEventListener("click", () => {
+      openAuditPopup();
+    });
+
     if (!container.dataset.companyActionsBound) {
       container.dataset.companyActionsBound = "1";
       container.addEventListener("click", (event) => {
@@ -1036,12 +1120,45 @@
           return;
         }
 
+        const inactivateBtn = event.target.closest("[data-inactivate]");
+        if (inactivateBtn) {
+          event.preventDefault();
+          if (!confirm("Inativar este funcionário? Ele deixa de aparecer na escala futura, mas o histórico é preservado.")) return;
+          try {
+            AppData.setEmployeeStatus(inactivateBtn.dataset.inactivate, "Inativo", inactivateBtn.dataset.company);
+          } catch (error) {
+            alert(error?.message || "Não foi possível inativar o funcionário.");
+            return;
+          }
+          window.App.renderCurrent();
+          return;
+        }
+
+        const reactivateBtn = event.target.closest("[data-reactivate]");
+        if (reactivateBtn) {
+          event.preventDefault();
+          if (!confirm("Reativar este funcionário?")) return;
+          try {
+            AppData.setEmployeeStatus(reactivateBtn.dataset.reactivate, "Ativo", reactivateBtn.dataset.company);
+          } catch (error) {
+            alert(error?.message || "Não foi possível reativar o funcionário.");
+            return;
+          }
+          window.App.renderCurrent();
+          return;
+        }
+
         const removeBtn = event.target.closest("[data-remove]");
         if (removeBtn) {
           event.preventDefault();
           if (!confirm("Excluir este funcionário e seus vínculos de escala, férias e feriados?")) return;
           const company = removeBtn.dataset.company;
-          AppData.removeEmployee(removeBtn.dataset.remove, company);
+          try {
+            AppData.removeEmployee(removeBtn.dataset.remove, company);
+          } catch (error) {
+            alert(error?.message || "Não foi possível excluir o funcionário.");
+            return;
+          }
           closeEmployeePopup();
           window.App.renderCurrent();
         }
@@ -1173,6 +1290,7 @@
 
         <div class="page-footer-actions">
           <button type="button" class="secondary btn-sm" data-open-modal="employeeImportModal" title="Aceita arquivos CSV e JSON">Importar dados</button>
+          <button type="button" class="secondary btn-sm" id="btnOpenAudit" title="Histórico de quem cadastrou, inativou, reativou ou excluiu funcionários">Auditoria</button>
           <span class="footer-hint">CSV e JSON</span>
         </div>
       </div>

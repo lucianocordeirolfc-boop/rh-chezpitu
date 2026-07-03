@@ -7,6 +7,67 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-07-03 — Exclusão limitada a 24h + trilha de auditoria + botão Inativar/Reativar
+
+**Objetivo:** permitir excluir um funcionário apenas nas primeiras **24h após o
+cadastro**. Passada essa janela, a exclusão fica **bloqueada para sempre**
+(inclusive ao editar o cadastro) — resta apenas **Inativar** (status Inativo),
+preservando o histórico do funcionário.
+
+**Camada de dados (`js/data.js`):**
+- Novo carimbo imutável **`createdAt`** em `upsertEmployee`: definido no primeiro
+  cadastro e **preservado** em edições e re-imports (`existing?.createdAt || ...`).
+  Persiste no localStorage/Firebase (employees serializados por inteiro) e trafega
+  no merge newer-wins como os demais campos.
+- Nova função **`canDeleteEmployee(employee)`** (exportada): `true` somente se
+  `Date.now() - createdAt <= 24h`. Registros **legados sem `createdAt`** (cadastros
+  anteriores a esta regra) retornam `false` — não excluíveis, apenas inativáveis
+  (comportamento seguro por padrão, alinhado à Regra de Ouro de preservação).
+- **`removeEmployee`** passou a validar `canDeleteEmployee` e **lançar erro** quando
+  fora da janela — bloqueio na camada de dados, para nenhum caminho (UI/import)
+  contornar. `removeEmployeeFromCompany` (usado pelo purge de mocks) segue direto,
+  sem a trava, pois é limpeza interna.
+
+**UI (`js/funcionarios.js`):**
+- Na lista de cadastro, o botão **Excluir** só é renderizado quando
+  `AppData.canDeleteEmployee(employee)` é verdadeiro. Fora da janela, aparece o
+  rótulo desabilitado **"Inativar (Editar)"** com tooltip explicando a regra.
+- Handler de exclusão envolto em `try/catch`: se `removeEmployee` lançar, exibe
+  `alert` com a mensagem e não recarrega — defesa em profundidade.
+
+**Melhoria 2 — Trilha de auditoria (`js/data.js`, `js/firebase-sync.js`, `js/funcionarios.js`):**
+- Nova coleção global **`auditLog`** no estado: registra **quem** (e-mail do
+  usuário logado via `window.AppAuth`), **qual ação** e **quando** — ações
+  `cadastro`, `inativacao`, `reativacao` e `exclusao`. Helpers `recordAudit`,
+  `getAuditLog({company,limit})`, `getEmployeeAuditLog(id,company)`. Teto de 3000
+  eventos (nunca apaga seletivamente; só descarta os mais antigos ao estourar).
+- Desempate de ordem por contador monotônico `seq` (eventos no mesmo ms).
+- Persistência completa: `createDefaultState`, `finalizeIncomingState`,
+  `buildLeanPersistedState` (auditoria preservada mesmo no cache enxuto) e
+  sincronização Firebase (`stateToFirebase`/`firebaseToState`). Merge entre PCs
+  por `mergeAuditLogs` (união por id, sem duplicar) em `mergeRemoteIntoLocal`.
+- `upsertEmployee` registra `cadastro` no 1º cadastro e `inativacao`/`reativacao`
+  quando o status muda; `removeEmployee` registra `exclusao` antes de remover.
+  `options.silentAudit` desliga o registro (reservado a migrações).
+- UI: botão **"Auditoria"** no rodapé da lista abre um modal (`openAuditPopup`)
+  com Quando / Ação / Funcionário / Usuário, filtrado pela empresa da aba ativa.
+
+**Melhoria 3 — Botão Inativar/Reativar na lista (`js/data.js`, `js/funcionarios.js`):**
+- Nova função **`setEmployeeStatus(id, status, company)`**: altera **apenas** o
+  status preservando todos os demais campos, carimba/limpa `deactivatedAt` (mesma
+  regra do `upsertEmployee`) e registra auditoria. Retorna o funcionário; é
+  idempotente (status igual não gera evento).
+- Cada linha da lista passa a ter **Inativar** (quando Ativo) ou **Reativar**
+  (quando Inativo), com confirmação. Substitui o antigo rótulo "Inativar (Editar)".
+
+**Testes:** `npm test` (47/47) e `npm run validate` (25/25) verdes. Scripts
+dedicados: `scripts/verify-exclusao-24h.mjs` (13/13) e
+`scripts/verify-auditoria-status.mjs` (17/17) — cobrem carimbo/janela de 24h,
+auditoria de cadastro/inativação/reativação/exclusão, `setEmployeeStatus`
+(preservação de campos, `deactivatedAt`, idempotência) e ordenação/filtro do log.
+
+**Versão:** 20260703.01.
+
 ## 2026-07-02 — Inativar funcionário na escala + ajustes de layout (VT impresso e assinatura da Escala)
 
 **Objetivo:** melhorias específicas solicitadas, sem apagar dados nem alterar

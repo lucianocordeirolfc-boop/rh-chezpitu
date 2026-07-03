@@ -95,6 +95,92 @@
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   }
 
+  // Janela em que um funcionário recém-cadastrado ainda pode ser EXCLUÍDO.
+  // Passadas 24h do cadastro, a exclusão é bloqueada permanentemente — inclusive
+  // ao editar o cadastro. Nesse caso, apenas a inativação (status Inativo) é
+  // permitida, preservando o histórico do funcionário.
+  const EMPLOYEE_DELETE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  function canDeleteEmployee(employee) {
+    if (!employee) return false;
+    const createdAt = Number(employee.createdAt);
+    // Sem carimbo de criação (cadastros anteriores a esta regra) => não excluível.
+    if (!createdAt) return false;
+    return Date.now() - createdAt <= EMPLOYEE_DELETE_WINDOW_MS;
+  }
+
+  // ── Trilha de auditoria de funcionários ──────────────────────────────────
+  // Registra QUEM (e-mail do usuário logado) fez QUAL ação e QUANDO. Nunca
+  // apaga registros antigos; apenas mantém um teto para não estourar a cota.
+  const AUDIT_LOG_LIMIT = 3000;
+  const AUDIT_ACTION_LABELS = {
+    cadastro: "Cadastrou",
+    inativacao: "Inativou",
+    reativacao: "Reativou",
+    exclusao: "Excluiu"
+  };
+
+  function currentUserEmail() {
+    try {
+      const g = typeof window !== "undefined" ? window : {};
+      return g.AppAuth?.getUser?.()?.email || "sistema";
+    } catch (_) {
+      return "sistema";
+    }
+  }
+
+  // Contador monotônico por dispositivo: desempata eventos gravados no mesmo
+  // milissegundo, garantindo ordem de exibição estável.
+  let auditSeq = 0;
+
+  function recordAudit(action, info = {}) {
+    if (!Array.isArray(state.auditLog)) state.auditLog = [];
+    auditSeq += 1;
+    state.auditLog.push({
+      id: uid("audit"),
+      at: Date.now(),
+      seq: auditSeq,
+      action,
+      employeeId: info.employeeId || "",
+      employeeName: info.employeeName || "",
+      company: info.company || "",
+      user: currentUserEmail()
+    });
+    if (state.auditLog.length > AUDIT_LOG_LIMIT) {
+      state.auditLog = state.auditLog.slice(-AUDIT_LOG_LIMIT);
+    }
+  }
+
+  // Ordena crescente por (timestamp, seq) — seq desempata mesmo milissegundo.
+  function compareAuditAsc(a, b) {
+    return (a.at || 0) - (b.at || 0) || (a.seq || 0) - (b.seq || 0);
+  }
+
+  // Une duas trilhas de auditoria (local/remoto) sem duplicar por id. Mantém a
+  // ordem cronológica e respeita o teto — usado no merge entre PCs.
+  function mergeAuditLogs(localArr = [], remoteArr = []) {
+    const map = new Map();
+    [...(remoteArr || []), ...(localArr || [])].forEach((entry) => {
+      if (entry && entry.id) map.set(entry.id, entry);
+    });
+    const merged = [...map.values()].sort(compareAuditAsc);
+    return merged.length > AUDIT_LOG_LIMIT ? merged.slice(-AUDIT_LOG_LIMIT) : merged;
+  }
+
+  function getAuditLog(options = {}) {
+    const list = Array.isArray(state.auditLog) ? [...state.auditLog] : [];
+    const filtered = options.company
+      ? list.filter((entry) => entry.company === options.company)
+      : list;
+    // Mais recentes primeiro para exibição (desempate estável por seq).
+    filtered.sort((a, b) => -compareAuditAsc(a, b));
+    return options.limit ? filtered.slice(0, options.limit) : filtered;
+  }
+
+  function getEmployeeAuditLog(employeeId, company) {
+    return getAuditLog({ company }).filter((entry) => entry.employeeId === employeeId);
+  }
+
   function addDays(isoDate, days) {
     const date = new Date(`${isoDate}T00:00:00`);
     date.setDate(date.getDate() + days);
@@ -559,7 +645,10 @@
       },
       // Registro de exclusões (tombstones) por coleção/empresa: { id: deletedAt }.
       // Permite propagar exclusões entre PCs sem ressuscitar registros no merge.
-      tombstones: { employees: {}, vacations: {}, absences: {} }
+      tombstones: { employees: {}, vacations: {}, absences: {} },
+      // Trilha de auditoria de funcionários: quem cadastrou/inativou/reativou/
+      // excluiu e quando. Ver recordAudit / getAuditLog.
+      auditLog: []
     };
   }
 
@@ -1181,7 +1270,8 @@
         ...(rawState.pageFilters || {})
       },
       companies: rawState.companies || defaults.companies,
-      valeTransporte: normalizeValeTransporteBlock(rawState.valeTransporte, defaults.valeTransporte)
+      valeTransporte: normalizeValeTransporteBlock(rawState.valeTransporte, defaults.valeTransporte),
+      auditLog: Array.isArray(rawState.auditLog) ? rawState.auditLog : []
     };
     migratePageFilters(next, defaults);
     migrateVtStorage(next);
@@ -1282,7 +1372,9 @@
         deductionDaysMeta: {}
       },
       // União das exclusões dos dois lados (deletedAt mais recente por id).
-      tombstones: mergeTombstoneStores(local.tombstones, remote.tombstones)
+      tombstones: mergeTombstoneStores(local.tombstones, remote.tombstones),
+      // União das trilhas de auditoria dos dois lados (sem duplicar por id).
+      auditLog: mergeAuditLogs(local.auditLog, remote.auditLog)
     };
 
     const companyKeys = new Set([
@@ -1888,6 +1980,8 @@
       valeTransporte: { selectedYearMonth: src.valeTransporte?.selectedYearMonth || "" },
       // Exclusões são minúsculas e críticas para o merge: preserva mesmo no lean.
       tombstones: src.tombstones || {},
+      // Auditoria é pequena e não pode ser perdida no cache enxuto.
+      auditLog: Array.isArray(src.auditLog) ? src.auditLog : [],
       companies: {} // dados operacionais vêm do Firebase
     };
   }
@@ -2655,6 +2749,10 @@
       doubleSundayOff: String(employee.doubleSundayOff ?? existing?.doubleSundayOff ?? "false"),
       notes: employee.notes ?? existing?.notes ?? "",
       source,
+      // Carimbo de criação (imutável): define a janela de 24h em que o
+      // funcionário ainda pode ser excluído. Preserva o valor do registro
+      // existente; só é definido no primeiro cadastro. Ver canDeleteEmployee.
+      createdAt: existing?.createdAt || employee.createdAt || Date.now(),
       fixedDayHistory: normalizeFixedDayHistory(existing)
     };
 
@@ -2691,6 +2789,20 @@
     }
     data.employees = sortEmployeesByName(data.employees);
 
+    // Auditoria: cadastro novo, inativação ou reativação (quando o status muda
+    // numa edição). Não registra edições que não mexem no status, salvo o
+    // primeiro cadastro. `options.silentAudit` desativa (usado por migrações).
+    if (!options.silentAudit) {
+      const prevStatus = String(existing?.status || "").trim().toLowerCase();
+      const nextStatus = String(normalized.status || "").trim().toLowerCase();
+      const auditInfo = { employeeId: normalized.id, employeeName: normalized.name, company: resolved };
+      if (!existing) {
+        recordAudit("cadastro", auditInfo);
+      } else if (prevStatus !== nextStatus) {
+        recordAudit(nextStatus === "inativo" ? "inativacao" : "reativacao", auditInfo);
+      }
+    }
+
     if (options.save !== false) saveState();
     return normalized;
   }
@@ -2720,7 +2832,49 @@
   }
 
   function removeEmployee(id, company) {
-    removeEmployeeFromCompany(company || getPrimaryPageCompany("funcionarios"), id, true);
+    const resolved = company || getPrimaryPageCompany("funcionarios");
+    const data = getCompanyData(resolved);
+    const employee = (data.employees || []).find((item) => item.id === id);
+    // Regra: exclusão permitida somente dentro de 24h após o cadastro. Depois
+    // disso NUNCA é permitido excluir — apenas inativar. Bloqueio também na
+    // camada de dados para que nenhum caminho (UI, import, etc.) contorne.
+    if (!canDeleteEmployee(employee)) {
+      throw new Error(
+        "Exclusão não permitida: o funcionário só pode ser excluído em até 24h após o cadastro. Utilize a opção Inativar."
+      );
+    }
+    // Registra a auditoria ANTES de remover (precisamos do nome do funcionário).
+    recordAudit("exclusao", { employeeId: id, employeeName: employee.name, company: resolved });
+    removeEmployeeFromCompany(resolved, id, true);
+  }
+
+  // Altera apenas o status (Ativo/Inativo) preservando todos os demais campos —
+  // usado pelo botão "Inativar/Reativar" da lista. Registra auditoria e ajusta
+  // deactivatedAt com a mesma regra do upsertEmployee. Retorna o funcionário.
+  function setEmployeeStatus(id, status, company) {
+    const resolved = company || getPrimaryPageCompany("funcionarios");
+    const data = getCompanyData(resolved);
+    const employee = (data.employees || []).find((item) => item.id === id);
+    if (!employee) throw new Error("Funcionário não encontrado.");
+
+    const nextStatus = String(status).trim().toLowerCase() === "inativo" ? "Inativo" : "Ativo";
+    if (String(employee.status || "").trim() === nextStatus) return employee;
+
+    employee.status = nextStatus;
+    if (nextStatus === "Inativo") {
+      employee.deactivatedAt = employee.deactivatedAt || todayISO();
+    } else {
+      delete employee.deactivatedAt;
+    }
+    employee.updatedAt = Date.now();
+
+    recordAudit(nextStatus === "Inativo" ? "inativacao" : "reativacao", {
+      employeeId: id,
+      employeeName: employee.name,
+      company: resolved
+    });
+    saveState();
+    return employee;
   }
 
   function monthsTouchedByRange(startDate, endDate) {
@@ -4351,6 +4505,10 @@
     purgeMockEmployees,
     monthKey,
     removeEmployee,
+    canDeleteEmployee,
+    setEmployeeStatus,
+    getAuditLog,
+    getEmployeeAuditLog,
     removeHoliday,
     restoreHoliday,
     getActiveHolidays,
