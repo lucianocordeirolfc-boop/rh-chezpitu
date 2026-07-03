@@ -8,14 +8,35 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260702.02` (exibida como `v2026.07.02.02`) — fonte: `js/version.js`
+- **Versão atual:** `20260703.01` (exibida como `v2026.07.03.01`) — fonte: `js/version.js`
 - **Branch atual:** `main`
-- **Último commit:** `ed58f07` — chore: carimbo de build em version.js (commit 93ac50a)
-- **Status geral:** 🟢 EM PRODUÇÃO — frente "inativar funcionário na Escala + ajustes
-  de recibo VT" commitada, pushada e deployada (`chez-pitu-rh.web.app`). Working tree
-  limpo (exceto `scripts/verify-*.mjs`, não versionados por convenção).
+- **Último commit:** `714c185` — chore: carimbo de build v20260703.01 (commit f8d62f6)
+- **Status geral:** 🟢 EM PRODUÇÃO — frente "exclusão 24h + auditoria + botão
+  Inativar/Reativar no Cadastro" commitada, pushada e deployada (`chez-pitu-rh.web.app`).
+  Working tree limpo (exceto `scripts/verify-*.mjs`, não versionados por convenção).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+- ✅ **Exclusão de funcionário limitada a 24h após o cadastro** — carimbo imutável
+  `createdAt` em `upsertEmployee` (`js/data.js`); `canDeleteEmployee` (true só se
+  ≤ 24h); `removeEmployee` valida e lança erro fora da janela (bloqueio na camada de
+  dados). Legado sem `createdAt` → **não excluível**, apenas inativável. Na lista
+  (`js/funcionarios.js`) o botão **Excluir** só aparece dentro da janela.
+- ✅ **Trilha de auditoria (`auditLog`)** — registra **quem** (e-mail via
+  `window.AppAuth`), **ação** (`cadastro`/`inativacao`/`reativacao`/`exclusao`) e
+  **quando**. Helpers `recordAudit`/`getAuditLog`/`getEmployeeAuditLog` (`js/data.js`),
+  teto 3000, desempate por `seq`. Persiste local (inclusive cache **lean**) e no
+  Firebase (`js/firebase-sync.js`); merge entre PCs por `mergeAuditLogs` (união por
+  id). Botão **"Auditoria"** no rodapé abre modal (`openAuditPopup`) com
+  Quando/Ação/Funcionário/Usuário, filtrado pela empresa ativa.
+- ✅ **Botão Inativar/Reativar na linha da lista** — `setEmployeeStatus(id,status,co)`
+  altera **só** o status, preserva os demais campos, ajusta `deactivatedAt` e registra
+  auditoria (idempotente). Substitui o rótulo "Inativar (Editar)".
+- Versão `20260703.01`. Commits `f8d62f6` (feat) + `714c185` (carimbo). Testes:
+  npm test 47/47, validate 25/25, `verify-exclusao-24h.mjs` 13/13,
+  `verify-auditoria-status.mjs` 17/17. **Em produção.**
+
+### Frente 2026-07-02 (já em produção)
 
 - ✅ **Inativar funcionário na Escala + data de saída (`deactivatedAt`)** —
   `upsertEmployee` (`js/data.js`) carimba a data na transição Ativo→Inativo,
@@ -88,20 +109,44 @@
 
 ## Pendências de deploy
 
-- ✅ **Commitado, pushado (`main`) e deployado em produção** (`chez-pitu-rh.web.app`).
+- ✅ **Commitado, pushado (`main`) e deployado em produção** (`chez-pitu-rh.web.app`)
+  na versão `20260703.01` (deploy Firebase Hosting concluído).
+- ⚠️ Validação visual em produção pelo usuário (botões Inativar/Reativar, modal
+  Auditoria, bloqueio de exclusão após 24h).
 - ⚠️ Infra: garantir que a regra de leitura `logos/{cnpj}/...` permaneça publicada
   no Firebase Storage (Console → Storage → Regras).
 
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo)
+(working tree limpo — versionados)
 ?? scripts/verify-*.mjs (homologação — não versionar)
 ```
 
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT
+- **Data:** 2026-07-03
+- **Versão:** 20260703.01
+- **Branch:** main
+- **Commits:** `f8d62f6` (feat exclusão 24h + auditoria + Inativar/Reativar) +
+  `714c185` (carimbo de build)
+- **Arquivos alterados:** js/data.js (createdAt, canDeleteEmployee, removeEmployee
+  com bloqueio, setEmployeeStatus, auditLog + recordAudit/getAuditLog/
+  getEmployeeAuditLog/mergeAuditLogs, seq) · js/funcionarios.js (botões
+  Inativar/Reativar na lista, handlers, modal Auditoria) · js/firebase-sync.js
+  (auditLog em stateToFirebase/firebaseToState) · js/version.js · index.html (?v=) ·
+  PROJECT_HISTORY.md · CHANGELOG.md · PROJECT_STATUS.md · .claude/project-state.md
+- **Resumo:** Cadastro de Funcionários — (1) exclusão só em ≤24h após o cadastro,
+  depois apenas inativar (bloqueio na camada de dados); (2) trilha de auditoria de
+  cadastro/inativação/reativação/exclusão (quem/quando), com modal "Auditoria" e
+  sincronização local+Firebase; (3) botão Inativar/Reativar na linha da lista.
+  Testes: npm test 47/47, validate 25/25, verify-exclusao-24h 13/13,
+  verify-auditoria-status 17/17. Push (main) e deploy (chez-pitu-rh.web.app) OK.
+- **Próximo passo:** Validação visual em produção pelo usuário. Nenhuma pendência
+  técnica aberta.
 
 ### CHECKPOINT
 - **Data:** 2026-07-02 (b)
