@@ -10,12 +10,25 @@
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
 - **Versão atual:** `20260703.01` (exibida como `v2026.07.03.01`) — fonte: `js/version.js`
 - **Branch atual:** `main`
-- **Último commit:** `714c185` — chore: carimbo de build v20260703.01 (commit f8d62f6)
-- **Status geral:** 🟢 EM PRODUÇÃO — frente "exclusão 24h + auditoria + botão
-  Inativar/Reativar no Cadastro" commitada, pushada e deployada (`chez-pitu-rh.web.app`).
-  Working tree limpo (exceto `scripts/verify-*.mjs`, não versionados por convenção).
+- **Último commit:** `a00e9e4` — chore: carimbo de build (deploy fix mascara HHH:MM, commit 3b9b996)
+- **Status geral:** 🟢 EM PRODUÇÃO — frente "máscara de horas HHH:MM no Contador"
+  commitada e deployada (`chez-pitu-rh.web.app`). Working tree limpo.
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-07-22 (já em produção)
+
+- ✅ **Contador — máscara de horas HHH:MM (permite digitar `178:45`)** — no pop-up
+  de lançamento (aba Informações para Contador), o campo **Ad. Noturno** (e demais
+  campos de hora, máscara compartilhada) não permitia 3 dígitos de hora. Causa raiz:
+  `maskHora` (`js/contador.js`) inseria o `:` cedo demais (`178`→`1:78`) e descartava
+  os dígitos que passavam de 2 casas de minutos. Reescrita com regra única (2 últimos
+  dígitos = minutos, até 3 = horas) e transbordo dos excedentes para as horas. Sem
+  mudança de regra de negócio: limite máximo permanece `200:00`; `normalizeHora` e o
+  submit inalterados. Placeholder/hint atualizados; `maxlength` 6→7. Testes: npm test
+  47/47, validate 25/25 + simulação de digitação progressiva. Commits `3b9b996` (fix)
+  + `a00e9e4` (carimbo). **Em produção.**
+
 
 - ✅ **Exclusão de funcionário limitada a 24h após o cadastro** — carimbo imutável
   `createdAt` em `upsertEmployee` (`js/data.js`); `canDeleteEmployee` (true só se
@@ -109,8 +122,12 @@
 
 ## Pendências de deploy
 
-- ✅ **Commitado, pushado (`main`) e deployado em produção** (`chez-pitu-rh.web.app`)
-  na versão `20260703.01` (deploy Firebase Hosting concluído).
+- ✅ **Fix máscara HHH:MM commitado e deployado em produção** (`chez-pitu-rh.web.app`),
+  commits `3b9b996` + `a00e9e4`. Deploy Firebase Hosting concluído.
+- ⚠️ Validação visual em produção pelo usuário: aba Informações para Contador →
+  Novo Lançamento → campo Ad. Noturno → digitar `17845` deve exibir `178:45`
+  (Ctrl+F5 se estiver com build antiga em cache).
+- ✅ **Frente anterior (`20260703.01`) — commitado, pushado (`main`) e deployado.**
 - ⚠️ Validação visual em produção pelo usuário (botões Inativar/Reativar, modal
   Auditoria, bloqueio de exclusão após 24h).
 - ⚠️ Infra: garantir que a regra de leitura `logos/{cnpj}/...` permaneça publicada
@@ -126,6 +143,24 @@
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT
+- **Data:** 2026-07-22
+- **Versão:** 20260703.01
+- **Branch:** main
+- **Commits:** `3b9b996` (fix máscara HHH:MM) + `a00e9e4` (carimbo de build)
+- **Arquivos alterados:** js/contador.js (maskHora reescrita + placeholder/hint +
+  maxlength) · PROJECT_HISTORY.md · js/version.js (carimbo bump-cache) ·
+  .claude/project-state.md
+- **Resumo:** Corrigida a máscara de digitação dos campos de hora do pop-up do
+  Contador (Ad. Noturno e Hora Extra). Antes era impossível digitar 3 dígitos de
+  hora (ex.: `178:45`): `maskHora` inseria o `:` cedo demais e perdia os dígitos
+  excedentes de minutos. Regra unificada com transbordo para as horas; limite
+  `200:00` mantido; `normalizeHora`/submit inalterados. Testes: npm test 47/47,
+  validate 25/25, simulação progressiva OK. Commit e deploy (chez-pitu-rh.web.app)
+  concluídos.
+- **Próximo passo:** Validação visual em produção pelo usuário (digitar `17845` no
+  campo Ad. Noturno). Nenhuma pendência técnica aberta.
 
 ### CHECKPOINT
 - **Data:** 2026-07-03
