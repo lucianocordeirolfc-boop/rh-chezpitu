@@ -7,6 +7,30 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-07-22 — Contador: máscara de horas HHH:MM (permite digitar 178:45)
+
+**Problema:** no pop-up de lançamento (aba Informações para Contador), o campo
+**Ad. Noturno** (e demais campos de hora) não permitia digitar valores com 3
+dígitos de hora, como `178:45` (= 178h45min). Embora `normalizeHora` já aceitasse
+até `200:00`, a **máscara de digitação `maskHora`** inseria o `:` cedo demais
+(`178` virava `1:78`) e, a partir daí, os dígitos que passavam de 2 casas de
+minutos eram **descartados** (`mm.slice(0,2)`), travando a entrada em `1:78`.
+
+**Correção (`js/contador.js`):**
+- `maskHora` reescrita: regra única "2 últimos dígitos = minutos, restante (até 3)
+  = horas". Quando o usuário digita `:` manual e continua além dos 2 minutos, os
+  dígitos **transbordam** para as horas em vez de serem perdidos. Ex.: digitar
+  `17845` (ou `178:45`) resulta corretamente em `178:45`.
+- Placeholder/hint do campo atualizados para o padrão **HHH:MM** com exemplo de 3
+  dígitos (`17845 = 178:45`); `maxlength` do input ajustado de 6 → 7.
+- Sem mudança de regra de negócio: limite máximo permanece `200:00`; `normalizeHora`
+  e o submit não foram alterados. A correção beneficia igualmente o campo Hora Extra
+  (mesma máscara compartilhada).
+
+**Testes:** `npm test` (47/47) e `npm run validate` (25/25) OK; simulação de
+digitação progressiva confirma `17845 → 178:45`, `1030 → 10:30`, `20000 → 200:00`,
+`030 → 0:30`, `178:45h → 178:45`, com rejeição mantida para `200:01` e minutos > 59.
+
 ## 2026-07-03 — Exclusão limitada a 24h + trilha de auditoria + botão Inativar/Reativar
 
 **Objetivo:** permitir excluir um funcionário apenas nas primeiras **24h após o

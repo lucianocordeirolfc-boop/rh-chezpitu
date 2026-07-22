@@ -28,17 +28,22 @@
     return String(h).padStart(2, "0") + ":" + String(min).padStart(2, "0");
   }
 
-  // Máscara de digitação para campos de horas. Insere o ":" automaticamente:
-  // os 2 últimos dígitos viram minutos e o restante (até 3 dígitos) vira horas.
-  // Ex.: "1030" -> "10:30", "20000" -> "200:00", "030" -> "0:30".
-  // Se o usuário digitar o ":" manualmente, a posição dele é respeitada.
+  // Máscara de digitação para campos de horas (padrão HHH:MM, até 200:00).
+  // Regra única: os 2 últimos dígitos viram minutos e o restante (até 3 dígitos)
+  // vira horas. Ex.: "1030" -> "10:30", "20000" -> "200:00", "030" -> "0:30",
+  // "17845" -> "178:45". Se o usuário digitar o ":" manualmente, ele é respeitado;
+  // e se continuar digitando além dos 2 minutos, os dígitos "transbordam" para as
+  // horas (permite chegar a 3 dígitos de hora sem perder o que foi digitado).
   function maskHora(value) {
     var s = String(value || "");
-    if (s.indexOf(":") >= 0) {
-      var parts = s.split(":");
-      var hh = parts[0].replace(/\D/g, "").slice(0, 3);
-      var mm = parts.slice(1).join("").replace(/\D/g, "").slice(0, 2);
-      return hh + ":" + mm;
+    var idx = s.indexOf(":");
+    if (idx >= 0) {
+      var hhRaw = s.slice(0, idx).replace(/\D/g, "");
+      var mmRaw = s.slice(idx + 1).replace(/\D/g, "");
+      if (mmRaw.length <= 2) return hhRaw.slice(0, 3) + ":" + mmRaw;
+      // Transbordo: reflui todos os dígitos com os 2 últimos como minutos.
+      var all = (hhRaw + mmRaw).slice(0, 5);
+      return all.slice(0, all.length - 2) + ":" + all.slice(-2);
     }
     var digits = s.replace(/\D/g, "");
     if (digits.length <= 2) return digits;
@@ -226,8 +231,8 @@
         var timeVal = val || "";
         return '<label class="popup-field">' + f.label +
           '<input type="text" inputmode="numeric" class="hora-input" name="' + f.key + '" value="' + timeVal + '"' +
-          ' placeholder="HH:MM (até 200:00)" title="Digite os minutos no final — ex.: 1030 = 10:30, 20000 = 200:00" maxlength="6" autocomplete="off">' +
-          '<span class="popup-hint">Digite os números (minutos no final): 1030 = 10:30 — máximo 200:00</span>' +
+          ' placeholder="HHH:MM (até 200:00)" title="Digite os minutos no final — ex.: 1030 = 10:30, 17845 = 178:45, 20000 = 200:00" maxlength="7" autocomplete="off">' +
+          '<span class="popup-hint">Digite os números (minutos no final): 1030 = 10:30, 17845 = 178:45 — máximo 200:00</span>' +
           '</label>';
       }
       return '<label class="popup-field">' + f.label +
