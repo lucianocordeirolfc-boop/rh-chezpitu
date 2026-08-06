@@ -129,6 +129,8 @@ if (window.firebase && firebase.apps.length) {
       valeTransporte: state.valeTransporte || {},
       // Exclusões (tombstones) para propagar remoções entre PCs sem ressuscitar.
       tombstones: state.tombstones || {},
+      // Exclusões DEFINITIVAS de feriado (por conteúdo) — propagam entre PCs.
+      holidayTombstones: state.holidayTombstones || {},
       // Trilha de auditoria (cadastro/inativação/reativação/exclusão).
       auditLog: state.auditLog || [],
       contadorLancamentos
@@ -212,6 +214,7 @@ if (window.firebase && firebase.apps.length) {
       coveragePrincipalBindings: data.coveragePrincipalBindings || {},
       scaleCodeConfig: data.scaleCodeConfig || {},
       tombstones: data.tombstones || {},
+      holidayTombstones: data.holidayTombstones || {},
       auditLog: Array.isArray(data.auditLog) ? data.auditLog : []
     };
   }

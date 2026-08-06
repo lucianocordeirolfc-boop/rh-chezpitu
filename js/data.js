@@ -646,6 +646,9 @@
       // Registro de exclusões (tombstones) por coleção/empresa: { id: deletedAt }.
       // Permite propagar exclusões entre PCs sem ressuscitar registros no merge.
       tombstones: { employees: {}, vacations: {}, absences: {} },
+      // Exclusões DEFINITIVAS de feriado por conteúdo (data|nome): { escopo: { chave: deletedAt } }.
+      // Escopo = empresa (feriado da empresa) ou "__calendar__" (calendário).
+      holidayTombstones: {},
       // Trilha de auditoria de funcionários: quem cadastrou/inativou/reativou/
       // excluiu e quando. Ver recordAudit / getAuditLog.
       auditLog: []
@@ -815,6 +818,100 @@
         });
       });
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TOMBSTONES DE FERIADO — exclusão DEFINITIVA por conteúdo (data|nome).
+  //
+  // Diferente dos tombstones por id (funcionários/férias/ausências): feriados
+  // duplicados possuem ids distintos, então a identidade do usuário é
+  // data + nome normalizado. Escopo = nome da empresa (feriado da empresa) ou
+  // "__calendar__" (calendário). Bloqueia a ressurreição via merge do Firebase,
+  // via seeds e via auto-sync do calendário. Só é criado por ação explícita do
+  // usuário e é removido quando o usuário recria o mesmo feriado.
+  // ─────────────────────────────────────────────────────────────────────────
+  const HOLIDAY_TOMBSTONE_CALENDAR_SCOPE = "__calendar__";
+
+  function holidayTombstoneKey(date, name) {
+    return `${String(date || "").trim()}|${normalizeSearchText(name)}`;
+  }
+
+  function ensureHolidayTombstoneStore(targetState) {
+    if (!targetState.holidayTombstones || typeof targetState.holidayTombstones !== "object") {
+      targetState.holidayTombstones = {};
+    }
+    return targetState.holidayTombstones;
+  }
+
+  /** Marca uma exclusão definitiva (só na ação do usuário). Mantém o deletedAt maior. */
+  function recordHolidayTombstone(scope, date, name, when = Date.now(), targetState = state) {
+    if (!scope || !date || !name) return;
+    const store = ensureHolidayTombstoneStore(targetState);
+    if (!store[scope]) store[scope] = {};
+    const key = holidayTombstoneKey(date, name);
+    const prev = Number(store[scope][key]) || 0;
+    store[scope][key] = Math.max(prev, Number(when) || Date.now());
+  }
+
+  function isHolidayTombstoned(scope, date, name, targetState = state) {
+    const store = targetState.holidayTombstones;
+    return Boolean(store && store[scope] && store[scope][holidayTombstoneKey(date, name)]);
+  }
+
+  function clearHolidayTombstone(scope, date, name, targetState = state) {
+    const store = targetState.holidayTombstones;
+    if (!store || !store[scope]) return;
+    delete store[scope][holidayTombstoneKey(date, name)];
+  }
+
+  /** Limpa o tombstone de um feriado (data+nome) em TODAS as empresas e no calendário. */
+  function clearHolidayTombstones(name, date) {
+    const store = state.holidayTombstones;
+    if (!store) return;
+    Object.keys(store).forEach((scope) => clearHolidayTombstone(scope, date, name));
+  }
+
+  /** União de dois registros de tombstones de feriado; por chave mantém o deletedAt maior. */
+  function mergeHolidayTombstoneStores(localStore = {}, remoteStore = {}) {
+    const merged = {};
+    const scopes = new Set([...Object.keys(localStore || {}), ...Object.keys(remoteStore || {})]);
+    scopes.forEach((scope) => {
+      const out = {};
+      const lc = localStore?.[scope] || {};
+      const rc = remoteStore?.[scope] || {};
+      new Set([...Object.keys(lc), ...Object.keys(rc)]).forEach((key) => {
+        const t = Math.max(Number(lc[key]) || 0, Number(rc[key]) || 0);
+        if (t) out[key] = t;
+      });
+      if (Object.keys(out).length) merged[scope] = out;
+    });
+    return merged;
+  }
+
+  /**
+   * Remove dos arrays já mesclados os feriados excluídos definitivamente:
+   * por empresa (block.holidays) e no calendário (calendarHolidays). Idempotente.
+   * Não usa updatedAt: o tombstone só some quando o usuário recria explicitamente
+   * o feriado (clearHolidayTombstones), garantindo que a exclusão permaneça.
+   */
+  function applyHolidayTombstones(targetState) {
+    const store = ensureHolidayTombstoneStore(targetState);
+
+    Object.keys(store).forEach((scope) => {
+      if (scope === HOLIDAY_TOMBSTONE_CALENDAR_SCOPE) return;
+      const block = targetState.companies?.[scope];
+      if (!block || !Array.isArray(block.holidays)) return;
+      block.holidays = block.holidays.filter(
+        (holiday) => !isHolidayTombstoned(scope, holiday?.date, holiday?.name, targetState)
+      );
+    });
+
+    if (store[HOLIDAY_TOMBSTONE_CALENDAR_SCOPE] && Array.isArray(targetState.calendarHolidays)) {
+      targetState.calendarHolidays = targetState.calendarHolidays.filter(
+        (holiday) =>
+          !isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, holiday?.date, holiday?.name, targetState)
+      );
+    }
   }
 
   function mergeEmployeesById(localArr = [], remoteArr = []) {
@@ -1118,6 +1215,8 @@
     if (!Array.isArray(targetState.calendarHolidays)) targetState.calendarHolidays = [];
     HOLIDAY_SEED_2026.forEach((seed) => {
       if (targetState.calendarHolidays.some((holiday) => holidayMatchesSeed2026(holiday, seed))) return;
+      // Excluído definitivamente pelo usuário: o seed não recria.
+      if (isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, seed.date, seed.name, targetState)) return;
       targetState.calendarHolidays.push({
         id: `cal-seed-2026-${seed.slug}`,
         date: seed.date,
@@ -1136,6 +1235,8 @@
         // Soft-deletados também contam como existentes: o seed nunca ressuscita
         // um feriado que o usuário removeu de propósito.
         if (block.holidays.some((holiday) => holidayMatchesSeed2026(holiday, seed))) return;
+        // Excluído definitivamente pelo usuário: o seed não recria.
+        if (isHolidayTombstoned(company, seed.date, seed.name, targetState)) return;
         block.holidays.push({
           id: `feriado-seed-2026-${seed.slug}-${normalizeSearchText(company).replace(/\s+/g, "-")}`,
           name: seed.name,
@@ -1297,6 +1398,10 @@
     // Exclusões (tombstones): remove registros excluídos e poda tombstones obsoletos.
     ensureTombstoneStore(next);
     applyTombstonesToState(next);
+    // Exclusões DEFINITIVAS de feriado (por conteúdo): remove os excluídos e evita
+    // ressurreição via merge/seed/auto-sync do calendário.
+    ensureHolidayTombstoneStore(next);
+    applyHolidayTombstones(next);
 
     // Proteção dos dados da empresa: restaura do backup se vazio; atualiza backup se válido.
     recoverCompanyInfoForState(next);
@@ -1373,6 +1478,11 @@
       },
       // União das exclusões dos dois lados (deletedAt mais recente por id).
       tombstones: mergeTombstoneStores(local.tombstones, remote.tombstones),
+      // União das exclusões definitivas de feriado (deletedAt mais recente por chave).
+      holidayTombstones: mergeHolidayTombstoneStores(
+        local.holidayTombstones,
+        remote.holidayTombstones
+      ),
       // União das trilhas de auditoria dos dois lados (sem duplicar por id).
       auditLog: mergeAuditLogs(local.auditLog, remote.auditLog)
     };
@@ -1980,6 +2090,7 @@
       valeTransporte: { selectedYearMonth: src.valeTransporte?.selectedYearMonth || "" },
       // Exclusões são minúsculas e críticas para o merge: preserva mesmo no lean.
       tombstones: src.tombstones || {},
+      holidayTombstones: src.holidayTombstones || {},
       // Auditoria é pequena e não pode ser perdida no cache enxuto.
       auditLog: Array.isArray(src.auditLog) ? src.auditLog : [],
       companies: {} // dados operacionais vêm do Firebase
@@ -3066,6 +3177,9 @@
     let name = String(holiday.name || "").trim();
     let date = String(holiday.date || "").trim();
     if (isPadroeiraBuziosName(name)) date = correctPadroeiraBuziosDate(date);
+    // Recriação explícita pelo usuário: remove um eventual tombstone anterior
+    // deste feriado (data+nome) nesta empresa, para que a recriação permaneça.
+    clearHolidayTombstone(company, date, name);
     data.holidays.push({
       id: uid("feriado"),
       name,
@@ -3102,6 +3216,8 @@
       const data = getCompanyData(company);
       if (!data.holidays) data.holidays = [];
       if (findCompanyHolidayByNameDate(data, name, date)) return;
+      // Não recriar automaticamente um feriado excluído definitivamente pelo usuário.
+      if (isHolidayTombstoned(company, date, name)) return;
 
       data.holidays.push({
         id: uid("feriado"),
@@ -3181,6 +3297,51 @@
   function getActiveHolidays(company) {
     const data = getCompanyData(company);
     return (data.holidays || []).filter((h) => !h.isDeleted);
+  }
+
+  /**
+   * Exclusão DEFINITIVA de feriado da empresa (irreversível — ação do usuário).
+   * Remove TODOS os registros com o mesmo nome+data (elimina duplicatas) junto
+   * dos seus vínculos (workedEmployees) e cria um tombstone de conteúdo para que
+   * o feriado não retorne via merge do Firebase, seed ou auto-sync do calendário.
+   * Retorna { ok, removed, name, date }.
+   */
+  function removeCompanyHolidayPermanently(id, options = {}) {
+    const company = options.company || getPrimaryPageCompany("feriados");
+    const data = getCompanyData(company);
+    const holiday = (data.holidays || []).find((h) => h.id === id);
+    if (!holiday) return { ok: false, removed: 0 };
+
+    const { name, date } = holiday;
+    const key = holidayTombstoneKey(date, name);
+    const before = data.holidays.length;
+    data.holidays = data.holidays.filter((h) => holidayTombstoneKey(h.date, h.name) !== key);
+    const removed = before - data.holidays.length;
+
+    recordHolidayTombstone(company, date, name);
+    saveState();
+    return { ok: true, removed, name, date };
+  }
+
+  /**
+   * Exclusão DEFINITIVA de feriado do calendário (irreversível — ação do usuário).
+   * Remove todas as entradas com o mesmo nome+data e cria tombstone de calendário.
+   * Retorna { ok, removed, name, date }.
+   */
+  function removeCalendarHolidayPermanently(id) {
+    const list = Array.isArray(state.calendarHolidays) ? state.calendarHolidays : [];
+    const holiday = list.find((h) => h.id === id);
+    if (!holiday) return { ok: false, removed: 0 };
+
+    const { name, date } = holiday;
+    const key = holidayTombstoneKey(date, name);
+    const before = list.length;
+    state.calendarHolidays = list.filter((h) => holidayTombstoneKey(h.date, h.name) !== key);
+    const removed = before - state.calendarHolidays.length;
+
+    recordHolidayTombstone(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, date, name);
+    saveState();
+    return { ok: true, removed, name, date };
   }
 
   /**
@@ -4390,7 +4551,7 @@
       const inCalendar = state.calendarHolidays.some(
         (holiday) => String(holiday?.date || "").startsWith("2026") && holidayNameMatchesSeed(holiday?.name, seed)
       );
-      if (!inCalendar) {
+      if (!inCalendar && !isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, seed.date, seed.name)) {
         state.calendarHolidays.push({
           id: `cal-seed-2026-${seed.slug}`,
           date: seed.date,
@@ -4409,6 +4570,8 @@
           (holiday) => String(holiday?.date || "").startsWith("2026") && holidayNameMatchesSeed(holiday?.name, seed)
         );
         if (exists) return;
+        // Excluído definitivamente pelo usuário: o seed não recria.
+        if (isHolidayTombstoned(company, seed.date, seed.name)) return;
         data.holidays.push({
           id: `feriado-seed-2026-${seed.slug}-${companySlug(company)}`,
           name: seed.name,
@@ -4511,6 +4674,11 @@
     getEmployeeAuditLog,
     removeHoliday,
     restoreHoliday,
+    removeCompanyHolidayPermanently,
+    removeCalendarHolidayPermanently,
+    clearHolidayTombstones,
+    isHolidayTombstoned,
+    applyHolidayTombstones,
     getActiveHolidays,
     findOrMergeDuplicateHolidays,
     deduplicateAllHolidays,

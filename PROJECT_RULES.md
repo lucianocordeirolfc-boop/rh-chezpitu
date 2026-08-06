@@ -130,6 +130,25 @@ Regra:
 - Compensado: já compensado.
 - Vencido: passou de 120 dias e não compensou.
 
+## Exclusão de feriado (definitiva)
+
+Além do soft-delete (reversível), o Controle de Feriados permite **exclusão
+DEFINITIVA** de um feriado cadastrado, direto pela interface (botão
+"Excluir feriado"):
+
+- Remove o feriado e **todos os vínculos** (`workedEmployees`), incluindo
+  duplicatas de mesmo **nome + data**.
+- Grava um **tombstone por conteúdo** (`state.holidayTombstones`, escopo empresa
+  ou `__calendar__`) que impede o retorno do feriado por: merge do Firebase
+  (outro PC), seed 2026 e auto-sync do calendário.
+- É **irreversível** e só ocorre por **ação explícita do usuário com confirmação**.
+  Nenhuma rotina automática exclui feriado definitivamente.
+- **Recadastrar** o mesmo feriado (nome + data) pela interface **limpa** o
+  tombstone — o novo cadastro passa a valer normalmente.
+
+Funções: `removeCompanyHolidayPermanently`, `removeCalendarHolidayPermanently`
+(js/data.js). Ver PROJECT_HISTORY.md → 2026-08-06.
+
 ## CO e Feriados
 
 O código CO deve se vincular somente a feriados pendentes do próprio funcionário.

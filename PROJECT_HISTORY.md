@@ -7,6 +7,62 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-06 — Feriados: exclusão DEFINITIVA + limpeza de duplicados
+
+**Objetivo:** permitir excluir permanentemente um feriado cadastrado (com TODOS
+os vínculos), direto pela interface, sem depender do agente — e sem que ele volte
+por sincronização (Firebase/outro PC), por seed 2026 ou pelo auto-sync do
+calendário. Contexto: a aba Controle de Feriados acumulava duplicados (ex.: Natal
+25/12/2025, Ano Novo 2026, Semana Santa, São Jorge 2/3, "Teste Tiradentes").
+
+**Causa da persistência dos duplicados:** a exclusão existente era **soft-delete**
+(`removeHoliday` → `isDeleted=true`), que **mantém** registro e `workedEmployees`.
+Além disso, feriados de calendário e do seed 2026 podiam ressuscitar via merge do
+Firebase e via `syncCompanyHolidaysFromCalendarEntry`.
+
+**Solução — tombstone de feriado por CONTEÚDO (data|nome):**
+- `js/data.js`
+  - Novo `state.holidayTombstones = { escopo: { "data|nomeNormalizado": deletedAt } }`
+    (escopo = empresa ou `"__calendar__"`). Diferente dos tombstones por id
+    (funcionários/férias/ausências): feriados duplicados têm ids distintos, então
+    a identidade do usuário é **data + nome**.
+  - Helpers: `recordHolidayTombstone`, `isHolidayTombstoned`, `clearHolidayTombstone(s)`,
+    `mergeHolidayTombstoneStores` (união por chave, mantém o `deletedAt` maior) e
+    `applyHolidayTombstones` (remove os tombados de `companies[*].holidays` e de
+    `calendarHolidays`). Aplicado em `finalizeIncomingState` (cobre load e merge).
+  - `removeCompanyHolidayPermanently(id, {company})`: remove TODOS os registros de
+    mesmo nome+data (elimina duplicatas) com seus vínculos e grava o tombstone.
+  - `removeCalendarHolidayPermanently(id)`: idem para o calendário (escopo global).
+  - Bloqueios de ressurreição: `syncCompanyHolidaysFromCalendarEntry` e os dois
+    seeds (`applyHolidaySeed2026`, `seedComplianceHolidays2026`) passam a **pular**
+    feriados tombados. Recriação explícita pelo usuário (`addHoliday`,
+    `submitCalendarHolidayForm`) **limpa** o tombstone, permitindo recadastro.
+  - Persistência: `createDefaultState`, `mergeRemoteIntoLocal` (união) e
+    `buildLeanPersistedState` (preserva mesmo no cache enxuto) passam a carregar
+    `holidayTombstones`.
+- `js/firebase-sync.js` — serializa/lê `holidayTombstones` (propaga entre PCs).
+- `js/feriados.js`
+  - Botão **"Excluir feriado"** (definitivo) na 1ª linha de cada feriado no
+    Histórico → `removeCompanyHolidayPermanently`, com confirmação forte de ação
+    permanente. Botão "Excluir" do calendário (popup) e da lista de feriados
+    cadastrados passam a usar a exclusão definitiva.
+  - Confirmação `confirmDeleteHolidayPermanent` deixa explícito que é irreversível
+    e afeta os N vínculos do feriado.
+
+**Preservação:** o soft-delete antigo (`removeHoliday`/`restoreHoliday`) e todos os
+demais dados continuam intactos. A exclusão definitiva só ocorre por ação explícita
+do usuário na UI, com confirmação (alinhado à Regra de Ouro e à "Proteção de
+lançamentos existentes").
+
+**Testes:** `npm test` 47/47 e `npm run validate` 25/25 sem regressão;
+`scripts/verify-exclusao-feriado-definitiva.mjs` 15/15 (exclusão + duplicatas +
+vínculos, não-ressurreição via merge/seed/auto-sync do calendário, exclusão de
+calendário, recriação limpando tombstone e união de tombstones no merge).
+
+**Pendências:** deploy/commit aguardando autorização. Para o botão aparecer em
+produção é preciso publicar (`npm run deploy`, que faz o bump de cache); os 6
+duplicados serão removidos pelo próprio usuário com o novo botão.
+
 ## 2026-07-22 — Contador: máscara de horas HHH:MM (permite digitar 178:45)
 
 **Problema:** no pop-up de lançamento (aba Informações para Contador), o campo

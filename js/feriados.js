@@ -335,6 +335,7 @@
             ${isFirstHolidayRow ? `<button class="link-button" data-add-worked-employee="${esc(line.holiday.id)}" type="button">+ Funcionário</button>` : ""}
             ${line.employeeId ? `<input class="compact-date" type="date" data-compensation-date="${line.holiday.id}|${line.employeeId}" value="${esc(line.compensationDate)}" title="Data de compensação">` : ""}
             ${line.employeeId ? `<button class="link-button danger" data-unlink-holiday="${line.holiday.id}|${line.employeeId}" type="button">Excluir vínculo</button>` : ""}
+            ${isFirstHolidayRow ? `<button class="link-button danger" data-remove-holiday-perm="${esc(line.holiday.id)}" type="button" title="Excluir o feriado e todos os vínculos, definitivamente">Excluir feriado</button>` : ""}
           </td>
         </tr>
       `;
@@ -529,6 +530,21 @@
       : `Marcar o feriado "${holiday?.name || ""}" como excluído?\n\n` +
         `Nota: Esta ação não é definitiva. O feriado pode ser restaurado depois se necessário.`;
 
+    return window.confirm(msg);
+  }
+
+  // Exclusão DEFINITIVA (irreversível): remove o feriado e TODOS os vínculos e
+  // impede que ele volte por seed/sincronização. Confirmação explícita e forte.
+  function confirmDeleteHolidayPermanent(holiday) {
+    const total = holiday?.workedEmployees?.length || 0;
+    const linhas = total
+      ? `\n\nIsto vai excluir também ${total} vínculo(s) de funcionário(s) neste feriado.`
+      : "";
+    const msg =
+      `EXCLUIR DEFINITIVAMENTE o feriado "${holiday?.name || ""}" (${formatDateBR(holiday?.date || "")})?` +
+      linhas +
+      `\n\nEsta ação é PERMANENTE e NÃO pode ser desfeita. ` +
+      `O feriado não voltará por sincronização nem por cadastro automático.`;
     return window.confirm(msg);
   }
 
@@ -896,6 +912,26 @@
       });
     });
 
+    container.querySelectorAll("[data-remove-holiday-perm]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const holidayId = button.dataset.removeHolidayPerm;
+        const company = AppData.getPrimaryPageCompany("feriados");
+        const data = AppData.getCompanyData(company);
+        const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+        if (!holiday) return;
+        if (!confirmDeleteHolidayPermanent(holiday)) return;
+        const result = AppData.removeCompanyHolidayPermanently(holidayId, { company });
+        if (result?.ok) {
+          window.App?.toast?.(
+            `Feriado "${result.name}" excluído definitivamente.`,
+            "success"
+          );
+        }
+        refreshTable(container);
+        window.App.renderCurrent();
+      });
+    });
+
     container.querySelectorAll("[data-compensation-date]").forEach((input) => {
       input.addEventListener("change", () => {
         const [holidayId, employeeId] = input.dataset.compensationDate.split("|");
@@ -1100,6 +1136,9 @@
     if (!name) return false;
     let date = String(formData.get("date") || "").trim();
     if (AppData.isPadroeiraBuziosName(name)) date = AppData.correctPadroeiraBuziosDate(date);
+    // Recriação explícita pelo usuário: limpa tombstone anterior (empresa + calendário)
+    // para que o feriado recadastrado não seja removido pela regra de exclusão definitiva.
+    AppData.clearHolidayTombstones?.(name, date);
     // Vinculado à empresa da aba ativa (sem seletor de empresa — evita dados cruzados).
     const companies = [AppData.getActiveCompany()];
     ScaleRules.addCalendarHoliday({
@@ -1152,24 +1191,21 @@
       if (button.dataset.boundRemoveCalendar) return;
       button.dataset.boundRemoveCalendar = "1";
       button.addEventListener("click", () => {
-        const holidayId = button.dataset.removeCalendarHoliday;
-        const company = AppData.getActiveCompany();
-        const data = AppData.getCompanyData(company);
-        const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+        const calendarId = button.dataset.removeCalendarHoliday;
+        const calHoliday = (AppData.state.calendarHolidays || []).find((item) => item.id === calendarId);
+        if (!calHoliday) return;
 
-        if (!holiday) return;
-
-        const label = `${holiday.name} (${formatDateBR(holiday.date)})`;
-        const hasLinks = (holiday.workedEmployees || []).length > 0;
-
-        let message = `Excluir feriado: ${label}?`;
-        if (hasLinks) {
-          message += `\n\nEste feriado possui vínculos com ${holiday.workedEmployees.length} funcionário(s). A exclusão marcará o feriado como deletado, mas preservará o histórico de vínculos.`;
-        }
-
+        const label = `${calHoliday.name} (${formatDateBR(calHoliday.date)})`;
+        const message =
+          `EXCLUIR DEFINITIVAMENTE o feriado do calendário: ${label}?\n\n` +
+          `Esta ação é PERMANENTE e NÃO pode ser desfeita. ` +
+          `O feriado não voltará por sincronização nem por cadastro automático.`;
         if (!window.confirm(message)) return;
 
-        AppData.removeHoliday(holidayId, { company });
+        const result = AppData.removeCalendarHolidayPermanently(calendarId);
+        if (result?.ok) {
+          window.App?.toast?.(`Feriado "${result.name}" excluído definitivamente.`, "success");
+        }
         AppData.runScaleIntegrations([AppData.monthKey()]);
         refreshPopupCalendarList(root);
         window.App.renderCurrent();
@@ -1681,8 +1717,15 @@
     overlay.querySelectorAll("[data-popup-remove-holiday]").forEach((button) => {
       button.addEventListener("click", () => {
         const holidayId = button.dataset.popupRemoveHoliday;
-        if (!confirmDeleteHoliday(holidayId)) return;
-        AppData.removeHoliday(holidayId, { company: AppData.getPrimaryPageCompany("feriados") });
+        const company = AppData.getPrimaryPageCompany("feriados");
+        const data = AppData.getCompanyData(company);
+        const holiday = (data.holidays || []).find((item) => item.id === holidayId);
+        if (!holiday) return;
+        if (!confirmDeleteHolidayPermanent(holiday)) return;
+        const result = AppData.removeCompanyHolidayPermanently(holidayId, { company });
+        if (result?.ok) {
+          window.App?.toast?.(`Feriado "${result.name}" excluído definitivamente.`, "success");
+        }
         refreshPopupCompanyHolidayList(overlay);
         window.App.renderCurrent();
       });
