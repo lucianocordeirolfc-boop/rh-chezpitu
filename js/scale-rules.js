@@ -338,6 +338,23 @@
 
             // CORREÇÃO: Iterar por CADA feriado no dia (pode haver múltiplos)
             holidaysOnDay.forEach((calendarHoliday) => {
+              // Feriado excluído DEFINITIVAMENTE pelo usuário: o auto-vínculo não
+              // recria nem o feriado nem o vínculo (respeita o tombstone de feriado).
+              if (
+                typeof AppData.isHolidayTombstoned === "function" &&
+                AppData.isHolidayTombstoned(company, date, calendarHoliday.name)
+              ) {
+                return;
+              }
+
+              // Vínculo deste funcionário excluído DEFINITIVAMENTE: não recriar.
+              if (
+                typeof AppData.isWorkedLinkTombstoned === "function" &&
+                AppData.isWorkedLinkTombstoned(company, date, calendarHoliday.name, employee.id)
+              ) {
+                return;
+              }
+
               // Procurar feriado existente por data + nome
               let holidayRecord = data.holidays.find(
                 (item) =>

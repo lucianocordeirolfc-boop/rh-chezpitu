@@ -149,6 +149,24 @@ DEFINITIVA** de um feriado cadastrado, direto pela interface (botão
 Funções: `removeCompanyHolidayPermanently`, `removeCalendarHolidayPermanently`
 (js/data.js). Ver PROJECT_HISTORY.md → 2026-08-06.
 
+### Exclusão de vínculo (definitiva)
+
+"Excluir vínculo" (funcionário × feriado) também é **definitivo**: grava um
+**tombstone de vínculo** (`state.workedLinkTombstones`, chave `data|nome|employeeId`)
+que impede a recriação pelo **auto-vínculo da escala**
+(`syncAutoHolidaysWorkedForMonth`) e pela **união do merge** entre PCs. Revincular
+o mesmo funcionário pela interface limpa o tombstone. Sem isto, funcionários com
+código de escala "trabalhado" (código vazio inclusive) no dia do feriado eram
+re-vinculados automaticamente.
+
+### Transporte dos tombstones no Firebase
+
+`holidayTombstones` e `workedLinkTombstones` trafegam **aninhados** dentro do nó
+`tombstones` do RTDB (`__holidayTombstones` / `__workedLinkTombstones`). Não criar
+novos nós de topo sob `sistemaRH`: o deploy (`--only hosting`) NÃO publica as
+regras do Database, então um nó não previsto nas regras de produção pode ter a
+escrita negada (`permission_denied`).
+
 ## CO e Feriados
 
 O código CO deve se vincular somente a feriados pendentes do próprio funcionário.

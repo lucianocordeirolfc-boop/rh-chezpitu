@@ -649,6 +649,9 @@
       // Exclusões DEFINITIVAS de feriado por conteúdo (data|nome): { escopo: { chave: deletedAt } }.
       // Escopo = empresa (feriado da empresa) ou "__calendar__" (calendário).
       holidayTombstones: {},
+      // Exclusões DEFINITIVAS de VÍNCULO (data|nome|employeeId): { empresa: { chave: deletedAt } }.
+      // Impede que o auto-vínculo da escala / o merge recriem um vínculo removido.
+      workedLinkTombstones: {},
       // Trilha de auditoria de funcionários: quem cadastrou/inativou/reativou/
       // excluiu e quando. Ver recordAudit / getAuditLog.
       auditLog: []
@@ -912,6 +915,68 @@
           !isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, holiday?.date, holiday?.name, targetState)
       );
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TOMBSTONES DE VÍNCULO (workedEmployee) — exclusão DEFINITIVA de um
+  // funcionário em um feriado. Chave por conteúdo: data|nomeNormalizado|employeeId,
+  // escopo por empresa. Sem isto, o auto-vínculo da escala
+  // (syncAutoHolidaysWorkedForMonth) e a UNIÃO do merge recriam o vínculo removido.
+  // ─────────────────────────────────────────────────────────────────────────
+  function workedLinkTombstoneKey(date, name, employeeId) {
+    return `${String(date || "").trim()}|${normalizeSearchText(name)}|${String(employeeId || "").trim()}`;
+  }
+
+  function ensureWorkedLinkTombstoneStore(targetState) {
+    if (!targetState.workedLinkTombstones || typeof targetState.workedLinkTombstones !== "object") {
+      targetState.workedLinkTombstones = {};
+    }
+    return targetState.workedLinkTombstones;
+  }
+
+  function recordWorkedLinkTombstone(company, date, name, employeeId, when = Date.now(), targetState = state) {
+    if (!company || !date || !name || !employeeId) return;
+    const store = ensureWorkedLinkTombstoneStore(targetState);
+    if (!store[company]) store[company] = {};
+    const key = workedLinkTombstoneKey(date, name, employeeId);
+    const prev = Number(store[company][key]) || 0;
+    store[company][key] = Math.max(prev, Number(when) || Date.now());
+  }
+
+  function isWorkedLinkTombstoned(company, date, name, employeeId, targetState = state) {
+    const store = targetState.workedLinkTombstones;
+    return Boolean(store && store[company] && store[company][workedLinkTombstoneKey(date, name, employeeId)]);
+  }
+
+  function clearWorkedLinkTombstone(company, date, name, employeeId, targetState = state) {
+    const store = targetState.workedLinkTombstones;
+    if (!store || !store[company]) return;
+    delete store[company][workedLinkTombstoneKey(date, name, employeeId)];
+  }
+
+  function mergeWorkedLinkTombstoneStores(localStore = {}, remoteStore = {}) {
+    // Mesma forma de holidayTombstones (escopo → chave → deletedAt).
+    return mergeHolidayTombstoneStores(localStore, remoteStore);
+  }
+
+  /**
+   * Remove dos feriados já mesclados os vínculos excluídos definitivamente.
+   * Percorre companies[*].holidays e filtra workedEmployees tombados por
+   * (data|nome|employeeId). Idempotente.
+   */
+  function applyWorkedLinkTombstones(targetState) {
+    const store = ensureWorkedLinkTombstoneStore(targetState);
+    Object.keys(store).forEach((company) => {
+      const block = targetState.companies?.[company];
+      if (!block || !Array.isArray(block.holidays)) return;
+      block.holidays.forEach((holiday) => {
+        if (!Array.isArray(holiday.workedEmployees)) return;
+        holiday.workedEmployees = holiday.workedEmployees.filter(
+          (item) =>
+            !isWorkedLinkTombstoned(company, holiday.date, holiday.name, item?.employeeId, targetState)
+        );
+      });
+    });
   }
 
   function mergeEmployeesById(localArr = [], remoteArr = []) {
@@ -1402,6 +1467,10 @@
     // ressurreição via merge/seed/auto-sync do calendário.
     ensureHolidayTombstoneStore(next);
     applyHolidayTombstones(next);
+    // Exclusões DEFINITIVAS de vínculo (workedEmployee): remove os vínculos tombados
+    // (evita ressurreição via união do merge e via auto-vínculo da escala).
+    ensureWorkedLinkTombstoneStore(next);
+    applyWorkedLinkTombstones(next);
 
     // Proteção dos dados da empresa: restaura do backup se vazio; atualiza backup se válido.
     recoverCompanyInfoForState(next);
@@ -1482,6 +1551,11 @@
       holidayTombstones: mergeHolidayTombstoneStores(
         local.holidayTombstones,
         remote.holidayTombstones
+      ),
+      // União das exclusões definitivas de vínculo.
+      workedLinkTombstones: mergeWorkedLinkTombstoneStores(
+        local.workedLinkTombstones,
+        remote.workedLinkTombstones
       ),
       // União das trilhas de auditoria dos dois lados (sem duplicar por id).
       auditLog: mergeAuditLogs(local.auditLog, remote.auditLog)
@@ -2091,6 +2165,7 @@
       // Exclusões são minúsculas e críticas para o merge: preserva mesmo no lean.
       tombstones: src.tombstones || {},
       holidayTombstones: src.holidayTombstones || {},
+      workedLinkTombstones: src.workedLinkTombstones || {},
       // Auditoria é pequena e não pode ser perdida no cache enxuto.
       auditLog: Array.isArray(src.auditLog) ? src.auditLog : [],
       companies: {} // dados operacionais vêm do Firebase
@@ -3506,6 +3581,10 @@
     const changed = before !== holiday.workedEmployees.length;
     if (!changed) return false;
 
+    // Tombstone de vínculo: impede que o auto-vínculo da escala ou o merge
+    // recriem este vínculo removido (exclusão definitiva do vínculo).
+    recordWorkedLinkTombstone(company, holiday.date, holiday.name, employeeId);
+
     Object.keys(data.manualScale || {}).forEach((key) => {
       if (!key.startsWith(`${employeeId}|`)) return;
       const entry = data.manualScale[key];
@@ -3548,6 +3627,10 @@
 
     const emp = (data.employees || []).find((e) => e.id === employeeId);
     if (!emp) return { ok: false, error: "Funcionário não encontrado nesta empresa." };
+
+    // Revínculo explícito pelo usuário: remove eventual tombstone de vínculo,
+    // para que a inclusão permaneça (não seja apagada por applyWorkedLinkTombstones).
+    clearWorkedLinkTombstone(company, holiday.date, holiday.name, employeeId);
 
     const existing = (holiday.workedEmployees || []).find((item) => item.employeeId === employeeId);
     if (existing) {
@@ -4679,6 +4762,8 @@
     clearHolidayTombstones,
     isHolidayTombstoned,
     applyHolidayTombstones,
+    isWorkedLinkTombstoned,
+    applyWorkedLinkTombstones,
     getActiveHolidays,
     findOrMergeDuplicateHolidays,
     deduplicateAllHolidays,

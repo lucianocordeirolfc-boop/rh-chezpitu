@@ -128,9 +128,13 @@ if (window.firebase && firebase.apps.length) {
       scaleCodeConfig: state.scaleCodeConfig || {},
       valeTransporte: state.valeTransporte || {},
       // Exclusões (tombstones) para propagar remoções entre PCs sem ressuscitar.
-      tombstones: state.tombstones || {},
-      // Exclusões DEFINITIVAS de feriado (por conteúdo) — propagam entre PCs.
-      holidayTombstones: state.holidayTombstones || {},
+      // Os tombstones de feriado e de vínculo trafegam ANINHADOS aqui (nó já
+      // permitido pelas regras do RTDB) — evita depender de regra nova de Database.
+      tombstones: {
+        ...(state.tombstones || {}),
+        __holidayTombstones: state.holidayTombstones || {},
+        __workedLinkTombstones: state.workedLinkTombstones || {}
+      },
       // Trilha de auditoria (cadastro/inativação/reativação/exclusão).
       auditLog: state.auditLog || [],
       contadorLancamentos
@@ -201,6 +205,17 @@ if (window.firebase && firebase.apps.length) {
       vtFromFirebase.deductionDays = { ...data.vtDescontos };
     }
 
+    // Tombstones: separa os por id (employees/vacations/absences) dos aninhados
+    // (feriado e vínculo), que trafegam dentro do nó "tombstones".
+    const rawTombstones = data.tombstones || {};
+    const nestedHolidayTombstones = rawTombstones.__holidayTombstones || null;
+    const nestedWorkedLinkTombstones = rawTombstones.__workedLinkTombstones || null;
+    const idTombstones = {};
+    Object.keys(rawTombstones).forEach((k) => {
+      if (k === "__holidayTombstones" || k === "__workedLinkTombstones") return;
+      idTombstones[k] = rawTombstones[k];
+    });
+
     return {
       pageFilters: data.configuracoes?.pageFilters || {},
       escalaSelectedYearMonth: data.configuracoes?.escalaYearMonth || "",
@@ -213,8 +228,10 @@ if (window.firebase && firebase.apps.length) {
       coverageAlerts: data.coverageAlerts || [],
       coveragePrincipalBindings: data.coveragePrincipalBindings || {},
       scaleCodeConfig: data.scaleCodeConfig || {},
-      tombstones: data.tombstones || {},
-      holidayTombstones: data.holidayTombstones || {},
+      tombstones: idTombstones,
+      // Extraídos do nó tombstones (com fallback ao formato antigo top-level).
+      holidayTombstones: nestedHolidayTombstones || data.holidayTombstones || {},
+      workedLinkTombstones: nestedWorkedLinkTombstones || {},
       auditLog: Array.isArray(data.auditLog) ? data.auditLog : []
     };
   }

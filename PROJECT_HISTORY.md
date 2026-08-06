@@ -7,6 +7,50 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-06 (2) — Vínculo de feriado: exclusão DEFINITIVA (não volta pelo auto-vínculo) + Firebase aninhado
+
+**Sintoma (usuário):** "Sexta-Feira Santa" reaparecia para CINTHIA JOSÉ MARIA
+(Pengold) após "Excluir vínculo".
+
+**Análise / causa raiz (confirmada nos dados de produção):**
+1. **Auto-vínculo da escala.** `syncAutoHolidaysWorkedForMonth` (`scale-rules.js`),
+   chamado por `runScaleIntegrations` em muitas ações/renders, **recria** o
+   vínculo de todo funcionário ATIVO cujo código de escala no dia conta como
+   "trabalhado" (código VAZIO conta como trabalhado — ver 2026-06-15) para cada
+   feriado de calendário no dia. Cinthia (ativa, código vazio em 03/04/2026) era
+   re-vinculada. `removeWorkedEmployeeFromHoliday` só filtrava o array, sem
+   tombstone de sub-registro (limitação já documentada em 2026-06-24).
+2. **União no merge.** `mergeWorkedEmployeeItems` une `workedEmployees` entre PCs,
+   ressuscitando o vínculo a partir de outro PC/Firebase.
+3. **Cascata no feriado.** Como o auto-vínculo também CRIA o feriado da empresa se
+   existir feriado de calendário no dia, o próprio "Semana Santa" voltava.
+4. **Infra (descoberto no diagnóstico):** os `holidayTombstones` (entrada anterior)
+   estavam **vazios no localStorage** — sobrescritos por aba antiga em cache — e
+   as sondagens de escrita no RTDB davam `permission_denied`. Para não depender de
+   regra nova do Database (o deploy NÃO publica `database.rules.json`), os
+   tombstones novos passaram a trafegar **aninhados** no nó `tombstones` já permitido.
+
+**Correção:**
+- `js/data.js` — novo `state.workedLinkTombstones` (chave `data|nome|employeeId`,
+  escopo empresa). `removeWorkedEmployeeFromHoliday` grava o tombstone;
+  `addManualWorkedEmployee` o limpa no revínculo explícito. `applyWorkedLinkTombstones`
+  no `finalizeIncomingState` (cobre load e merge); união em `mergeRemoteIntoLocal`;
+  preservado no `buildLeanPersistedState`. Exporta `isWorkedLinkTombstoned`/
+  `applyWorkedLinkTombstones`.
+- `js/scale-rules.js` — `syncAutoHolidaysWorkedForMonth` passa a **pular**
+  (não recria) quando o feriado está tombado (`isHolidayTombstoned`) ou quando o
+  vínculo daquele funcionário está tombado (`isWorkedLinkTombstoned`).
+- `js/firebase-sync.js` — `holidayTombstones` e `workedLinkTombstones` trafegam
+  **dentro** de `tombstones` (`__holidayTombstones`/`__workedLinkTombstones`),
+  extraídos de volta na leitura; sem novo nó de topo (compatível com regras
+  restritivas do RTDB). Fallback ao formato antigo top-level na leitura.
+- `js/version.js` — APP_VERSION 20260806.02.
+
+**Testes:** `npm test` 47/47, `npm run validate` 25/25,
+`verify-exclusao-feriado-definitiva.mjs` 15/15 e novo
+`verify-vinculo-tombstone.mjs` 16/16 (tombstone de vínculo, não-ressurreição via
+merge e auto-vínculo, limpeza no revínculo e round-trip aninhado do Firebase).
+
 ## 2026-08-06 — Feriados: exclusão DEFINITIVA + limpeza de duplicados
 
 **Objetivo:** permitir excluir permanentemente um feriado cadastrado (com TODOS
