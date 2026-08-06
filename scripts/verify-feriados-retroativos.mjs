@@ -113,19 +113,34 @@ check("Mês sem escala NÃO auto-vincula ninguém", (hAno.workedEmployees || [])
 data.manualScale["e-joao|2026-01-15"] = "FOLGA";
 check("monthHasScaleData = true após lançamento de escala", ScaleRules.monthHasScaleData("2026-01", data) === true);
 
+// Ano Novo 01/01 já está VENCIDO (prazo de 120 dias expirado): a guarda
+// anti-regressão impede o auto-vínculo "nascido Vencido" mesmo com escala.
 ScaleRules.recomputeScaleIntegrations(["2026-01"], { companies: [company] });
 const hAno2 = App.getCompanyData(company).holidays.find((h) => h.id === "h-ano");
-const joaoAuto = (hAno2.workedEmployees || []).find((w) => w.employeeId === "e-joao");
-check("Mês com escala auto-vincula quem trabalhou (01/01 vazio = trabalhado)", Boolean(joaoAuto));
-check("Vínculo criado é automático", joaoAuto && joaoAuto.autoCreated === true);
+check(
+  "Feriado já vencido NÃO recebe auto-vínculo (guarda anti-regressão)",
+  (hAno2.workedEmployees || []).length === 0
+);
+
+// Feriado DENTRO do prazo (data recente): o auto-vínculo continua funcionando.
+const recent = new Date(Date.now() - 15 * 864e5).toISOString().slice(0, 10);
+const recentMonth = recent.slice(0, 7);
+const folgaDay = recent.endsWith("-01") ? `${recentMonth}-02` : `${recentMonth}-01`;
+App.state.calendarHolidays.push({ id: "cal-recent", name: "Feriado Recente", date: recent, companies: ["ambas"] });
+data.manualScale[`e-joao|${folgaDay}`] = "FOLGA"; // garante monthHasScaleData no mês recente
+ScaleRules.recomputeScaleIntegrations([recentMonth], { companies: [company] });
+const hRecent = App.getCompanyData(company).holidays.find((h) => h.date === recent && h.name === "Feriado Recente");
+const joaoAuto = hRecent && (hRecent.workedEmployees || []).find((w) => w.employeeId === "e-joao");
+check("Feriado dentro do prazo auto-vincula quem trabalhou", Boolean(joaoAuto));
+check("Vínculo criado é automático", Boolean(joaoAuto && joaoAuto.autoCreated === true));
 
 // --- 3. addManualWorkedEmployee converte automático → Manual ------------------
 console.log("\n[Conversão automático → Manual]");
-const res = App.addManualWorkedEmployee("h-ano", "e-joao", { company });
+const res = App.addManualWorkedEmployee(hRecent.id, "e-joao", { company });
 check("Vínculo manual sobre automático retorna ok", res.ok === true);
 check("Resultado sinaliza conversão (converted=true)", res.converted === true);
 check("Resultado traz mensagem informativa", typeof res.message === "string" && res.message.length > 0);
-const joaoNow = App.getCompanyData(company).holidays.find((h) => h.id === "h-ano").workedEmployees.filter((w) => w.employeeId === "e-joao");
+const joaoNow = App.getCompanyData(company).holidays.find((h) => h.id === hRecent.id).workedEmployees.filter((w) => w.employeeId === "e-joao");
 check("Não duplica vínculo (continua 1)", joaoNow.length === 1);
 check("Origem convertida para Manual", joaoNow[0].origin === "Manual");
 check("autoCreated zerado", joaoNow[0].autoCreated === false);

@@ -336,6 +336,17 @@
             const holidaysOnDay = getCalendarHolidaysOnDate(date, company, state);
             if (!holidaysOnDay.length) return;
 
+            // GUARDA ANTI-REGRESSÃO: nunca CRIAR um auto-vínculo que já nasceria
+            // "Vencido" (feriado cujo prazo de compensação de 120 dias já passou).
+            // Um vínculo automático overdue é apenas ruído — recomputar meses
+            // antigos não deve materializar dezenas de pendências vencidas. Casos
+            // reais de trabalho em feriado já vencido devem ser lançados MANUALMENTE
+            // (o cadastro manual não passa por aqui). Não altera vínculos existentes.
+            if (typeof AppData.getHolidayCompensationDueDate === "function") {
+              const dueDate = AppData.getHolidayCompensationDueDate(date);
+              if (dueDate && dueDate < AppData.todayISO()) return;
+            }
+
             // CORREÇÃO: Iterar por CADA feriado no dia (pode haver múltiplos)
             holidaysOnDay.forEach((calendarHoliday) => {
               // Feriado excluído DEFINITIVAMENTE pelo usuário: o auto-vínculo não

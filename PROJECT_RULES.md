@@ -167,6 +167,34 @@ novos nós de topo sob `sistemaRH`: o deploy (`--only hosting`) NÃO publica as
 regras do Database, então um nó não previsto nas regras de produção pode ter a
 escrita negada (`permission_denied`).
 
+## Auto-vínculo da escala (guarda anti-regressão)
+
+`syncAutoHolidaysWorkedForMonth` cria vínculos automáticos de feriado para
+funcionários ativos com código de escala "trabalhado" no dia (código vazio conta
+como trabalhado). Regra fixa:
+
+- **Nunca CRIAR** auto-vínculo para feriado cujo **prazo de compensação (120 dias)
+  já passou** (nasceria Vencido). Auto-vínculo overdue é ruído e não é compensável.
+- A guarda **só bloqueia criação** — nunca apaga vínculo já existente.
+- Casos reais de trabalho em feriado já vencido entram por **cadastro manual**
+  (não passa pela guarda).
+
+Função: `getHolidayCompensationDueDate` em `js/scale-rules.js`. Teste:
+`scripts/verify-auto-vinculo-vencido-guard.mjs`. Ver PROJECT_HISTORY.md → 2026-08-06 (3).
+
+## Salvaguarda ao validar em produção (processo do agente)
+
+Ao validar uma correção/melhoria ao vivo em produção:
+
+- A validação deve ser **somente leitura** sempre que possível.
+- **Não executar** rotinas que gravam na base como parte do teste — em especial
+  `runScaleIntegrations`/recompute de escala, que dispara o auto-vínculo e pode
+  **materializar dados** (ex.: pendências Vencidas) que não existiam.
+- Para exercitar lógica que grava, usar **fixtures**/`scripts/verify-*.mjs`
+  (sandbox), nunca a base de produção.
+- Rodar `npm test` + `npm run validate` + os `scripts/verify-*` relevantes antes
+  de qualquer deploy.
+
 ## CO e Feriados
 
 O código CO deve se vincular somente a feriados pendentes do próprio funcionário.

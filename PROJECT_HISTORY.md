@@ -7,6 +7,43 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-06 (3) — Auto-vínculo: guarda anti-regressão (não criar vínculo "nascido Vencido")
+
+**Sintoma (usuário):** apareceram vínculos automáticos **Vencidos** de "Sexta-Feira
+Santa" e "Carnaval 2026" que não existiam antes.
+
+**Causa raiz (confirmada e assumida):** durante a validação ao vivo da entrega
+anterior, foi executado `runScaleIntegrations` (recompute da escala) contra a base
+de produção. Isso disparou `syncAutoHolidaysWorkedForMonth`, que **cria** vínculo
+automático para todo funcionário ativo cujo código de escala no dia conta como
+"trabalhado" — e **código vazio conta como trabalhado**. Como os feriados já
+estavam com o prazo de 120 dias expirado, os vínculos nasceram **Vencidos** (10
+casos, todos com código vazio/FOLGA — nenhum dia realmente trabalhado).
+
+**Ação corretiva (dados):** removidos os **10 vínculos Vencidos** (auto+vazio e 2
+manuais com FOLGA) de Carnaval 2026 e Sexta-Feira Santa, via
+`removeWorkedEmployeeFromHoliday` (grava tombstone de vínculo → definitivo).
+Os **47 vínculos Compensados/Agendados** (legítimos) foram **preservados**.
+
+**Mecanismo (autorizado pelo usuário) — `js/scale-rules.js`:**
+- `syncAutoHolidaysWorkedForMonth` passa a **NÃO CRIAR** auto-vínculo para feriado
+  cujo prazo de compensação (`getHolidayCompensationDueDate`) já passou de hoje —
+  um vínculo automático "nascido Vencido" é apenas ruído e não é compensável.
+  A guarda **só bloqueia CRIAÇÃO**; nunca remove vínculo já existente. Casos reais
+  de trabalho em feriado vencido continuam possíveis via **cadastro manual**
+  (`addManualWorkedEmployee` não passa pela guarda).
+- Consequência: recomputar meses antigos não materializa mais pendências vencidas.
+
+**Salvaguarda de processo (PROJECT_RULES.md):** validação ao vivo em produção deve
+ser **somente leitura**; não executar recompute/integração de escala que grave na
+base de produção como parte de teste — usar fixtures/`scripts/verify-*`.
+
+**Testes:** `npm test` 47/47, `npm run validate` 25/25;
+`verify-feriados-retroativos.mjs` atualizado 25/25 (agora afirma que feriado
+vencido não auto-vincula e que feriado dentro do prazo ainda auto-vincula);
+novo `verify-auto-vinculo-vencido-guard.mjs` 4/4;
+`verify-exclusao-feriado-definitiva` 15/15 e `verify-vinculo-tombstone` 16/16 sem regressão.
+
 ## 2026-08-06 (2) — Vínculo de feriado: exclusão DEFINITIVA (não volta pelo auto-vínculo) + Firebase aninhado
 
 **Sintoma (usuário):** "Sexta-Feira Santa" reaparecia para CINTHIA JOSÉ MARIA
