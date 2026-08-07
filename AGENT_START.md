@@ -9,6 +9,12 @@ Antes de executar qualquer tarefa neste projeto, leia obrigatoriamente:
 5. BUGS_CONHECIDOS.md
 6. .cursor/rules/karpathy-general.mdc
 
+REGRA FIXA acima de qualquer tarefa: melhoria, correção ou **teste** NUNCA
+altera dado já registrado (feriados, escala, VT, ausências, lançamentos do
+Contador, cadastro). Testar sempre em fixtures/`scripts/verify-*.mjs`; validação
+em produção é somente leitura. Ver PROJECT_RULES.md → "Imutabilidade dos dados
+já registrados".
+
 Fluxo obrigatório:
 
 1. Entender o problema.

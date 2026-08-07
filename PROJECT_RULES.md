@@ -1,5 +1,48 @@
 # PROJECT_RULES.md — Regras de Negócio RH Chez Pitu
 
+## Imutabilidade dos dados já registrados (REGRA FIXA — TODOS OS MÓDULOS)
+
+**Nenhuma melhoria, correção, refatoração, migração, homologação ou TESTE pode
+alterar, apagar, sobrescrever ou "corrigir" um dado já registrado pelo usuário.**
+
+Vale para **todos** os módulos, sem exceção:
+
+| Módulo | Dados protegidos |
+|---|---|
+| Controle de Feriados | feriados lançados, vínculos funcionário × feriado, status (Pendente/Agendado/Compensado/Vencido), compensações, tombstones |
+| Escala de Folga | códigos lançados por dia (CO, TR, TM, MR, FOLGA, vazio), meses fechados, meses passados |
+| Vale-transporte | recibos gerados, valores, descontos, abatimentos já apurados |
+| Ausências / Férias | períodos lançados, atestados, licenças, afastamentos |
+| Informações Contador | lançamentos de horas (Hora Extra, Ad. Noturno), resumos e PDFs já emitidos |
+| Cadastro de Funcionários | funcionários, `employeeId`, `createdAt`, `deactivatedAt`, `auditLog` |
+
+Regras operacionais derivadas:
+
+1. **Teste nunca escreve na base real.** Homologação de melhoria/correção usa
+   **fixtures** e `scripts/verify-*.mjs` (sandbox em memória), nunca o
+   `localStorage` de produção nem o Firebase de produção.
+2. **Validação ao vivo em produção é SOMENTE LEITURA.** Abrir tela, conferir,
+   fechar. Proibido acionar, como parte do teste, rotinas que gravam — em
+   especial `runScaleIntegrations` / recompute de escala, `syncAutoHolidays*`,
+   seeds e migrações (foi exatamente isso que materializou 10 vínculos Vencidos
+   em 2026-08-06; ver `PROJECT_HISTORY.md`).
+3. **Mudança de formato/validação vale só para o futuro.** Novos formatos (ex.:
+   máscara `HHH:MM` do Contador) aplicam-se a novos lançamentos e a edições
+   feitas pelo próprio usuário; valores antigos continuam legíveis e válidos.
+4. **Rotina automática não descarta dado.** Nenhum job, sync, seed, dedup ou
+   migração pode remover registro sem ação direta do usuário na interface.
+5. **Merge sempre aditivo.** Firebase × localStorage fazem união segura; nunca
+   sobrescrever o remoto com base filtrada ou parcial.
+6. **Se um teste precisar de dado, ele cria o seu próprio** — nunca reaproveita
+   nem muta registro existente.
+
+**Exceção única:** exclusão/edição explícita feita pelo próprio usuário na
+interface (botões de editar/excluir), com confirmação. Correção de dado em
+produção pelo agente exige **autorização explícita do usuário caso a caso**, com
+o que será alterado descrito antes da execução.
+
+Em caso de dúvida: **não gravar** e perguntar.
+
 ## Padrão visual / Cores (REGRA FIXA)
 
 O sistema segue o **padrão de cores oficial do Grupo Chez Pitu**: **navy + pêssego**.
@@ -184,6 +227,8 @@ Função: `getHolidayCompensationDueDate` em `js/scale-rules.js`. Teste:
 
 ## Salvaguarda ao validar em produção (processo do agente)
 
+> Regra-mãe: **"Imutabilidade dos dados já registrados"** (topo deste arquivo).
+
 Ao validar uma correção/melhoria ao vivo em produção:
 
 - A validação deve ser **somente leitura** sempre que possível.
@@ -258,6 +303,9 @@ Campos de horas (Hora Extra e Ad. Noturno) usam digitação livre no formato
 (`input type="time"`), que limitava a 23:59.
 
 ## Proteção de lançamentos existentes (REGRA FIXA)
+
+> Detalhamento por módulo e regras de teste: ver
+> **"Imutabilidade dos dados já registrados"** no topo deste arquivo.
 
 Qualquer alteração de melhoria, refatoração, migração ou correção:
 

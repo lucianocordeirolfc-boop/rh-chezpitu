@@ -9,35 +9,45 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260703.01 (Exclusão 24h + auditoria + botão Inativar/Reativar no Cadastro)
-**Data:** 2026-07-03
+**Versão:** 20260806.03 (Feriados: exclusão definitiva de feriado e de vínculo +
+guarda anti-regressão do auto-vínculo)
+**Data:** 2026-08-06
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
 
-Data: 03/07/2026
-Versão: 20260703.01 (Firebase Hosting — chez-pitu-rh)
+Data: 06/08/2026
+Versão: 20260806.03 (Firebase Hosting — chez-pitu-rh)
+Commits: `954f7cd` + `cfab872` · `d663d67` + `73fb812` · `aade7e6` + `e3dd4f7`
 
-Inclui: **exclusão de funcionário permitida só nas primeiras 24h após o cadastro**
-(depois disso apenas inativar — `createdAt` imutável + `canDeleteEmployee`, bloqueio
-também em `removeEmployee`); **trilha de auditoria** (`auditLog`) registrando quem
-cadastrou/inativou/reativou/excluiu e quando, com modal "Auditoria" no rodapé da
-lista; **botão Inativar/Reativar** direto na linha da lista (`setEmployeeStatus`,
-preserva os demais campos e ajusta `deactivatedAt`). Auditoria persiste local
-(inclusive cache lean) e no Firebase, com merge por id entre PCs.
+Inclui: **exclusão DEFINITIVA de feriado** (tombstone por conteúdo `data|nome`,
+remove duplicatas e bloqueia ressurreição por merge, calendário e seeds 2026);
+**exclusão DEFINITIVA de vínculo** funcionário × feriado (`workedLinkTombstones`,
+chave `data|nome|employeeId`), impedindo recriação pelo auto-vínculo da escala e
+pela união do merge entre PCs — tombstones trafegam **aninhados** no nó
+`tombstones` do RTDB (sem novo nó de topo, evitando `permission_denied`);
+**guarda anti-regressão** em `syncAutoHolidaysWorkedForMonth`, que deixa de criar
+auto-vínculo para feriado com prazo de 120 dias já expirado (não nasce Vencido).
 
-**Cache-busting:** todos os `?v=` do index.html em `20260703.01` — usuários
+**Cache-busting:** todos os `?v=` do index.html em `20260806.03` — usuários
 recebem a nova versão automaticamente no próximo carregamento (Ctrl+F5 força).
+
+## Regra fixa vigente
+
+⚠️ **Imutabilidade dos dados já registrados** — melhoria, correção ou teste nunca
+altera feriados lançados, escala, VT, ausências, lançamentos do Contador ou
+cadastro. Teste em fixtures/`scripts/verify-*.mjs`; validação em produção é
+somente leitura. Ver `PROJECT_RULES.md`.
 
 **Próximo deploy recomendado:** conforme novas demandas.
 
 ## Módulos
 
-Escala de Folga: OK
+Escala de Folga: OK (+ guarda anti auto-vínculo vencido)
 Vale Transporte: OK
 Ausências: OK
-Controle de Feriados: OK (+ soft delete)
-Cadastro: OK (+ confirmação inativação)
+Controle de Feriados: OK (+ exclusão definitiva de feriado e de vínculo)
+Cadastro: OK (+ confirmação inativação, exclusão 24h, auditoria)
 Informações Contador: OK
 Dashboard: OK
 
@@ -50,7 +60,11 @@ Dashboard: OK
 **Offline Recovery Tests:**
 - npm run test:offline: 15/15 ✓
 
-**Homologação da frente atual (não versionada):**
+**Homologação da frente atual (`scripts/verify-*.mjs`, sandbox com fixtures):**
+- verify-exclusao-feriado-definitiva.mjs: 15/15 ✓
+- verify-vinculo-tombstone.mjs: 16/16 ✓
+- verify-auto-vinculo-vencido-guard.mjs: 4/4 ✓
+- verify-feriados-retroativos.mjs: 25/25 ✓
 - scripts/verify-inativo-escala.mjs: 12/12 ✓ (deactivatedAt + visibilidade na Escala)
 
 **Total:** 245/245 testes passando ✅

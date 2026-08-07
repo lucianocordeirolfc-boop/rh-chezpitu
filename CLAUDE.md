@@ -42,6 +42,21 @@ Sempre usar employeeId como vínculo principal.
 
 Nome do funcionário só pode ser fallback para migração de dados antigos.
 
+## Imutabilidade dos dados registrados (REGRA FIXA)
+
+Melhorias, correções, refatorações e **testes** NUNCA podem alterar dados já
+registrados pelo usuário: feriados lançados e seus vínculos, escala, recibos de
+vale-transporte, ausências/férias, lançamentos do Contador e cadastro.
+
+- Teste e homologação usam **fixtures** / `scripts/verify-*.mjs`, nunca a base
+  de produção (localStorage real ou Firebase).
+- Validação ao vivo em produção é **somente leitura**: não acionar recompute de
+  escala (`runScaleIntegrations`), seeds, dedup ou migrações como parte do teste.
+- Corrigir dado em produção só com **autorização explícita do usuário**,
+  descrevendo antes o que será alterado.
+
+Detalhamento completo: PROJECT_RULES.md → "Imutabilidade dos dados já registrados".
+
 ## Persistência
 
 Nunca apagar dados existentes.

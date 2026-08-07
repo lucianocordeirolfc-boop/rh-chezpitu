@@ -7,6 +7,51 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-07 — REGRA FIXA: imutabilidade dos dados já registrados (melhoria/teste nunca altera dado)
+
+**Origem:** pedido do usuário após o incidente de 2026-08-06 (3), em que a
+validação ao vivo de uma correção gravou na base de produção e materializou 10
+vínculos de feriado Vencidos que não existiam. A salvaguarda criada naquela
+entrega cobria apenas o caso da escala; o usuário pediu que a regra fosse
+**geral e explícita para todos os módulos**.
+
+**O que foi feito (somente documentação — nenhum código alterado):**
+
+- `PROJECT_RULES.md` — nova seção no **topo** do arquivo: *"Imutabilidade dos
+  dados já registrados (REGRA FIXA — TODOS OS MÓDULOS)"*, com tabela dos dados
+  protegidos por módulo (Feriados e vínculos · Escala · Vale-transporte ·
+  Ausências/Férias · Contador · Cadastro) e 6 regras operacionais:
+  1. teste nunca escreve na base real (usar fixtures / `scripts/verify-*.mjs`);
+  2. validação ao vivo em produção é **somente leitura** — proibido acionar
+     `runScaleIntegrations`, `syncAutoHolidays*`, seeds, dedup ou migrações;
+  3. mudança de formato/validação vale só para lançamentos novos;
+  4. rotina automática não descarta dado sem ação do usuário;
+  5. merge sempre aditivo;
+  6. teste que precisa de dado cria o seu próprio.
+  Exceção única: exclusão/edição explícita do usuário na interface. Correção de
+  dado em produção pelo agente exige **autorização caso a caso**, descrevendo
+  antes o que será alterado. As duas seções já existentes ("Proteção de
+  lançamentos existentes" e "Salvaguarda ao validar em produção") foram
+  **mantidas** e passaram a apontar para a regra-mãe.
+- `CLAUDE.md` — seção "Imutabilidade dos dados registrados (REGRA FIXA)" antes
+  de "Persistência", para o agente ler já na abertura do projeto.
+- `AGENT_START.md` — aviso da regra antes do fluxo obrigatório.
+- `TEST_CHECKLIST.md` — bloco de alerta no topo: nenhum item do checklist
+  autoriza gravar/corrigir/apagar dado real; em produção, testar somente leitura.
+
+**Correção de defasagem documental (divergência detectada por `/recuperar-projeto`):**
+`PROJECT_STATUS.md`, `CHANGELOG.md` e `.claude/project-state.md` ainda apontavam
+a versão `20260703.01` (03/07), ignorando as entregas de 2026-07-22 e as três de
+2026-08-06 já em produção. Todos sincronizados para **`20260806.03`**, com os
+commits reais (`954f7cd`+`cfab872`, `d663d67`+`73fb812`, `aade7e6`+`e3dd4f7`).
+
+**Deploy:** não se aplica — `*.md` está no `ignore` do `firebase.json`, portanto
+documentação não é publicada no Hosting e o código em produção permanece o de
+`20260806.03`.
+
+**Testes:** `npm test` 47/47 e `npm run validate` 25/25 (regressão — confirmam
+que a alteração de documentação não tocou o comportamento do sistema).
+
 ## 2026-08-06 (3) — Auto-vínculo: guarda anti-regressão (não criar vínculo "nascido Vencido")
 
 **Sintoma (usuário):** apareceram vínculos automáticos **Vencidos** de "Sexta-Feira

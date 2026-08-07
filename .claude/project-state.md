@@ -8,13 +8,51 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260703.01` (exibida como `v2026.07.03.01`) — fonte: `js/version.js`
-- **Branch atual:** `main`
-- **Último commit:** `a00e9e4` — chore: carimbo de build (deploy fix mascara HHH:MM, commit 3b9b996)
-- **Status geral:** 🟢 EM PRODUÇÃO — frente "máscara de horas HHH:MM no Contador"
-  commitada e deployada (`chez-pitu-rh.web.app`). Working tree limpo.
+- **Versão atual:** `20260806.03` (exibida como `v2026.08.06.03`) — fonte: `js/version.js`
+- **Branch atual:** `main` (sincronizada com `origin/main`)
+- **Último commit:** `e3dd4f7` — chore: carimbo de build (deploy guarda auto-vinculo Vencido, commit aade7e6)
+- **Status geral:** 🟢 EM PRODUÇÃO — frente "Feriados: exclusão definitiva +
+  guarda do auto-vínculo" commitada, pushada e deployada (`chez-pitu-rh.web.app`).
+
+## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
+
+**Melhoria, correção ou TESTE nunca altera dado já registrado** (feriados
+lançados e vínculos, escala, recibos de VT, ausências/férias, lançamentos do
+Contador, cadastro). Homologação usa **fixtures** e `scripts/verify-*.mjs`;
+validação em produção é **somente leitura** (proibido acionar
+`runScaleIntegrations`, `syncAutoHolidays*`, seeds, dedup ou migrações como
+parte do teste). Corrigir dado real exige **autorização caso a caso**.
+Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
+(replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-08-06 — Feriados / Vínculos (já em produção)
+
+- ✅ **Exclusão DEFINITIVA de feriado** (`20260806.01`, commits `954f7cd` +
+  `cfab872`) — tombstone por **conteúdo** (`data|nomeNormalizado`, escopo empresa
+  ou `__calendar__`), pois duplicados têm ids distintos.
+  `removeCompanyHolidayPermanently` / `removeCalendarHolidayPermanently` apagam
+  todos os registros de mesmo nome+data com seus vínculos; `syncCompanyHolidays
+  FromCalendarEntry` e os seeds 2026 pulam os tombados; recadastro explícito pelo
+  usuário limpa o tombstone. Substitui o soft delete que acumulava duplicados.
+- ✅ **Exclusão DEFINITIVA de vínculo** (`20260806.02`, commits `d663d67` +
+  `73fb812`) — `state.workedLinkTombstones` (`data|nome|employeeId`) impede a
+  recriação pelo **auto-vínculo da escala** e pela **união do merge** entre PCs
+  (sintoma: "Sexta-Feira Santa" voltava para CINTHIA JOSÉ MARIA/Pengold).
+  Tombstones trafegam **aninhados** no nó `tombstones` do RTDB
+  (`__holidayTombstones` / `__workedLinkTombstones`) — o deploy não publica
+  `database.rules.json`, e nó de topo novo daria `permission_denied`.
+- ✅ **Guarda anti-regressão do auto-vínculo** (`20260806.03`, commits `aade7e6` +
+  `e3dd4f7`) — `syncAutoHolidaysWorkedForMonth` não CRIA auto-vínculo para feriado
+  com prazo de 120 dias já expirado (não nasce Vencido). Só bloqueia criação;
+  nunca remove vínculo existente; trabalho real em feriado vencido entra por
+  cadastro manual. Corrigidos nos dados os 10 vínculos Vencidos indevidos
+  (Carnaval 2026 / Sexta-Feira Santa, todos com código vazio ou FOLGA); os 47
+  Compensados/Agendados legítimos preservados.
+- Testes: `npm test` 47/47 · `validate` 25/25 · `verify-exclusao-feriado-definitiva`
+  15/15 · `verify-vinculo-tombstone` 16/16 · `verify-auto-vinculo-vencido-guard` 4/4 ·
+  `verify-feriados-retroativos` 25/25. **Em produção.**
 
 ### Frente 2026-07-22 (já em produção)
 
@@ -122,27 +160,58 @@
 
 ## Pendências de deploy
 
-- ✅ **Fix máscara HHH:MM commitado e deployado em produção** (`chez-pitu-rh.web.app`),
-  commits `3b9b996` + `a00e9e4`. Deploy Firebase Hosting concluído.
-- ⚠️ Validação visual em produção pelo usuário: aba Informações para Contador →
-  Novo Lançamento → campo Ad. Noturno → digitar `17845` deve exibir `178:45`
-  (Ctrl+F5 se estiver com build antiga em cache).
-- ✅ **Frente anterior (`20260703.01`) — commitado, pushado (`main`) e deployado.**
-- ⚠️ Validação visual em produção pelo usuário (botões Inativar/Reativar, modal
-  Auditoria, bloqueio de exclusão após 24h).
+- ✅ **Frente de Feriados (`20260806.01/.02/.03`) — commitada, pushada (`main`) e
+  deployada** em `chez-pitu-rh.web.app`. Nada pendente de publicar no código.
+- ℹ️ **Documentação não exige deploy:** `*.md` está no `ignore` do `firebase.json`
+  (não é servido pelo Hosting).
+- ⚠️ Validação visual em produção pelo usuário (Ctrl+F5 para `?v=20260806.03`),
+  **somente leitura**: (a) feriado duplicado excluído não volta após recarregar;
+  (b) vínculo excluído (CINTHIA × Sexta-Feira Santa) não volta ao navegar pela
+  Escala; (c) abrir meses antigos da Escala não gera novos vínculos Vencidos.
 - ⚠️ Infra: garantir que a regra de leitura `logos/{cnpj}/...` permaneça publicada
   no Firebase Storage (Console → Storage → Regras).
 
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo — versionados)
-?? scripts/verify-*.mjs (homologação — não versionar)
+ M .claude/project-state.md   (checkpoint 2026-08-07)
+ M AGENT_START.md             (aviso da regra fixa)
+ M CHANGELOG.md               (4 entregas que faltavam: 07-22, 08-06 x3, 08-07)
+ M CLAUDE.md                  (seção Imutabilidade dos dados registrados)
+ M PROJECT_HISTORY.md         (entrada 2026-08-07)
+ M PROJECT_RULES.md           (REGRA FIXA global + ponteiros)
+ M PROJECT_STATUS.md          (sincronizado 20260703.01 -> 20260806.03)
+ M TEST_CHECKLIST.md          (alerta: teste não altera dado real)
 ```
+> Somente documentação — nenhum arquivo de código alterado.
 
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT
+- **Data:** 2026-08-07
+- **Versão:** 20260806.03 (inalterada — entrega de documentação)
+- **Branch:** main
+- **Commits:** (pendente de autorização) — nenhum código alterado
+- **Arquivos alterados:** PROJECT_RULES.md · CLAUDE.md · AGENT_START.md ·
+  TEST_CHECKLIST.md · PROJECT_STATUS.md · CHANGELOG.md · PROJECT_HISTORY.md ·
+  .claude/project-state.md
+- **Resumo:** Formalizada a **REGRA FIXA de imutabilidade dos dados já
+  registrados**, válida para TODOS os módulos: melhoria, correção ou **teste**
+  nunca altera feriados lançados e vínculos, escala, recibos de VT,
+  ausências/férias, lançamentos do Contador ou cadastro. Homologação em
+  fixtures/`scripts/verify-*.mjs`; validação em produção somente leitura;
+  correção de dado real só com autorização caso a caso. Regra publicada em
+  PROJECT_RULES.md (topo) e replicada em CLAUDE.md, AGENT_START.md e
+  TEST_CHECKLIST.md. Corrigida também a **defasagem documental** detectada pelo
+  `/recuperar-projeto`: PROJECT_STATUS.md, CHANGELOG.md e este arquivo
+  apontavam `20260703.01` e ignoravam as entregas de 2026-07-22 e 2026-08-06 já
+  em produção — todos sincronizados para `20260806.03`.
+- **Testes:** npm test 47/47, npm run validate 25/25 (regressão — sem impacto).
+- **Próximo passo:** autorizar commit (docs). Deploy não se aplica (`*.md` no
+  ignore do firebase.json). Depois, validação visual em produção **somente
+  leitura** da frente de Feriados.
 
 ### CHECKPOINT
 - **Data:** 2026-07-22

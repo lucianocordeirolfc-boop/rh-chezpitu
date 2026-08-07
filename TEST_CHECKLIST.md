@@ -2,6 +2,15 @@
 
 Use este checklist antes de qualquer commit ou deploy.
 
+> ⚠️ **REGRA FIXA — o teste não pode alterar dado registrado.**
+> Nenhum item deste checklist autoriza gravar, corrigir ou apagar dados reais
+> (feriados lançados, escala, recibos de VT, ausências, lançamentos do Contador,
+> cadastro). Em produção, testar **somente leitura**: abrir a tela, conferir,
+> sair — sem acionar recompute de escala, seeds, dedup ou migrações.
+> Para exercitar lógica que grava, usar `scripts/verify-*.mjs` (fixtures).
+> Se o teste precisar de dado, criar um registro próprio e removê-lo depois.
+> Ver PROJECT_RULES.md → "Imutabilidade dos dados já registrados".
+
 ## Escala de Folga
 
 - [ ] Trocar empresa Chez Pitu para Pengold.
