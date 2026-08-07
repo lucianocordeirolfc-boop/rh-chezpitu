@@ -174,16 +174,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Arquivos modificados não commitados (snapshot)
 
 ```
- M .claude/project-state.md   (checkpoint 2026-08-07)
- M AGENT_START.md             (aviso da regra fixa)
- M CHANGELOG.md               (4 entregas que faltavam: 07-22, 08-06 x3, 08-07)
- M CLAUDE.md                  (seção Imutabilidade dos dados registrados)
- M PROJECT_HISTORY.md         (entrada 2026-08-07)
- M PROJECT_RULES.md           (REGRA FIXA global + ponteiros)
- M PROJECT_STATUS.md          (sincronizado 20260703.01 -> 20260806.03)
- M TEST_CHECKLIST.md          (alerta: teste não altera dado real)
+(working tree limpo — commit 965f3b6 pushado em main)
 ```
-> Somente documentação — nenhum arquivo de código alterado.
+> Última entrega (`965f3b6`) foi somente documentação — nenhum arquivo de
+> código alterado, portanto sem deploy (`*.md` no ignore do `firebase.json`).
 
 ---
 
@@ -193,7 +187,7 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 - **Data:** 2026-08-07
 - **Versão:** 20260806.03 (inalterada — entrega de documentação)
 - **Branch:** main
-- **Commits:** (pendente de autorização) — nenhum código alterado
+- **Commits:** `965f3b6` (docs) — nenhum código alterado; push em `main` concluído
 - **Arquivos alterados:** PROJECT_RULES.md · CLAUDE.md · AGENT_START.md ·
   TEST_CHECKLIST.md · PROJECT_STATUS.md · CHANGELOG.md · PROJECT_HISTORY.md ·
   .claude/project-state.md
