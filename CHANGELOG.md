@@ -1,3 +1,29 @@
+2026-08-10 (3) — verify-print-escala: 8,7s → 2,7s (mesmas 55 asserções, mesmas medições)
+- [MELHORIA] CSS do projeto (style.css + print.css + escala-print.css) passa a ser lido UMA vez e embutido no HTML de cada caso, no lugar de três <link href="file://">. Com isso o page.goto saiu de ~900ms para ~80ms por caso: não havia mais requisição para o waitUntil "networkidle0" esperar (500ms de ociosidade por navegação). Nenhum dos três CSS usa url(), então não há caminho relativo a resolver — a cascata é idêntica
+- [MELHORIA] waitUntil de "networkidle0" para "load" (sem requisições, "load" já garante o CSS aplicado)
+- [MELHORIA] Os 5 casos passam a rodar em PARALELO, cada um em sua própria aba, já que o custo dominante virou o page.pdf() do Chrome (~0,5s cada, ~2,6s em série). A saída é bufferizada por caso e impressa na ordem declarada, então o log continua agrupado e determinístico
+- [VERIFICAÇÃO] Saída de geometria comparada com a versão anterior linha a linha (escala de auto-fit, altura do conteúdo, páginas do PDF, rodapé, razão nome/dia, preenchimento da grade): idêntica. 55/55 asserções, estável em 3 execuções seguidas
+- npm run validate total: ~10,6s → ~4,9s
+- Arquivos: scripts/verify-print-escala.mjs
+
+2026-08-10 (2) — Suíte de testes: fixtures datadas corrigidas e npm run validate roda tudo
+- [CORREÇÃO] run-functional-validation.mjs: fixture "Feriado Teste" tinha data FIXA (2026-04-10); ao vencer o prazo de compensação de 120 dias em 08/08/2026, o vínculo virou "Vencido" e derrubou duas asserções sem nenhuma mudança de código ("Status pendente detectado corretamente" e "Dashboard stats feriados: pendentes ≥ 1"). Data passou a ser relativa a hoje (hoje-30); o CO de 14/05/2026 usado pelo VT foi movido para um feriado próprio já compensado (status que não envelhece)
+- [CORREÇÃO] verify-tombstones-sync.mjs: fixture criada antes da regra das 24h de exclusão de funcionário; sem createdAt, removeEmployee lançava exceção e o script morria no meio. Fixture ganhou createdAt recente (o teste é de cascata de tombstones, não da janela de exclusão)
+- [NOVO] scripts/run-validate.mjs: runner que executa TODAS as suítes mesmo quando uma falha, imprime resumo com tempo por suíte e só então sai com código 1. Antes era uma cadeia com && — a primeira falha escondia o estado das demais
+- [NOVO] npm run validate passou de 5 para 17 suítes (todas as scripts/verify-*.mjs entraram); aceita filtro por termo (ex.: npm run validate feriado) e avisa quando existe verify-*.mjs fora da lista
+- Arquivos: scripts/run-validate.mjs (novo), scripts/run-functional-validation.mjs, scripts/verify-tombstones-sync.mjs, package.json
+- npm test 47/47; npm run validate 17/17 suítes aprovadas
+
+2026-08-10 — Controle de Feriados: lista completa (todos os anos) + editar/excluir por identidade
+- [CORREÇÃO] Popup "Gerenciar Feriados" listava só state.calendarHolidays da empresa ativa; feriados que existiam apenas no bloco da empresa (companies[x].holidays) ficavam invisíveis — sintoma relatado: feriados de 2027 cadastrados não apareciam na lista
+- [CORREÇÃO] mergeCalendarHolidaysPreservingSeeds fazia "remoto vence": qualquer feriado de calendário criado localmente e ainda não presente no remoto era DESCARTADO na primeira sincronização (perda silenciosa). Agora é UNIÃO por conteúdo (data + nome normalizado), unindo as empresas; exclusões continuam garantidas pelos tombstones
+- [NOVO] AppData.listRegisteredHolidays(empresa) — visão unificada calendário + bloco da empresa, sem duplicar, sem recorte de ano, com contagem de vínculos
+- [NOVO] Filtro de ano na lista do popup ("Todos os anos" por padrão) e coluna "Vínculos"
+- [NOVO] AppData.updateHolidayEverywhere / removeHolidayEverywhere — editar e excluir pela identidade do feriado (data + nome), atingindo calendário + empresa; exclusão leva TODOS os vínculos e grava tombstones de feriado e de vínculo (não volta por merge, seed ou auto-sync); o CO já lançado na escala é preservado, só perde a referência
+- [SEGURANÇA DE DADOS] Escopo por empresa: editar/excluir age só na empresa da aba ativa; entrada de calendário compartilhada ("ambas"/seed) é dividida/reduzida, nunca apagando o feriado nem os vínculos da outra empresa
+- Arquivos: js/data.js, js/feriados.js, css/style.css, scripts/verify-feriados-todos-anos.mjs (novo), scripts/run-functional-validation.mjs, package.json
+- npm test 47/47; verify-feriados-todos-anos 29/29; suítes de feriados/vínculos/tombstones sem regressão
+
 2026-08-07 — Documentação: regra fixa de imutabilidade dos dados registrados
 - [NOVO] PROJECT_RULES.md: seção "Imutabilidade dos dados já registrados (REGRA FIXA — TODOS OS MÓDULOS)" com tabela de dados protegidos por módulo (Feriados, Escala, VT, Ausências, Contador, Cadastro) e 6 regras operacionais
 - [NOVO] Regra explícita: melhoria/correção/TESTE nunca altera dado registrado; homologação usa fixtures e scripts/verify-*.mjs; validação em produção é somente leitura; correção de dado real exige autorização caso a caso

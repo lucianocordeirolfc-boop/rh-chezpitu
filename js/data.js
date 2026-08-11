@@ -1332,23 +1332,38 @@
   }
 
   /**
-   * Calendário no merge: o remoto prevalece quando existe, mas os seeds 2026
-   * locais não podem ser perdidos enquanto o remoto ainda não os recebeu
-   * (a flag local impediria um novo seed e os feriados sumiriam para sempre).
+   * Calendário no merge: UNIÃO de local + remoto por conteúdo (data + nome
+   * normalizado), unindo as empresas de cada lado.
+   *
+   * Antes o remoto prevalecia por completo quando existia: qualquer feriado de
+   * calendário cadastrado localmente (ex.: os feriados de 2027) e ainda não
+   * presente no remoto era DESCARTADO na primeira sincronização e sumia da
+   * lista "Feriados cadastrados". A união preserva os dois lados; as exclusões
+   * definitivas continuam garantidas pelos tombstones (applyHolidayTombstones
+   * roda depois, em finalizeIncomingState), então nada excluído ressuscita.
+   * Os seeds 2026 locais também sobrevivem por consequência da união.
    */
   function mergeCalendarHolidaysPreservingSeeds(localList = [], remoteList = []) {
-    const base = (remoteList || []).length ? [...remoteList] : [...(localList || [])];
-    HOLIDAY_SEED_2026.forEach((seed) => {
-      const localSeed = (localList || []).find(
-        (holiday) => String(holiday?.id || "") === `cal-seed-2026-${seed.slug}`
-      );
-      if (!localSeed) return;
-      const exists = base.some(
-        (holiday) => holiday?.id === localSeed.id || holidayMatchesSeed2026(holiday, seed)
-      );
-      if (!exists) base.push(localSeed);
-    });
-    return base;
+    const byKey = new Map();
+
+    function upsert(holiday) {
+      if (!holiday || !holiday.date || !holiday.name) return;
+      const key = holidayTombstoneKey(holiday.date, holiday.name);
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, { ...holiday, companies: [...(holiday.companies || [])] });
+        return;
+      }
+      // Mesmo feriado nos dois lados: une as empresas e completa o tipo.
+      existing.companies = [
+        ...new Set([...(existing.companies || []), ...(holiday.companies || [])])
+      ];
+      if (!existing.type && holiday.type) existing.type = holiday.type;
+    }
+
+    (localList || []).forEach(upsert);
+    (remoteList || []).forEach(upsert);
+    return [...byKey.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }
 
   /**
@@ -3419,6 +3434,323 @@
     return { ok: true, removed, name, date };
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // FERIADOS CADASTRADOS — VISÃO UNIFICADA
+  // Um feriado pode existir em duas fontes: o calendário global
+  // (state.calendarHolidays) e o bloco da empresa (companies[x].holidays).
+  // A UI mostrava apenas o calendário, então feriados que só existiam no bloco
+  // da empresa (ou cujo registro de calendário se perdeu em uma sincronização
+  // antiga) ficavam invisíveis. As funções abaixo tratam as duas fontes como
+  // uma coisa só, usando a mesma chave de identidade dos tombstones
+  // (data + nome normalizado), sem nenhum recorte de ano.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Um feriado de calendário vale para a empresa? (vazio/"ambas" = todas.) */
+  function calendarHolidayTargetsCompany(holiday, company) {
+    const companies = holiday?.companies || [];
+    if (!companies.length || companies.includes("ambas")) return true;
+    return companies.includes(company);
+  }
+
+  /**
+   * Lista TODOS os feriados cadastrados de uma empresa (calendário + bloco da
+   * empresa), de qualquer ano, sem duplicar. Cada item traz as duas origens e
+   * a contagem de vínculos, para a UI editar/excluir a identidade inteira.
+   */
+  function listRegisteredHolidays(company, options = {}) {
+    const target = company || getPrimaryPageCompany("feriados");
+    const includeDeleted = options.includeDeleted === true;
+    const byKey = new Map();
+
+    function ensure(date, name) {
+      const key = holidayTombstoneKey(date, name);
+      let entry = byKey.get(key);
+      if (!entry) {
+        entry = {
+          key,
+          date: String(date || "").trim(),
+          name: String(name || "").trim(),
+          year: String(date || "").slice(0, 4),
+          type: "",
+          calendarIds: [],
+          companyHolidayIds: [],
+          workedCount: 0,
+          inCalendar: false,
+          inCompany: false
+        };
+        byKey.set(key, entry);
+      }
+      return entry;
+    }
+
+    (state.calendarHolidays || []).forEach((holiday) => {
+      if (!holiday?.date || !holiday?.name) return;
+      if (!includeDeleted && holiday.isDeleted) return;
+      if (!calendarHolidayTargetsCompany(holiday, target)) return;
+      const entry = ensure(holiday.date, holiday.name);
+      entry.inCalendar = true;
+      entry.calendarIds.push(holiday.id);
+      if (!entry.type) entry.type = holiday.type || "";
+    });
+
+    (getCompanyData(target).holidays || []).forEach((holiday) => {
+      if (!holiday?.date || !holiday?.name) return;
+      if (!includeDeleted && holiday.isDeleted) return;
+      const entry = ensure(holiday.date, holiday.name);
+      entry.inCompany = true;
+      entry.companyHolidayIds.push(holiday.id);
+      entry.workedCount += (holiday.workedEmployees || []).length;
+    });
+
+    return [...byKey.values()]
+      .map((entry) => ({ ...entry, type: entry.type || "nacional" }))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, "pt-BR"));
+  }
+
+  /**
+   * Empresas efetivamente atendidas por uma entrada de calendário.
+   * Lista vazia ou "ambas" (legado/seed) significam TODAS as empresas.
+   */
+  function expandCalendarHolidayCompanies(companies) {
+    const listed = (Array.isArray(companies) ? companies : []).filter(Boolean);
+    if (!listed.length || listed.includes("ambas")) return getCompanies();
+    return listed.filter((company) => company !== "ambas");
+  }
+
+  /**
+   * Empresas alvo de uma edição/exclusão de feriado. Padrão: SOMENTE a empresa
+   * da aba ativa — os dados da outra empresa nunca são tocados por tabela.
+   */
+  function resolveHolidayScopeCompanies(companies) {
+    const listed = (Array.isArray(companies) ? companies : []).filter(Boolean);
+    if (!listed.length) return [getActiveCompany()];
+    if (listed.includes("ambas")) return getCompanies();
+    return listed.filter((company) => getCompanies().includes(company));
+  }
+
+  /** Quantos vínculos (funcionários) este feriado tem, por empresa. */
+  function countHolidayLinksAllCompanies(date, name) {
+    const key = holidayTombstoneKey(date, name);
+    const byCompany = {};
+    let total = 0;
+    getCompanies().forEach((company) => {
+      const count = (getCompanyData(company).holidays || [])
+        .filter((holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) === key)
+        .reduce((sum, holiday) => sum + (holiday.workedEmployees || []).length, 0);
+      if (count) {
+        byCompany[company] = count;
+        total += count;
+      }
+    });
+    return { total, byCompany };
+  }
+
+  /**
+   * Exclusão DEFINITIVA de um feriado nas duas fontes (ação explícita do
+   * usuário): entrada do calendário, feriado do bloco da empresa e TODOS os
+   * vínculos de funcionários daquele feriado.
+   *
+   * Escopo por empresa: por padrão só a empresa da aba ativa. Se a entrada do
+   * calendário atende mais de uma empresa (legado/seed "ambas"), ela é mantida
+   * para as demais — nada da outra empresa é apagado por tabela.
+   *
+   * Grava tombstones de feriado e de vínculo para que nada volte por merge do
+   * Firebase, seed ou auto-sync do calendário. O CO já lançado na escala é
+   * preservado: só perde a referência ao feriado excluído.
+   * Retorna { ok, name, date, companies, removedCalendar, removedHolidays, removedLinks, byCompany }.
+   */
+  function removeHolidayEverywhere(date, name, options = {}) {
+    const targetDate = String(date || "").trim();
+    const targetName = String(name || "").trim();
+    if (!targetDate || !targetName) return { ok: false, removedLinks: 0 };
+
+    const scope = resolveHolidayScopeCompanies(options.companies);
+    if (!scope.length) return { ok: false, removedLinks: 0 };
+    const key = holidayTombstoneKey(targetDate, targetName);
+
+    // ── Calendário: remove só o que pertence ao escopo ────────────────────
+    const list = Array.isArray(state.calendarHolidays) ? state.calendarHolidays : [];
+    const keptCalendar = [];
+    let removedCalendar = 0;
+    list.forEach((holiday) => {
+      if (holidayTombstoneKey(holiday?.date, holiday?.name) !== key) {
+        keptCalendar.push(holiday);
+        return;
+      }
+      const remaining = expandCalendarHolidayCompanies(holiday.companies).filter(
+        (company) => !scope.includes(company)
+      );
+      if (remaining.length) {
+        // Ainda vale para outra empresa: mantém a entrada, sem o escopo excluído.
+        holiday.companies = remaining;
+        keptCalendar.push(holiday);
+        return;
+      }
+      removedCalendar += 1;
+    });
+    state.calendarHolidays = keptCalendar;
+    const stillInCalendar = keptCalendar.some(
+      (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) === key
+    );
+    // Tombstone de calendário só quando a identidade sai por completo — senão
+    // bloquearia o feriado que continua válido para a outra empresa.
+    if (!stillInCalendar) {
+      recordHolidayTombstone(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, targetDate, targetName);
+    }
+
+    // ── Empresas do escopo: feriado + vínculos ────────────────────────────
+    const byCompany = {};
+    let removedHolidays = 0;
+    let removedLinks = 0;
+
+    scope.forEach((company) => {
+      const data = getCompanyData(company);
+      const holidays = Array.isArray(data.holidays) ? data.holidays : [];
+      const doomed = holidays.filter(
+        (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) === key
+      );
+      // Tombstone da empresa mesmo sem registro local: impede que o feriado
+      // volte pelo merge de outro PC que ainda o tenha.
+      recordHolidayTombstone(company, targetDate, targetName);
+      if (!doomed.length) return;
+
+      let links = 0;
+      doomed.forEach((holiday) => {
+        (holiday.workedEmployees || []).forEach((item) => {
+          if (!item?.employeeId) return;
+          links += 1;
+          recordWorkedLinkTombstone(company, holiday.date, holiday.name, item.employeeId);
+        });
+        // Escala: mantém o CO lançado, mas remove o vínculo com o feriado excluído.
+        Object.keys(data.manualScale || {}).forEach((scaleKey) => {
+          const entry = data.manualScale[scaleKey];
+          if (entry && typeof entry === "object" && entry.linkedHolidayId === holiday.id) {
+            data.manualScale[scaleKey] = "CO";
+          }
+        });
+      });
+
+      data.holidays = holidays.filter(
+        (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) !== key
+      );
+      removedHolidays += doomed.length;
+      removedLinks += links;
+      byCompany[company] = { holidays: doomed.length, links };
+    });
+
+    if (options.recompute !== false) runScaleIntegrations([targetDate.slice(0, 7)]);
+    saveState();
+    return {
+      ok: true,
+      name: targetName,
+      date: targetDate,
+      companies: scope,
+      removedCalendar,
+      removedHolidays,
+      removedLinks,
+      byCompany
+    };
+  }
+
+  /**
+   * Edição de um feriado nas duas fontes (calendário + bloco da empresa) pela
+   * identidade atual (data + nome), preservando os vínculos existentes e
+   * reajustando o status pela nova data.
+   *
+   * Escopo por empresa igual ao da exclusão: por padrão só a empresa da aba
+   * ativa. Se a entrada do calendário também atende outra empresa, ela é
+   * DIVIDIDA — a original continua com a data/nome antigos para as demais e uma
+   * nova entrada recebe os dados editados para o escopo.
+   * Retorna { ok, error, name, date, changed }.
+   */
+  function updateHolidayEverywhere(date, name, patch = {}, options = {}) {
+    const oldDate = String(date || "").trim();
+    const oldName = String(name || "").trim();
+    if (!oldDate || !oldName) return { ok: false, error: "Feriado não encontrado." };
+
+    const nextName = patch.name !== undefined ? String(patch.name || "").trim() : oldName;
+    let nextDate = patch.date !== undefined ? String(patch.date || "").trim() : oldDate;
+    if (!nextName || !nextDate) return { ok: false, error: "Informe o nome e a data do feriado." };
+    if (isPadroeiraBuziosName(nextName)) nextDate = correctPadroeiraBuziosDate(nextDate);
+
+    const scope = resolveHolidayScopeCompanies(options.companies);
+    if (!scope.length) return { ok: false, error: "Empresa não identificada." };
+
+    const nextType = patch.type !== undefined ? String(patch.type || "").trim() : "";
+    const oldKey = holidayTombstoneKey(oldDate, oldName);
+    const nextKey = holidayTombstoneKey(nextDate, nextName);
+
+    // Edição explícita do usuário: a nova identidade não pode ficar bloqueada
+    // por um tombstone antigo (senão o feriado editado sumiria na próxima carga).
+    if (nextKey !== oldKey) clearHolidayTombstones(nextName, nextDate);
+
+    let changed = false;
+
+    // ── Calendário ────────────────────────────────────────────────────────
+    const nextCalendar = [];
+    (state.calendarHolidays || []).forEach((holiday) => {
+      if (holidayTombstoneKey(holiday?.date, holiday?.name) !== oldKey) {
+        nextCalendar.push(holiday);
+        return;
+      }
+      const covered = expandCalendarHolidayCompanies(holiday.companies);
+      const moved = covered.filter((company) => scope.includes(company));
+      if (!moved.length) {
+        nextCalendar.push(holiday);
+        return;
+      }
+      const remaining = covered.filter((company) => !scope.includes(company));
+      if (remaining.length) {
+        // Entrada compartilhada: preserva o feriado das demais empresas.
+        nextCalendar.push({ ...holiday, companies: remaining });
+        nextCalendar.push({
+          ...holiday,
+          id: uid("cal"),
+          date: nextDate,
+          name: nextName,
+          type: nextType || holiday.type || "nacional",
+          companies: moved
+        });
+        changed = true;
+        return;
+      }
+      if (holiday.name !== nextName || holiday.date !== nextDate) changed = true;
+      holiday.name = nextName;
+      holiday.date = nextDate;
+      if (nextType && holiday.type !== nextType) {
+        holiday.type = nextType;
+        changed = true;
+      }
+      nextCalendar.push(holiday);
+    });
+    state.calendarHolidays = nextCalendar;
+
+    // ── Feriados das empresas do escopo ───────────────────────────────────
+    scope.forEach((company) => {
+      const data = getCompanyData(company);
+      const targets = (data.holidays || []).filter(
+        (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) === oldKey
+      );
+      targets.forEach((holiday) => {
+        // Só age se o feriado ainda existir (um duplicado pode ter sido
+        // consolidado pelo updateHoliday na iteração anterior).
+        if (!(data.holidays || []).some((item) => item.id === holiday.id)) return;
+        if (updateHoliday(holiday.id, { name: nextName, date: nextDate }, { company, save: false })) {
+          changed = true;
+        }
+      });
+    });
+
+    if (changed) {
+      dedupeCalendarHolidays(state);
+      if (options.recompute !== false) {
+        runScaleIntegrations([oldDate.slice(0, 7), nextDate.slice(0, 7)].filter(Boolean));
+      }
+      saveState();
+    }
+    return { ok: true, name: nextName, date: nextDate, changed };
+  }
+
   /**
    * FASE 3A — Deduplicação de feriados
    *
@@ -4759,6 +5091,10 @@
     restoreHoliday,
     removeCompanyHolidayPermanently,
     removeCalendarHolidayPermanently,
+    listRegisteredHolidays,
+    countHolidayLinksAllCompanies,
+    removeHolidayEverywhere,
+    updateHolidayEverywhere,
     clearHolidayTombstones,
     isHolidayTombstoned,
     applyHolidayTombstones,

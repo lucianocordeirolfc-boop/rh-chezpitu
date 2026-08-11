@@ -150,10 +150,22 @@ function seedValidationState(AppData) {
     {
       id: "h1",
       name: "Feriado Teste",
+      // Data RELATIVA a hoje (dentro dos 120 dias de prazo). Com data fixa
+      // (era 2026-04-10) o vínculo "Pendente" virava "Vencido" assim que o
+      // prazo expirava no mundo real — em 08/08/2026 a suíte passou a falhar
+      // sozinha, sem nenhuma mudança de código.
+      date: AppData.addDays(AppData.todayISO(), -30),
+      workedEmployees: [{ employeeId: "chez-1", compensationDate: "", status: "Pendente" }]
+    },
+    {
+      // Feriado já compensado em 14/05/2026: é o que faz 2026-05-14 aparecer
+      // como CO na escala (getScaleCode) para as asserções de VT.
+      // Status "compensado" não envelhece, então pode ter data fixa.
+      id: "h1b",
+      name: "Feriado Compensado em Maio",
       date: "2026-04-10",
       workedEmployees: [
-        { employeeId: "chez-1", compensationDate: "2026-05-14", status: "Agendado" },
-        { employeeId: "chez-1", compensationDate: "", status: "Pendente" }
+        { employeeId: "chez-1", compensationDate: "2026-05-14", status: "Compensado" }
       ]
     },
     {
@@ -1774,10 +1786,11 @@ function validatePhase2Improvements(AppData) {
   assert(
     area,
     feriados.includes("const companies = [AppData.getActiveCompany()];") &&
-      feriados.includes("calendarHolidayBelongsToActiveCompany"),
+      feriados.includes("AppData.listRegisteredHolidays(company)") &&
+      read("js/data.js").includes("function calendarHolidayTargetsCompany"),
     "Calendário: criação e listagem vinculadas à empresa da aba ativa",
-    ["js/feriados.js"],
-    "submitCalendarHolidayForm usa getActiveCompany; lista filtra por empresa"
+    ["js/feriados.js", "js/data.js"],
+    "submitCalendarHolidayForm usa getActiveCompany; listRegisteredHolidays filtra por empresa"
   );
   assert(
     area,

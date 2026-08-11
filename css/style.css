@@ -3746,6 +3746,31 @@ body {
   gap: 8px;
 }
 
+/* Cabeçalho da lista: título + filtro de ano na mesma linha */
+.feriados-manager-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.feriados-manager-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--sea-900);
+}
+
+.feriados-manager-filter select {
+  min-width: 150px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
 .feriados-manager-badge {
   display: inline-grid;
   place-items: center;

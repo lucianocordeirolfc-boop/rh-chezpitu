@@ -114,7 +114,12 @@ console.log("\n=== TESTE: tombstones (exclusões) em todos os módulos ===\n");
 
 // ── Funcional: removeEmployee tomba em cascata férias e ausências ─────────────
 {
-  AppData.state.companies[CO].employees = [{ id: "e9", name: "Cascata", status: "Ativo", updatedAt: 1 }];
+  // createdAt recente: removeEmployee só permite exclusão dentro de 24h após o
+  // cadastro (regra criada depois deste script — ver verify-exclusao-24h.mjs).
+  // O que se testa aqui é a CASCATA de tombstones, não a janela de exclusão.
+  AppData.state.companies[CO].employees = [
+    { id: "e9", name: "Cascata", status: "Ativo", updatedAt: 1, createdAt: Date.now() }
+  ];
   AppData.state.companies[CO].vacations = [{ id: "v9", employeeId: "e9", startDate: "2026-06-10", endDate: "2026-06-12", updatedAt: 1 }];
   AppData.state.companies[CO].absences = [{ id: "a9", employeeId: "e9", type: "Falta", startDate: "2026-06-01", endDate: "2026-06-01", updatedAt: 1 }];
 

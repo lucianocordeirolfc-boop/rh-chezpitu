@@ -159,12 +159,23 @@ function buildPrintArea({ companyClass, legalName, cnpj, employeesByDept, totalC
   </div>`;
 }
 
+/**
+ * CSS REAL do projeto, lido UMA vez e embutido no HTML de cada caso.
+ *
+ * Antes eram três <link href="file://…">: o Chrome abria uma requisição por
+ * arquivo e o `goto` esperava `networkidle0` (500ms de ociosidade após a última
+ * resposta), custando ~0,9s por caso. Embutir é idêntico em cascata — a ordem
+ * dos arquivos é preservada e nenhum dos três usa `url(...)`, então não há
+ * caminho relativo para resolver.
+ */
+const CSS_FILES = ["style.css", "print.css", "escala-print.css"];
+const INLINE_CSS = CSS_FILES.map(
+  (file) => `/* ===== css/${file} ===== */\n${fs.readFileSync(path.join(root, "css", file), "utf8")}`
+).join("\n");
+
 function buildHtml(areaHtml) {
-  const cssLink = (f) => `<link rel="stylesheet" href="file:///${path.join(root, "css", f).replace(/\\/g, "/")}">`;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
-  ${cssLink("style.css")}
-  ${cssLink("print.css")}
-  ${cssLink("escala-print.css")}
+  <style>${INLINE_CSS}</style>
   <style>@page { size: A4 landscape; margin: 0; }</style>
   </head><body class="printing-scale">${areaHtml}</body></html>`;
 }
@@ -177,19 +188,38 @@ function countPdfPages(pdfPath) {
 }
 
 let pass = 0, fail = 0;
-function check(desc, cond) {
-  if (cond) { pass++; console.log(`  ✓ ${desc}`); }
-  else { fail++; console.log(`  ✗ ${desc}`); }
+
+/** Abre uma aba só para este caso e garante o fechamento dela. */
+async function validateCase(browser, label, cfg) {
+  const page = await browser.newPage();
+  try {
+    return await runCase(page, label, cfg);
+  } finally {
+    await page.close();
+  }
 }
 
-async function validateCase(page, label, cfg) {
-  console.log(`\n[${label}]`);
+/**
+ * Devolve o relatório pronto (linhas + contagens) em vez de imprimir na hora:
+ * os casos rodam em paralelo e a saída precisa sair agrupada, na ordem em que
+ * foram declarados.
+ */
+async function runCase(page, label, cfg) {
+  const lines = [`\n[${label}]`];
+  let casePass = 0, caseFail = 0;
+  const check = (desc, cond) => {
+    if (cond) { casePass += 1; lines.push(`  ✓ ${desc}`); }
+    else { caseFail += 1; lines.push(`  ✗ ${desc}`); }
+  };
+
   const totalCount = cfg.employeesByDept.reduce((n, [, e]) => n + e.length, 0);
   const html = buildHtml(buildPrintArea({ ...cfg, totalCount }));
   const htmlPath = path.join(outDir, `${label.replace(/[^a-z0-9]+/gi, "-")}.html`);
   fs.writeFileSync(htmlPath, html, "utf8");
 
-  await page.goto("file:///" + htmlPath.replace(/\\/g, "/"), { waitUntil: "networkidle0" });
+  // "load" basta: com o CSS embutido a página não faz nenhuma requisição, e
+  // `load` só dispara depois de aplicar todas as folhas de estilo.
+  await page.goto("file:///" + htmlPath.replace(/\\/g, "/"), { waitUntil: "load" });
   await page.emulateMediaType("print");
 
   // Replica applyPrintFitScale (js/escala.js): mede a altura natural do conteúdo
@@ -256,7 +286,7 @@ async function validateCase(page, label, cfg) {
   await page.pdf({ path: pdfPath, preferCSSPageSize: true, printBackground: true });
   const pages = countPdfPages(pdfPath);
 
-  console.log(`  (funcionários=${totalCount}, escala=${fit.scale.toFixed(3)}, conteúdo=${Math.round(fit.contentH)}px, páginas PDF=${pages}, rodapé.bottom=${m.footerBottom}px, pageH=${m.pageH}px, razão nome/dia=${m.nameToDayRatio}, grade preenche=${m.gridFillPct}%) -> ${pdfPath}`);
+  lines.push(`  (funcionários=${totalCount}, escala=${fit.scale.toFixed(3)}, conteúdo=${Math.round(fit.contentH)}px, páginas PDF=${pages}, rodapé.bottom=${m.footerBottom}px, pageH=${m.pageH}px, razão nome/dia=${m.nameToDayRatio}, grade preenche=${m.gridFillPct}%) -> ${pdfPath}`);
 
   check(`Todos os ${totalCount} funcionários renderizados`, m.employeeRows === totalCount);
   check(`Nenhum funcionário cortado (todos dentro da página)`, m.overflowingRows === 0);
@@ -269,7 +299,7 @@ async function validateCase(page, label, cfg) {
   check("Observações presentes", m.hasObs);
   check("Assinatura presente", m.hasSign);
   check(`PDF em 1 ÚNICA página A4 paisagem`, pages === 1);
-  return pages;
+  return { lines, casePass, caseFail };
 }
 
 (async () => {
@@ -279,44 +309,37 @@ async function validateCase(page, label, cfg) {
   console.log("Saída (HTML/PDF):", outDir);
 
   const browser = await puppeteer.launch({ executablePath: exe, headless: "new", args: ["--no-sandbox"] });
-  const page = await browser.newPage();
 
   // Cada caso deve resultar em 1 ÚNICA página A4 paisagem, sem cortar ninguém.
-  // Chez Pitu — quadro grande (auto-fit reduz) e quadro pequeno (sem reduzir).
-  await validateCase(page, "Chez Pitu Junho-2026 (48 func.)", {
+  // Chez Pitu e Pengold, com quadro grande (auto-fit reduz) e pequeno (não reduz).
+  const CHEZ = {
     companyClass: "scale-company-chez-pitu",
     legalName: "Chez Pitu Restaurante LTDA",
-    cnpj: "00.000.000/0001-00",
-    employeesByDept: buildEmployees(48)
-  });
-
-  await validateCase(page, "Chez Pitu Junho-2026 (20 func.)", {
-    companyClass: "scale-company-chez-pitu",
-    legalName: "Chez Pitu Restaurante LTDA",
-    cnpj: "00.000.000/0001-00",
-    employeesByDept: buildEmployees(20)
-  });
-
-  await validateCase(page, "Chez Pitu Junho-2026 (8 func.)", {
-    companyClass: "scale-company-chez-pitu",
-    legalName: "Chez Pitu Restaurante LTDA",
-    cnpj: "00.000.000/0001-00",
-    employeesByDept: buildEmployees(8)
-  });
-
-  // Pengold — quadro grande e quadro pequeno
-  await validateCase(page, "Pengold Junho-2026 (40 func.)", {
+    cnpj: "00.000.000/0001-00"
+  };
+  const PENGOLD = {
     companyClass: "scale-company-pengold",
     legalName: "Pengold Comércio LTDA",
-    cnpj: "11.111.111/0001-11",
-    employeesByDept: buildEmployees(40)
-  });
+    cnpj: "11.111.111/0001-11"
+  };
+  const CASES = [
+    ["Chez Pitu Junho-2026 (48 func.)", { ...CHEZ, employeesByDept: buildEmployees(48) }],
+    ["Chez Pitu Junho-2026 (20 func.)", { ...CHEZ, employeesByDept: buildEmployees(20) }],
+    ["Chez Pitu Junho-2026 (8 func.)", { ...CHEZ, employeesByDept: buildEmployees(8) }],
+    ["Pengold Junho-2026 (40 func.)", { ...PENGOLD, employeesByDept: buildEmployees(40) }],
+    ["Pengold Junho-2026 (8 func.)", { ...PENGOLD, employeesByDept: buildEmployees(8) }]
+  ];
 
-  await validateCase(page, "Pengold Junho-2026 (8 func.)", {
-    companyClass: "scale-company-pengold",
-    legalName: "Pengold Comércio LTDA",
-    cnpj: "11.111.111/0001-11",
-    employeesByDept: buildEmployees(8)
+  // Os casos são independentes (aba própria, arquivo próprio), então rodam em
+  // PARALELO: o custo dominante é o page.pdf() do Chrome (~0,5s cada), que em
+  // série somava ~2,6s. A saída é impressa depois, na ordem declarada acima.
+  const reports = await Promise.all(
+    CASES.map(([label, cfg]) => validateCase(browser, label, cfg))
+  );
+  reports.forEach((report) => {
+    report.lines.forEach((line) => console.log(line));
+    pass += report.casePass;
+    fail += report.caseFail;
   });
 
   await browser.close();

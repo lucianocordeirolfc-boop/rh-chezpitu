@@ -1159,25 +1159,43 @@
     bindCalendarHolidayRemoveButtons(overlay);
   }
 
+  /** Identidade do feriado (data + nome) guardada na célula de ações da linha. */
+  function readRegisteredHolidayRef(button) {
+    const cell = button.closest("[data-holiday-date][data-holiday-name]");
+    if (!cell) return null;
+    const date = String(cell.dataset.holidayDate || "").trim();
+    const name = String(cell.dataset.holidayName || "").trim();
+    if (!date || !name) return null;
+    return { date, name };
+  }
+
   function bindCalendarHolidayRemoveButtons(root) {
+    root.querySelectorAll("[data-holiday-year-filter]").forEach((select) => {
+      if (select.dataset.boundYearFilter) return;
+      select.dataset.boundYearFilter = "1";
+      select.addEventListener("change", () => {
+        registeredHolidayYearFilter = String(select.value || "");
+        refreshPopupCalendarList(root);
+      });
+    });
+
     root.querySelectorAll("[data-link-employee-cal]").forEach((button) => {
       if (button.dataset.boundLinkEmployeeCal) return;
       button.dataset.boundLinkEmployeeCal = "1";
       button.addEventListener("click", () => {
-        const calendarHolidayId = button.dataset.linkEmployeeCal;
-        const calHoliday = (AppData.state.calendarHolidays || []).find((h) => h.id === calendarHolidayId);
-        if (!calHoliday) return;
+        const ref = readRegisteredHolidayRef(button);
+        if (!ref) return;
         const company = AppData.getPrimaryPageCompany("feriados");
         // Garante que o feriado da empresa existe antes de abrir o modal
         AppData.syncCompanyHolidaysFromCalendarEntry(
-          { name: calHoliday.name, date: calHoliday.date, companies: [company] },
+          { name: ref.name, date: ref.date, companies: [company] },
           { save: true }
         );
         const data = AppData.getCompanyData(company);
         const companyHoliday = (data.holidays || []).find(
           (h) =>
-            h.date === calHoliday.date &&
-            AppData.normalizeSearchText(h.name) === AppData.normalizeSearchText(calHoliday.name)
+            h.date === ref.date &&
+            AppData.normalizeSearchText(h.name) === AppData.normalizeSearchText(ref.name)
         );
         if (!companyHoliday) {
           alert("Não foi possível localizar o feriado nesta empresa. Recarregue a página e tente novamente.");
@@ -1191,22 +1209,33 @@
       if (button.dataset.boundRemoveCalendar) return;
       button.dataset.boundRemoveCalendar = "1";
       button.addEventListener("click", () => {
-        const calendarId = button.dataset.removeCalendarHoliday;
-        const calHoliday = (AppData.state.calendarHolidays || []).find((item) => item.id === calendarId);
-        if (!calHoliday) return;
+        const ref = readRegisteredHolidayRef(button);
+        if (!ref) return;
 
-        const label = `${calHoliday.name} (${formatDateBR(calHoliday.date)})`;
+        // Exclusão sempre no escopo da empresa da aba ativa (a outra empresa
+        // mantém o feriado e os vínculos dela).
+        const company = AppData.getActiveCompany();
+        const links = AppData.countHolidayLinksAllCompanies(ref.date, ref.name);
+        const detalhe = links.byCompany[company]
+          ? `\n\nIsto vai excluir também ${links.byCompany[company]} vínculo(s) de funcionário(s) desta empresa.`
+          : "";
         const message =
-          `EXCLUIR DEFINITIVAMENTE o feriado do calendário: ${label}?\n\n` +
-          `Esta ação é PERMANENTE e NÃO pode ser desfeita. ` +
+          `EXCLUIR DEFINITIVAMENTE o feriado ${ref.name} (${formatDateBR(ref.date)}) de ${company}?` +
+          detalhe +
+          `\n\nEsta ação é PERMANENTE e NÃO pode ser desfeita. ` +
           `O feriado não voltará por sincronização nem por cadastro automático.`;
         if (!window.confirm(message)) return;
 
-        const result = AppData.removeCalendarHolidayPermanently(calendarId);
+        const result = AppData.removeHolidayEverywhere(ref.date, ref.name, { companies: [company] });
         if (result?.ok) {
-          window.App?.toast?.(`Feriado "${result.name}" excluído definitivamente.`, "success");
+          const vinculos = result.removedLinks
+            ? ` (${result.removedLinks} vínculo(s) removido(s))`
+            : "";
+          window.App?.toast?.(
+            `Feriado "${result.name}" excluído definitivamente${vinculos}.`,
+            "success"
+          );
         }
-        AppData.runScaleIntegrations([AppData.monthKey()]);
         refreshPopupCalendarList(root);
         window.App.renderCurrent();
       });
@@ -1216,15 +1245,29 @@
       if (button.dataset.boundEditCalendar) return;
       button.dataset.boundEditCalendar = "1";
       button.addEventListener("click", () => {
-        showEditCalendarHolidayModal(button.dataset.editCalendarHoliday, () => refreshPopupCalendarList(root));
+        const ref = readRegisteredHolidayRef(button);
+        if (!ref) return;
+        showEditCalendarHolidayModal(ref, () => refreshPopupCalendarList(root));
       });
     });
   }
 
-  function showEditCalendarHolidayModal(holidayId, onDone) {
+  /**
+   * Edição de um feriado cadastrado, identificado por data + nome (e não por id),
+   * porque a mesma identidade pode existir no calendário e no bloco da empresa.
+   * A alteração é aplicada nas duas fontes, preservando os vínculos existentes.
+   */
+  function showEditCalendarHolidayModal(ref, onDone) {
     document.getElementById("calendarEditPicker")?.remove();
-    const holiday = (AppData.state.calendarHolidays || []).find((item) => item.id === holidayId);
-    if (!holiday) return;
+    if (!ref?.date || !ref?.name) return;
+
+    const company = AppData.getActiveCompany();
+    const holiday =
+      AppData.listRegisteredHolidays(company).find(
+        (item) =>
+          item.date === ref.date &&
+          AppData.normalizeSearchText(item.name) === AppData.normalizeSearchText(ref.name)
+      ) || { ...ref, type: "nacional", workedCount: 0 };
 
     const typeOptions = ["nacional", "estadual", "municipal", "interno"]
       .map((t) => `<option value="${t}" ${(holiday.type || "nacional") === t ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`)
@@ -1234,8 +1277,12 @@
     picker.id = "calendarEditPicker";
     picker.className = "co-holiday-picker";
     picker.innerHTML = `
-      <p class="co-picker-title">Editar feriado do calendário</p>
-      <p class="co-picker-hint">Vinculado a <strong>${esc(AppData.getActiveCompany())}</strong>.</p>
+      <p class="co-picker-title">Editar feriado cadastrado</p>
+      <p class="co-picker-hint">Vinculado a <strong>${esc(company)}</strong>.${
+        holiday.workedCount
+          ? ` Os ${holiday.workedCount} vínculo(s) de funcionários são preservados.`
+          : ""
+      }</p>
       <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
           Nome do feriado
@@ -1274,14 +1321,24 @@
         alert("Preencha nome e data do feriado.");
         return;
       }
-      ScaleRules.updateCalendarHoliday(holidayId, { name, date, type });
-      AppData.syncCompanyHolidaysFromCalendarEntry(
-        { name, date, companies: [AppData.getActiveCompany()] },
-        { save: false }
+
+      const result = AppData.updateHolidayEverywhere(
+        ref.date,
+        ref.name,
+        { name, date, type },
+        { companies: [company] }
       );
-      AppData.runScaleIntegrations([date.slice(0, 7)]);
-      AppData.saveState();
+      if (!result?.ok) {
+        alert(result?.error || "Não foi possível salvar o feriado.");
+        return;
+      }
+      // Garante que o feriado editado continua existindo no bloco da empresa ativa.
+      AppData.syncCompanyHolidaysFromCalendarEntry(
+        { name: result.name, date: result.date, companies: [company] },
+        { save: true }
+      );
       backdrop.remove();
+      window.App?.toast?.(`Feriado "${result.name}" atualizado.`, "success");
       window.App.renderCurrent();
       if (typeof onDone === "function") onDone();
     });
@@ -1305,7 +1362,7 @@
   function renderHolidayRegisterPopupBody(data) {
     const company = AppData.getActiveCompany();
     return `
-      <div class="feriados-register-content" data-company-holiday-manager>
+      <div class="feriados-register-content">
         <form id="calendarHolidayForm" class="popup-form feriados-popup-form feriados-panel-form">
           <div class="feriados-panel-body">
             <p class="help-text compact-help">Calendário vinculado à empresa da aba ativa: <strong>${esc(company)}</strong>.</p>
@@ -1732,25 +1789,59 @@
     });
   }
 
-  function calendarHolidayBelongsToActiveCompany(holiday) {
-    const active = AppData.getActiveCompany();
-    const companies = holiday.companies || [];
-    // Sem empresa definida ou "ambas" (legado) aparecem; senão, só os da empresa ativa.
-    if (!companies.length || companies.includes("ambas")) return true;
-    return companies.includes(active);
-  }
+  // O recorte por empresa do calendário agora vive em AppData.listRegisteredHolidays
+  // (calendarHolidayTargetsCompany), que une calendário + feriados da empresa.
 
+  // Filtro de ano da lista "Feriados cadastrados" ("" = todos os anos).
+  // Guardado em memória para sobreviver ao refresh da lista dentro do popup.
+  let registeredHolidayYearFilter = "";
+
+  /**
+   * Lista "Feriados cadastrados" do popup Gerenciar Feriados.
+   *
+   * Mostra TODOS os feriados cadastrados da empresa ativa, de qualquer ano,
+   * somando as duas fontes (calendário global + feriados do bloco da empresa).
+   * Antes lia só o calendário, então feriados de outros anos que existiam
+   * apenas no bloco da empresa não apareciam.
+   */
   function renderCalendarHolidays() {
     const company = AppData.getActiveCompany();
-    // Fase 3A — Filtrar feriados deletados (soft delete)
-    const holidays = (AppData.state.calendarHolidays || [])
-      .filter((h) => !h.isDeleted)
-      .filter(calendarHolidayBelongsToActiveCompany);
-    const count = holidays.length;
-    const header = `<h4 class="feriados-manager-title">Calendário — ${esc(company)} <span class="feriados-manager-badge">${count}</span></h4>`;
+    const all = AppData.listRegisteredHolidays(company);
+    const years = [...new Set(all.map((item) => item.year))].sort();
+    if (registeredHolidayYearFilter && !years.includes(registeredHolidayYearFilter)) {
+      registeredHolidayYearFilter = "";
+    }
+    const rows = registeredHolidayYearFilter
+      ? all.filter((item) => item.year === registeredHolidayYearFilter)
+      : all;
 
-    if (!count) {
-      return `${header}<p class="help-text compact-help">Nenhum feriado de calendário cadastrado para ${esc(company)}.</p>`;
+    const yearOptions = [
+      `<option value="" ${registeredHolidayYearFilter ? "" : "selected"}>Todos os anos (${all.length})</option>`,
+      ...years.map((year) => {
+        const total = all.filter((item) => item.year === year).length;
+        const selected = registeredHolidayYearFilter === year ? "selected" : "";
+        return `<option value="${esc(year)}" ${selected}>${esc(year)} (${total})</option>`;
+      })
+    ].join("");
+
+    const header = `
+      <div class="feriados-manager-head">
+        <h4 class="feriados-manager-title">Feriados — ${esc(company)} <span class="feriados-manager-badge">${rows.length}</span></h4>
+        ${
+          years.length > 1
+            ? `<label class="feriados-manager-filter">Ano
+                 <select class="field-select btn-sm" data-holiday-year-filter>${yearOptions}</select>
+               </label>`
+            : ""
+        }
+      </div>
+    `;
+
+    if (!all.length) {
+      return `${header}<p class="help-text compact-help">Nenhum feriado cadastrado para ${esc(company)}.</p>`;
+    }
+    if (!rows.length) {
+      return `${header}<p class="help-text compact-help">Nenhum feriado cadastrado em ${esc(registeredHolidayYearFilter)} para ${esc(company)}.</p>`;
     }
 
     return `
@@ -1758,21 +1849,21 @@
       <div class="table-wrap table-compact feriados-manager-table">
         <table>
           <thead>
-            <tr><th>Data</th><th>Nome</th><th>Tipo</th><th>Ações</th></tr>
+            <tr><th>Data</th><th>Nome</th><th>Tipo</th><th>Vínculos</th><th>Ações</th></tr>
           </thead>
           <tbody>
-            ${holidays
-              .sort((a, b) => a.date.localeCompare(b.date))
+            ${rows
               .map(
                 (holiday) => `
               <tr>
                 <td>${formatDateBR(holiday.date)}</td>
                 <td>${esc(holiday.name)}</td>
-                <td>${esc(holiday.type || "nacional")}</td>
-                <td class="actions">
-                  <button class="link-button success" data-link-employee-cal="${esc(holiday.id)}" type="button">+ Funcionário</button>
-                  <button class="link-button" data-edit-calendar-holiday="${esc(holiday.id)}" type="button">Editar</button>
-                  <button class="link-button danger" data-remove-calendar-holiday="${esc(holiday.id)}" type="button">Excluir</button>
+                <td>${esc(holiday.type)}</td>
+                <td class="feriados-manager-count">${holiday.workedCount}</td>
+                <td class="actions" data-holiday-date="${esc(holiday.date)}" data-holiday-name="${esc(holiday.name)}">
+                  <button class="link-button success" data-link-employee-cal type="button">+ Funcionário</button>
+                  <button class="link-button" data-edit-calendar-holiday type="button">Editar</button>
+                  <button class="link-button danger" data-remove-calendar-holiday type="button">Excluir</button>
                 </td>
               </tr>
             `

@@ -7,6 +7,169 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-10 (3) — verify-print-escala: 8,7s → 2,7s sem perder fidelidade
+
+**Origem:** a suíte de impressão consumia 8,7s dos ~10,6s do `npm run validate`.
+
+**Onde estava o tempo (medido antes de mexer):**
+
+| fase | custo |
+| --- | --- |
+| boot do node + import do puppeteer | ~0,34s |
+| launch do Chrome | ~0,56s |
+| `page.goto` × 5 | **~0,9s cada (~4,5s)** |
+| medições no DOM × 5 | ~0,02s cada |
+| `page.pdf` × 5 | ~0,5s cada (~2,6s) |
+
+**O que foi feito:**
+
+1. **CSS embutido.** O HTML de cada caso linkava três arquivos por
+   `file://` (`style.css`, `print.css`, `escala-print.css`). Cada navegação
+   abria três requisições e o `waitUntil: "networkidle0"` ainda esperava 500ms
+   de ociosidade depois da última resposta. Os três arquivos passam a ser lidos
+   **uma vez** no início e embutidos em `<style>`, na mesma ordem. Nenhum dos
+   três usa `url(...)` (verificado), então não há caminho relativo a resolver e
+   a cascata é idêntica. `goto` caiu de ~900ms para ~80ms.
+2. **`waitUntil: "load"`.** Sem requisições, `networkidle0` só cobrava o timer
+   ocioso; `load` já dispara depois de aplicar as folhas de estilo.
+3. **Casos em paralelo.** Com o `goto` barato, o custo dominante virou o
+   `page.pdf()` do Chrome. Os 5 casos são independentes (aba própria, arquivo
+   próprio), então rodam com `Promise.all`. Para o log não embaralhar, cada caso
+   passou a **acumular suas linhas** e devolver `{ lines, casePass, caseFail }`;
+   a impressão acontece depois, na ordem declarada. `validateCase` virou só o
+   ciclo de vida da aba (`try/finally`), com o corpo em `runCase`.
+
+**Fidelidade — o ponto que importa numa suíte de homologação:** a saída de
+geometria foi comparada linha a linha com a versão anterior (fator de auto-fit,
+altura do conteúdo, páginas do PDF, `footerBottom`, razão nome/dia,
+preenchimento da grade): **idêntica**. Nada de `sleep`, `timeout` ou asserção
+afrouxada — só trabalho removido do caminho crítico.
+
+**Testes:** 55/55 asserções, estável em 3 execuções seguidas. `npm test` 47/47.
+`npm run validate` 17/17 suítes, total **~10,6s → ~4,9s**.
+
+## 2026-08-10 (2) — Suíte de testes: fixtures datadas que envelhecem e validate que abortava na 1ª falha
+
+**Origem:** as duas falhas pendentes registradas na entrega anterior desta mesma
+data, mais o `npm run validate` que parava na primeira suíte.
+
+**Causa raiz das duas falhas (era UMA só):** em
+`scripts/run-functional-validation.mjs` o feriado da fixture `h1` ("Feriado
+Teste") tinha **data fixa** `2026-04-10`, com um vínculo sem compensação que o
+teste esperava como *Pendente*. O prazo de compensação é de 120 dias corridos:
+10/04/2026 + 120 = **08/08/2026**. A partir daquele dia o vínculo passou a
+resolver como *Vencido* — corretamente, pela regra de negócio — e derrubou:
+
+- `[Controle de Feriados] Status pendente detectado corretamente`
+- `[Dashboard] Dashboard stats feriados: pendentes ≥ 1 (Chez Pitu)`
+  (`getHolidayStats().pending` caiu para 0 pelo mesmo motivo)
+
+Não havia bug de produto: a fixture é que envelheceu. Vizinhas na mesma lista
+(`h2` Vencido e `h3` Compensado) já usavam datas relativas a hoje; só `h1` ficou
+com data absoluta.
+
+**O que foi feito:**
+
+- `scripts/run-functional-validation.mjs` — `h1` passou a usar
+  `addDays(todayISO(), -30)` (dentro do prazo, sempre *Pendente*). O vínculo
+  com `compensationDate: "2026-05-14"` que morava em `h1` — e que é o que faz
+  14/05/2026 aparecer como **CO** em `getScaleCode` para as asserções de VT —
+  foi movido para um feriado próprio (`h1b`, data fixa, status *Compensado*,
+  que não envelhece). Assim cada fixture tem um propósito declarado.
+- `scripts/verify-tombstones-sync.mjs` — o script morria no meio (exceção não
+  tratada) porque `removeEmployee` passou a exigir a janela de 24h e a fixture,
+  anterior à regra, não tinha `createdAt`. Fixture ganhou `createdAt: Date.now()`.
+  O alvo do teste é a **cascata de tombstones**; a janela de exclusão tem suíte
+  própria (`verify-exclusao-24h.mjs`). Como o script não estava no `validate`,
+  ficou quebrado sem ninguém ver.
+- `scripts/run-validate.mjs` (**novo**) — runner do `npm run validate`. Roda
+  **todas** as suítes, cada uma em seu processo, com a saída preservada; no fim
+  imprime resumo com tempo por suíte e sai com código 1 se qualquer uma falhou.
+  A cadeia anterior (`node a && node b && ...`) escondia o estado real: uma
+  fixture vencida na primeira suíte mascarou as outras quatro por dias.
+  Extras: filtro por termo (`npm run validate feriado`) e aviso quando existe
+  um `scripts/verify-*.mjs` fora da lista `SUITES` (guarda contra o
+  apodrecimento que aconteceu com o `verify-tombstones-sync.mjs`).
+- `package.json` — `validate` agora aponta para o runner. Cobertura foi de
+  **5 para 17 suítes** (todos os `verify-*.mjs` entraram na lista).
+
+**Testes:** `npm test` 47/47; `npm run validate` **17/17 suítes aprovadas**
+(funcional, offline, dedup, quota + 13 `verify-*`). Caminho de falha do runner
+verificado com uma suíte propositalmente reprovada: as demais continuaram
+rodando e o processo saiu com código 1.
+
+## 2026-08-10 — Controle de Feriados: lista mostrava só um recorte; editar/excluir por identidade
+
+**Sintoma relatado:** no popup "Gerenciar Feriados" (aba Controle de Feriados →
+*+ Cadastrar feriado*), a lista "Feriados cadastrados" mostrava apenas feriados
+de 2026. Os feriados cadastrados para 2027 não apareciam e, por isso, não havia
+como editar nem excluir.
+
+**Causa raiz (duas, somadas):**
+
+1. **Lista lia uma fonte só.** `renderCalendarHolidays()` (js/feriados.js)
+   montava a tabela apenas com `state.calendarHolidays` filtrado pela empresa
+   ativa. Um feriado tem duas moradas no estado — o calendário global e o bloco
+   da empresa (`companies[x].holidays`, onde vivem os vínculos). Feriado que
+   existisse só no bloco da empresa era invisível na lista, em qualquer ano.
+2. **Merge do Firebase descartava o calendário local.**
+   `mergeCalendarHolidaysPreservingSeeds` (js/data.js) fazia
+   `remoto.length ? remoto : local` — o remoto vencia por completo. Qualquer
+   entrada de calendário criada localmente e ainda não sincronizada era perdida
+   na primeira carga do remoto. O feriado da empresa sobrevivia (esse merge é
+   por união), o do calendário não — exatamente o par de sintomas observado.
+
+**O que foi feito:**
+
+- `js/data.js`
+  - `mergeCalendarHolidaysPreservingSeeds` → **união** por conteúdo
+    (data + nome normalizado), unindo `companies` dos dois lados. As exclusões
+    definitivas continuam vencendo porque `applyHolidayTombstones` roda depois,
+    em `finalizeIncomingState`. Os seeds 2026 sobrevivem por consequência.
+  - `listRegisteredHolidays(empresa)` — visão unificada (calendário + bloco da
+    empresa), sem duplicar, **sem recorte de ano**, com `workedCount`,
+    `inCalendar`/`inCompany` e ids das duas origens.
+  - `countHolidayLinksAllCompanies(data, nome)` — vínculos por empresa, para a
+    confirmação de exclusão dizer exatamente o que será apagado.
+  - `updateHolidayEverywhere` / `removeHolidayEverywhere` — editar e excluir
+    pela **identidade** (data + nome), atingindo as duas fontes. A exclusão leva
+    todos os vínculos e grava tombstone de feriado **e** de vínculo (não volta
+    por merge, seed ou auto-sync); o CO já lançado na escala é preservado e só
+    perde o `linkedHolidayId`.
+  - **Escopo por empresa** (`resolveHolidayScopeCompanies` /
+    `expandCalendarHolidayCompanies`): editar/excluir age só na empresa da aba
+    ativa. Entrada de calendário compartilhada (`["ambas"]`, caso dos seeds) é
+    reduzida na exclusão e **dividida** na edição — a outra empresa nunca perde
+    feriado nem vínculo por tabela. O tombstone de calendário (`__calendar__`,
+    que é global) só é gravado quando a identidade sai do calendário por
+    completo.
+- `js/feriados.js` — lista do popup passa a usar `listRegisteredHolidays`, com
+  **filtro de ano** ("Todos os anos" por padrão) e coluna "Vínculos". Ações
+  passam a identificar a linha por `data + nome` (não mais pelo id do
+  calendário, que pode não existir), habilitando editar/excluir também nos
+  feriados que só existem no bloco da empresa. Removido o atributo
+  `data-company-holiday-manager` do container do popup — apontava para um
+  refresh que substituiria o formulário inteiro.
+- `css/style.css` — `.feriados-manager-head` / `.feriados-manager-filter`.
+- `scripts/verify-feriados-todos-anos.mjs` (novo, 29 asserções, fixtures em
+  memória) e ajuste da asserção de fonte em `run-functional-validation.mjs`
+  (passou a checar `listRegisteredHolidays` + `calendarHolidayTargetsCompany`
+  no lugar do helper local removido).
+
+**Testes:** `npm test` 47/47; `verify-feriados-todos-anos` 29/29;
+`verify-exclusao-feriado-definitiva` 15/15; `verify-vinculo-tombstone` 16/16;
+`verify-feriados-retroativos` 25/25; dedup 44/44; offline 15/15; quota 25/25.
+Sem regressão. Duas falhas de `run-functional-validation.mjs` ("Status pendente
+detectado corretamente" e "Dashboard stats feriados") **já existiam antes desta
+alteração** (confirmado com `git stash`) e seguem pendentes — como esse script
+sai com código 1, o `&&` de `npm run validate` sempre parou nele; por isso o
+novo script foi posto no **início** da cadeia.
+
+**Observação sobre dados:** a correção do merge impede novas perdas e a lista
+passa a exibir tudo o que existe no estado. Feriados de 2027 que já tenham sido
+descartados pelo merge antigo em **ambas** as fontes não podem ser recuperados
+por código — precisam ser recadastrados.
+
 ## 2026-08-07 — REGRA FIXA: imutabilidade dos dados já registrados (melhoria/teste nunca altera dado)
 
 **Origem:** pedido do usuário após o incidente de 2026-08-06 (3), em que a

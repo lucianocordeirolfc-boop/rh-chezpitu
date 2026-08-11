@@ -8,7 +8,7 @@
     "test:offline": "node scripts/test-offline-recovery.mjs",
     "test:dedup": "node scripts/test-holiday-deduplication.mjs",
     "test:quota": "node scripts/test-storage-quota.mjs",
-    "validate": "node scripts/run-functional-validation.mjs && node scripts/test-offline-recovery.mjs && node scripts/test-holiday-deduplication.mjs && node scripts/test-storage-quota.mjs",
+    "validate": "node scripts/run-validate.mjs",
     "deploy:preview": "firebase hosting:channel:deploy preview",
     "deploy": "npm run bump-cache && firebase deploy --only hosting",
     "deploy:ci": "firebase deploy --only hosting --non-interactive"

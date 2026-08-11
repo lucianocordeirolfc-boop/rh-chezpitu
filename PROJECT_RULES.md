@@ -237,8 +237,17 @@ Ao validar uma correção/melhoria ao vivo em produção:
   **materializar dados** (ex.: pendências Vencidas) que não existiam.
 - Para exercitar lógica que grava, usar **fixtures**/`scripts/verify-*.mjs`
   (sandbox), nunca a base de produção.
-- Rodar `npm test` + `npm run validate` + os `scripts/verify-*` relevantes antes
-  de qualquer deploy.
+- Rodar `npm test` + `npm run validate` antes de qualquer deploy. Desde
+  2026-08-10 o `validate` roda **todas** as suítes (inclusive os
+  `scripts/verify-*.mjs`) mesmo quando uma falha, e só então reprova — leia o
+  resumo final, não só a última linha da saída. Para focar: `npm run validate <termo>`.
+- Ao criar um `scripts/verify-*.mjs`, cadastre-o em `SUITES` de
+  `scripts/run-validate.mjs`. Fora da lista o script apodrece sem ninguém notar
+  (o runner avisa, mas não reprova).
+- **Fixture com data fixa é dívida.** Qualquer dado de teste sujeito a prazo
+  (feriado × 120 dias de compensação, janela de 24h de exclusão) deve ser
+  relativo a `todayISO()`. Fixtures datadas já quebraram a suíte sozinhas, sem
+  nenhuma mudança de código.
 
 ## CO e Feriados
 
