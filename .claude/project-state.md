@@ -8,11 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260806.03` (exibida como `v2026.08.06.03`) — fonte: `js/version.js`
-- **Branch atual:** `main` (sincronizada com `origin/main`)
-- **Último commit:** `e3dd4f7` — chore: carimbo de build (deploy guarda auto-vinculo Vencido, commit aade7e6)
-- **Status geral:** 🟢 EM PRODUÇÃO — frente "Feriados: exclusão definitiva +
-  guarda do auto-vínculo" commitada, pushada e deployada (`chez-pitu-rh.web.app`).
+- **Versão atual:** `20260810.01` (exibida como `v2026.08.10.01`) — fonte: `js/version.js`
+- **Branch atual:** `main` — **2 commits à frente de `origin/main` (push NÃO feito)**
+- **Último commit:** `40e4e50` — chore: carimbo de build 20260810.01 (deploy lista completa de feriados, commit 62412f6)
+- **Status geral:** 🟢 EM PRODUÇÃO — frente "Feriados: lista completa de
+  cadastrados + editar/excluir por identidade" commitada e **deployada**
+  (`chez-pitu-rh.web.app`). ⚠️ Falta apenas o **push para `origin/main`**.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -26,6 +27,31 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-08-10 — Feriados: lista completa + editar/excluir (em produção)
+
+- ✅ **Lista completa de feriados cadastrados** (`20260810.01`, commit `62412f6`)
+  — o popup Gerenciar Feriados mostrava só feriados de 2026; os de 2027 não
+  apareciam. Duas causas: (a) `renderCalendarHolidays` lia **só**
+  `state.calendarHolidays` da empresa ativa, deixando invisível o feriado que
+  existisse apenas no bloco da empresa; (b) `mergeCalendarHolidaysPreservingSeeds`
+  fazia "remoto vence" e **descartava silenciosamente** feriados de calendário
+  criados localmente e ainda não sincronizados. O merge virou **união** por
+  `data|nomeNormalizado`; novo `listRegisteredHolidays(empresa)` une as duas
+  fontes sem recorte de ano; UI ganhou filtro de ano e coluna de vínculos.
+- ✅ **Editar/excluir por identidade** — `updateHolidayEverywhere` /
+  `removeHolidayEverywhere` agem pela chave `data + nome` nas duas fontes. A
+  exclusão leva **todos os vínculos** e grava tombstone de feriado e de vínculo;
+  o CO já lançado na escala é preservado (perde só o `linkedHolidayId`).
+- ✅ **Escopo por empresa** — editar/excluir age só na empresa da aba ativa;
+  entrada de calendário compartilhada (`"ambas"`/seed) é reduzida na exclusão e
+  **dividida** na edição. A outra empresa nunca perde feriado nem vínculo.
+- ✅ **Manutenção da suíte** — fixtures com data fixa que venciam sozinhas
+  (`run-functional-validation.mjs`, `verify-tombstones-sync.mjs`); novo
+  `scripts/run-validate.mjs` roda **todas** as 17 suítes mesmo com falha e só
+  então sai com código 1; `verify-print-escala` de 8,7s → 2,7s.
+- Testes: npm test 47/47 · npm run validate 17/17 suítes (~10,6s → ~4,9s) ·
+  `verify-feriados-todos-anos` 29/29. Commits `62412f6` + `40e4e50`.
 
 ### Frente 2026-08-06 — Feriados / Vínculos (já em produção)
 
@@ -151,37 +177,83 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Próximas tarefas
 
-- (nenhuma pendência aberta nesta frente — concluída e em produção)
+- ⏳ **Push de `main` para `origin/main`** (2 commits: `62412f6` + `40e4e50`) —
+  não autorizado ainda.
+- Varrer as demais fixtures em busca de outras datas absolutas sujeitas a prazo
+  (a regra nova em `PROJECT_RULES.md` cobre o futuro, não o passado).
+- Diagnóstico **somente leitura** de feriados órfãos (existem no bloco da empresa
+  mas não no calendário), para o usuário decidir o que consolidar.
 
 ## Pendências de validação
 
+- ⚠️ **Validação visual em produção pelo usuário** (Ctrl+F5 para
+  `?v=20260810.01`), **somente leitura**: abrir Controle de Feriados →
+  *+ Cadastrar feriado* e conferir se o filtro "Ano" lista 2027. Se 2027 não
+  aparecer, os dados foram perdidos pelo merge antigo nas **duas** fontes e
+  precisam ser recadastrados — não há recuperação por código.
 - ✅ Validado pelo usuário no preview (`20260618.02`): logos das duas empresas
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
 
-- ✅ **Frente de Feriados (`20260806.01/.02/.03`) — commitada, pushada (`main`) e
-  deployada** em `chez-pitu-rh.web.app`. Nada pendente de publicar no código.
-- ℹ️ **Documentação não exige deploy:** `*.md` está no `ignore` do `firebase.json`
-  (não é servido pelo Hosting).
-- ⚠️ Validação visual em produção pelo usuário (Ctrl+F5 para `?v=20260806.03`),
-  **somente leitura**: (a) feriado duplicado excluído não volta após recarregar;
-  (b) vínculo excluído (CINTHIA × Sexta-Feira Santa) não volta ao navegar pela
-  Escala; (c) abrir meses antigos da Escala não gera novos vínculos Vencidos.
+- ✅ **Frente de Feriados (`20260810.01`) — commitada e deployada** em
+  `chez-pitu-rh.web.app`. Verificado em produção: `js/version.js` com
+  `APP_VERSION 20260810.01` e commit `62412f6`; `js/feriados.js` publicado
+  contém `listRegisteredHolidays`; `index.html` pede `?v=20260810.01`.
+- ⚠️ **Push pendente** para `origin/main` (o Hosting já está atualizado; o
+  GitHub, não).
+- ℹ️ **Lição do deploy `20260810.01`:** `npm run deploy` **não** incrementa
+  `APP_VERSION` — ela é manual em `js/version.js` e o `bump-cache` apenas a
+  propaga para os `?v=`. O primeiro deploy saiu com o `?v=` antigo
+  (`20260806.03`), publicando JS novo sob URL já cacheada; foi preciso subir a
+  versão e republicar. **Sempre editar `APP_VERSION` antes de `npm run deploy`.**
 - ⚠️ Infra: garantir que a regra de leitura `logos/{cnpj}/...` permaneça publicada
   no Firebase Storage (Console → Storage → Regras).
 
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo — commit 965f3b6 pushado em main)
+ M PROJECT_STATUS.md
+ M .claude/project-state.md
 ```
-> Última entrega (`965f3b6`) foi somente documentação — nenhum arquivo de
-> código alterado, portanto sem deploy (`*.md` no ignore do `firebase.json`).
+> Apenas documentação de estado (sincronização de versão para `20260810.01`).
+> `*.md` está no `ignore` do `firebase.json` — não exige deploy.
 
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT
+- **Data:** 2026-08-10 21:11
+- **Versão:** 20260810.01
+- **Branch:** main (2 commits à frente de `origin/main` — push não feito)
+- **Commits:** `62412f6` (fix) + `40e4e50` (carimbo de build)
+- **Arquivos alterados:** js/data.js · js/feriados.js · css/style.css ·
+  js/version.js · index.html · package.json · scripts/run-validate.mjs (novo) ·
+  scripts/verify-feriados-todos-anos.mjs (novo) ·
+  scripts/run-functional-validation.mjs · scripts/verify-print-escala.mjs ·
+  scripts/verify-tombstones-sync.mjs · PROJECT_RULES.md · CHANGELOG.md ·
+  PROJECT_HISTORY.md · PROJECT_STATUS.md · .claude/project-state.md
+- **Resumo:** Corrigida a lista "Feriados cadastrados" do popup Gerenciar
+  Feriados, que mostrava só 2026. Duas causas: a lista lia **só** o calendário
+  global (feriado que existisse apenas no bloco da empresa era invisível) e o
+  merge do Firebase fazia "remoto vence", **descartando silenciosamente**
+  feriados de calendário criados localmente. Merge virou união por
+  `data|nomeNormalizado`; novo `listRegisteredHolidays` une as duas fontes sem
+  recorte de ano; editar/excluir passaram a agir pela identidade
+  (`data + nome`), levando todos os vínculos na exclusão e com **escopo por
+  empresa** (a outra empresa nunca perde dado). Junto: manutenção da suíte
+  (fixtures datadas que venciam sozinhas), `npm run validate` roda todas as 17
+  suítes mesmo com falha e `verify-print-escala` caiu de 8,7s para 2,7s.
+- **Testes:** npm test 47/47 · npm run validate 17/17 suítes (~10,6s → ~4,9s) ·
+  verify-feriados-todos-anos 29/29.
+- **Deploy:** publicado em `chez-pitu-rh.web.app` e verificado por `curl`
+  (APP_VERSION, `listRegisteredHolidays` no bundle, `?v=20260810.01` no HTML).
+  O 1º deploy saiu com o `?v=` antigo porque `APP_VERSION` é manual — corrigido
+  com bump para `20260810.01` e republicação.
+- **Próximo passo:** autorizar o **push** de `main` para `origin/main`; depois,
+  validação visual em produção (**somente leitura**) do filtro "Ano" no popup
+  de feriados, para saber se os feriados de 2027 sobreviveram.
 
 ### CHECKPOINT
 - **Data:** 2026-08-07

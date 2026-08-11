@@ -9,27 +9,32 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260806.03 (Feriados: exclusão definitiva de feriado e de vínculo +
-guarda anti-regressão do auto-vínculo)
-**Data:** 2026-08-06
+**Versão:** 20260810.01 (Feriados: lista completa de cadastrados em todos os anos
++ editar/excluir por identidade, com escopo por empresa)
+**Data:** 2026-08-10
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
 
-Data: 06/08/2026
-Versão: 20260806.03 (Firebase Hosting — chez-pitu-rh)
-Commits: `954f7cd` + `cfab872` · `d663d67` + `73fb812` · `aade7e6` + `e3dd4f7`
+Data: 10/08/2026
+Versão: 20260810.01 (Firebase Hosting — chez-pitu-rh)
+Commits: `62412f6` (fix) + `40e4e50` (carimbo de build)
 
-Inclui: **exclusão DEFINITIVA de feriado** (tombstone por conteúdo `data|nome`,
-remove duplicatas e bloqueia ressurreição por merge, calendário e seeds 2026);
-**exclusão DEFINITIVA de vínculo** funcionário × feriado (`workedLinkTombstones`,
-chave `data|nome|employeeId`), impedindo recriação pelo auto-vínculo da escala e
-pela união do merge entre PCs — tombstones trafegam **aninhados** no nó
-`tombstones` do RTDB (sem novo nó de topo, evitando `permission_denied`);
-**guarda anti-regressão** em `syncAutoHolidaysWorkedForMonth`, que deixa de criar
-auto-vínculo para feriado com prazo de 120 dias já expirado (não nasce Vencido).
+Inclui: **lista completa de feriados cadastrados** no popup Gerenciar Feriados —
+une o calendário global e o bloco da empresa, sem recorte de ano (feriados de
+2027 não apareciam), com filtro de ano e coluna de vínculos; **editar/excluir
+pela identidade** do feriado (data + nome), atingindo as duas fontes, levando
+TODOS os vínculos na exclusão e gravando tombstones de feriado e de vínculo;
+**escopo por empresa** em editar/excluir (entrada de calendário compartilhada é
+dividida/reduzida — a outra empresa nunca perde dado por tabela); e a **correção
+do merge do calendário**, que fazia "remoto vence" e descartava silenciosamente
+feriados criados localmente e ainda não sincronizados.
 
-**Cache-busting:** todos os `?v=` do index.html em `20260806.03` — usuários
+Também: manutenção da suíte de testes (fixtures com data fixa que venciam
+sozinhas), `npm run validate` passou a rodar **todas** as 17 suítes mesmo com
+falha e o `verify-print-escala` caiu de 8,7s para 2,7s.
+
+**Cache-busting:** todos os `?v=` do index.html em `20260810.01` — usuários
 recebem a nova versão automaticamente no próximo carregamento (Ctrl+F5 força).
 
 ## Regra fixa vigente
