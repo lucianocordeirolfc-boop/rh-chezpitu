@@ -15,3 +15,7 @@ Sincronização Firebase
 
 js/company-ui.js
 Troca de empresas
+
+js/inactive-employees.js
+Botão e seletor "Mostrar funcionários inativos" (compartilhado por
+Cadastro de Funcionários e Controle de Feriados)
