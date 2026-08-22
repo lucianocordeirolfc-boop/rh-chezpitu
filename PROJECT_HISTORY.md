@@ -7,6 +7,46 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-22 (2) — Feriados: "+ Funcionário" sai da tabela (redundante com o botão global)
+
+**Pedido:** ajustar o layout da tela principal do Controle de Feriados — o botão
+**+ Funcionário**, herdado do arranjo anterior, ficou deslocado depois da saída
+do "Excluir feriado". Avaliar a necessidade e, não havendo, excluir.
+
+**Análise da necessidade (por que dava para remover):** o botão da linha abria
+`showAddWorkedEmployeeModal(holidayId)` — feriado fixo, escolhendo só o
+funcionário — e era renderizado **apenas na primeira linha de cada feriado**,
+o que deixava a coluna Ações com 3 elementos numa linha e 2 nas seguintes.
+A mesma operação (`AppData.addManualWorkedEmployee`) já tem dois outros
+caminhos, ambos preservados:
+
+1. **"+ Vincular funcionário a feriado"** — botão primário no topo da página,
+   sempre visível, escolhe feriado **e** funcionário num passo só e funciona
+   com a tabela vazia (situação em que o botão da linha nem aparecia).
+2. **"+ Funcionário"** do modal do calendário (`data-link-employee-cal`).
+
+O botão da linha era estritamente redundante, e o caminho global é superior.
+
+**O que foi feito (só em `js/feriados.js`):**
+
+1. Removido o botão `data-add-worked-employee` da coluna Ações da tabela.
+2. Removido o handler correspondente em `bindTableActions`, com comentário
+   apontando os dois caminhos que permanecem.
+3. Removidos `seenHoliday` / `isFirstHolidayRow`, que existiam **só** para
+   escolher em qual linha desenhar "+ Funcionário" e "Excluir feriado" — ambos
+   agora fora da tabela.
+
+**Layout:** toda linha passa a ter exatamente data de compensação + "Excluir
+vínculo". Como `.holiday-actions` já é `flex` com `gap: 10px`, o alinhamento
+ficou uniforme sem tocar no CSS.
+
+**Preservado:** `showAddWorkedEmployeeModal` continua em uso pelo modal do
+calendário. Popup, filtros, calendário e demais abas intocados. Só UI, nenhum
+dado registrado alterado.
+
+**Testes:** `npm test` 47/47. `npm run validate` 17/17 suítes, incluindo
+"Vínculo manual de funcionário".
+
 ## 2026-08-22 — Feriados: "Excluir feriado" sai da tela principal (fica só no modal)
 
 **Pedido:** na aba Controle de Feriados, tela principal, remover a ação

@@ -302,7 +302,6 @@
       return `<tr><td colspan="8">Nenhum registro na tabela.</td></tr>`;
     }
 
-    const seenHoliday = new Set();
     return lines
       .map((line) => {
         const status = statusLabel(line);
@@ -313,9 +312,6 @@
         const originNote = line.workedItem?.origin
           ? `<small class="help-text">${esc(line.workedItem.origin)}</small>`
           : "";
-        const isFirstHolidayRow = !seenHoliday.has(line.holiday.id);
-        if (isFirstHolidayRow) seenHoliday.add(line.holiday.id);
-
         return `
         <tr>
           <td>${esc(line.employeeName)}${originNote}</td>
@@ -332,7 +328,6 @@
           <td>${compensationDisplay}</td>
           <td><span class="pill ${badgeClass}">${status}</span></td>
           <td class="actions holiday-actions">
-            ${isFirstHolidayRow ? `<button class="link-button" data-add-worked-employee="${esc(line.holiday.id)}" type="button">+ Funcionário</button>` : ""}
             ${line.employeeId ? `<input class="compact-date" type="date" data-compensation-date="${line.holiday.id}|${line.employeeId}" value="${esc(line.compensationDate)}" title="Data de compensação">` : ""}
             ${line.employeeId ? `<button class="link-button danger" data-unlink-holiday="${line.holiday.id}|${line.employeeId}" type="button">Excluir vínculo</button>` : ""}
           </td>
@@ -893,12 +888,10 @@
   }
 
   function bindTableActions(container) {
-
-    container.querySelectorAll("[data-add-worked-employee]").forEach((button) => {
-      button.addEventListener("click", () => {
-        showAddWorkedEmployeeModal(button.dataset.addWorkedEmployee, container);
-      });
-    });
+    // Adicionar funcionário a um feriado vive no botão global
+    // "+ Vincular funcionário a feriado" (topo da página) e no modal do
+    // calendário (data-link-employee-cal) — ambos usam showAddWorkedEmployeeModal
+    // / addManualWorkedEmployee. A tabela só edita e desfaz vínculos.
 
     container.querySelectorAll("[data-unlink-holiday]").forEach((button) => {
       button.addEventListener("click", () => {
