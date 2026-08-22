@@ -1,3 +1,34 @@
+2026-08-22 (3) — Funcionário inativo sai das telas operacionais + data de desligamento obrigatória
+- [CORREÇÃO] Adonias Lima Santana estava Inativo no Cadastro e já não aparecia na Escala (que tem regra própria via deactivatedAt), mas seguia visível no Controle de Feriados e na própria lista do Cadastro: não existia regra geral de visibilidade de inativos
+- [NOVO] REGRA FIXA — funcionário Inativo não aparece no Cadastro de Funcionários nem no Controle de Feriados. O dado nunca é apagado, some apenas da tela (PROJECT_RULES.md → "Cadastro de Funcionários → Funcionário inativo")
+- [NOVO] Feriados: applyInactiveVisibility roda logo depois de buildLines, para que contadores do topo, filtros e tabela enxerguem o mesmo conjunto de linhas. Vínculo órfão ("Funcionário não encontrado") continua visível — é dado a corrigir, não alguém desligado (Boolean(employee) na marcação)
+- [NOVO] Cadastro: isEmployeeVisibleByStatus. Exceção deliberada — com o filtro Status = Inativo o usuário pediu explicitamente os inativos, e o pedido vence a regra de ocultar (senão a tela viria vazia e o filtro ficaria quebrado). "Limpar filtros" volta ao padrão
+- [NOVO] Botão "Mostrar funcionários inativos (N)" nas duas telas, abrindo um seletor com um checkbox por funcionário: só quem for marcado reaparece. A seleção é de exibição, vive em memória, não grava nada e não reativa ninguém. Em Feriados lista só os inativos COM vínculo de feriado (marcar quem não tem vínculo não mudaria nada) e a linha que volta ganha a tag "Inativo"
+- [NOVO] js/inactive-employees.js (window.InactiveEmployeesUI): componente compartilhado do botão + seletor, para que as duas telas sejam idênticas em vez de duplicar ~150 linhas. Carregado no index.html depois de company-ui.js
+- [NOVO] Data de desligamento obrigatória ao inativar: askTerminationDate no botão "Inativar" da lista e na mudança de status pelo formulário; valida data futura e data anterior à admissão. Substitui o confirm() antigo, que não pedia data
+- [CORREÇÃO] A data informada alimenta deactivatedAt — o campo que a Escala usa para exibir o funcionário até o mês da saída. Antes o sistema assumia sempre "hoje", registrando saída errada para quem foi desligado em outra data
+- [COMPATIBILIDADE] setEmployeeStatus(id, status, company) sem o 4º parâmetro mantém o comportamento antigo (data já registrada ou hoje): importações e chamadas legadas seguem funcionando. upsertEmployee passou a respeitar deactivatedAt explícito, com prioridade informado > registrado > hoje
+- [NOVO] scripts/verify-inativos-visibilidade.mjs (25 asserções): data informada gravada, fallback legado, as duas regras de visibilidade e amarras de fonte
+- [NOVO] scripts/verify-inativos-picker-ui.mjs (17 asserções): roda o seletor no Chrome real — asserção de fonte não prova que um modal funciona, e o seletor é o coração do pedido. Cobre abrir com um checkbox por inativo, ativo fora da lista, marcar/desmarcar todos, Aplicar devolvendo só os marcados e Cancelar inerte
+- Arquivos: js/inactive-employees.js (novo), js/feriados.js, js/funcionarios.js, js/data.js, css/style.css, index.html, scripts/verify-inativos-visibilidade.mjs (novo), scripts/verify-inativos-picker-ui.mjs (novo), scripts/run-validate.mjs, PROJECT_RULES.md
+- npm test 47/47; npm run validate 19/19 suítes (17 + 2 novas). Deploy 20260822.03, commits 1e2105a + 2a459a1
+
+2026-08-22 (2) — Feriados: "+ Funcionário" sai da tabela (redundante com o botão global)
+- [CORREÇÃO] Depois da saída do "Excluir feriado", o "+ Funcionário" ficou deslocado na coluna Ações. Ele só era renderizado na primeira linha de cada feriado, então a coluna alternava entre 3 e 2 elementos entre linhas
+- [ANÁLISE] A mesma operação (AppData.addManualWorkedEmployee) já tinha dois caminhos, ambos preservados: o botão global "+ Vincular funcionário a feriado" no topo da página — que escolhe feriado E funcionário num passo só e funciona com a tabela vazia, situação em que o botão da linha nem aparecia — e o "+ Funcionário" do modal do calendário (data-link-employee-cal). O botão da linha era estritamente redundante
+- [REMOÇÃO] Botão data-add-worked-employee e seu handler em bindTableActions; removidos também seenHoliday/isFirstHolidayRow, que existiam só para posicionar os dois botões agora fora da tabela
+- [LAYOUT] Toda linha passa a ter exatamente data de compensação + "Excluir vínculo"; .holiday-actions (flex + gap) já alinha isso sem tocar no CSS
+- showAddWorkedEmployeeModal permanece — segue em uso pelo modal do calendário. Apenas UI, nenhum dado tocado
+- Arquivos: js/feriados.js
+- npm test 47/47; npm run validate 17/17 suítes. Deploy 20260822.02, commits 101d1da + 8a111bf
+
+2026-08-22 — Feriados: "Excluir feriado" sai da tela principal (fica só no modal)
+- [CORREÇÃO] A coluna Ações da tabela principal trazia dois botões destrutivos lado a lado: "Excluir vínculo" (por funcionário) e "Excluir feriado" (apaga o feriado e TODOS os vínculos). A exclusão definitiva já existia no modal "Gerenciar feriados" (data-popup-remove-holiday), então o botão da tabela era uma segunda porta para a mesma ação, com risco real de clique errado
+- [REMOÇÃO] Botão data-remove-holiday-perm da linha da tabela e seu handler em bindTableActions
+- confirmDeleteHolidayPermanent e AppData.removeCompanyHolidayPermanently preservados — seguem em uso pelo modal. Nada mudou no popup, no calendário, nos filtros ou em outras abas. Apenas UI, nenhum dado tocado
+- Arquivos: js/feriados.js
+- npm test 47/47; npm run validate 17/17 suítes. Deploy 20260822.01, commits 9a5a16a + 872a710
+
 2026-08-10 (3) — verify-print-escala: 8,7s → 2,7s (mesmas 55 asserções, mesmas medições)
 - [MELHORIA] CSS do projeto (style.css + print.css + escala-print.css) passa a ser lido UMA vez e embutido no HTML de cada caso, no lugar de três <link href="file://">. Com isso o page.goto saiu de ~900ms para ~80ms por caso: não havia mais requisição para o waitUntil "networkidle0" esperar (500ms de ociosidade por navegação). Nenhum dos três CSS usa url(), então não há caminho relativo a resolver — a cascata é idêntica
 - [MELHORIA] waitUntil de "networkidle0" para "load" (sem requisições, "load" já garante o CSS aplicado)

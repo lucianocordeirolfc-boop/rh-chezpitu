@@ -8,12 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260810.01` (exibida como `v2026.08.10.01`) — fonte: `js/version.js`
-- **Branch atual:** `main` — **2 commits à frente de `origin/main` (push NÃO feito)**
-- **Último commit:** `40e4e50` — chore: carimbo de build 20260810.01 (deploy lista completa de feriados, commit 62412f6)
-- **Status geral:** 🟢 EM PRODUÇÃO — frente "Feriados: lista completa de
-  cadastrados + editar/excluir por identidade" commitada e **deployada**
-  (`chez-pitu-rh.web.app`). ⚠️ Falta apenas o **push para `origin/main`**.
+- **Versão atual:** `20260822.03` (exibida como `v2026.08.22.03`) — fonte: `js/version.js`
+- **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito)
+- **Último commit:** `2a459a1` — chore: carimbo de build 20260822.03 (deploy da regra de funcionarios inativos)
+- **Status geral:** 🟢 EM PRODUÇÃO — frente "Funcionários inativos + limpeza de
+  ações do Controle de Feriados" commitada, pushada e **deployada**
+  (`chez-pitu-rh.web.app`). Três deploys na data: `20260822.01`, `.02` e `.03`.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -27,6 +27,39 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-08-22 — Funcionários inativos + limpeza de ações em Feriados (em produção)
+
+- ✅ **"Excluir feriado" fora da tela principal** (`20260822.01`, commit `9a5a16a`)
+  — a coluna Ações tinha dois botões destrutivos lado a lado; a exclusão
+  definitiva já existia no modal "Gerenciar feriados". Removidos o botão
+  `data-remove-holiday-perm` e seu handler. `confirmDeleteHolidayPermanent` e
+  `removeCompanyHolidayPermanently` preservados (em uso pelo modal).
+- ✅ **"+ Funcionário" fora da tabela** (`20260822.02`, commit `101d1da`) — só
+  era renderizado na 1ª linha de cada feriado, deixando a coluna alternando
+  entre 3 e 2 elementos. Redundante: o botão global "+ Vincular funcionário a
+  feriado" faz o mesmo, escolhe feriado E funcionário e funciona com a tabela
+  vazia. Removidos também `seenHoliday`/`isFirstHolidayRow`, que existiam só
+  para posicionar os dois botões agora fora da tabela.
+- ✅ **Regra de funcionário inativo** (`20260822.03`, commit `1e2105a`) —
+  inativo não aparece no Cadastro nem no Controle de Feriados; o dado nunca é
+  apagado, some apenas da tela. Feriados usa `applyInactiveVisibility` logo após
+  `buildLines` (contadores, filtros e tabela veem o mesmo conjunto); Cadastro usa
+  `isEmployeeVisibleByStatus`, com exceção deliberada para o filtro
+  Status = Inativo. Vínculo órfão continua visível (é dado a corrigir).
+- ✅ **Seletor "Mostrar funcionários inativos (N)"** — botão nas duas telas com
+  checkbox por funcionário; só o marcado reaparece. Módulo compartilhado
+  `js/inactive-employees.js` (`window.InactiveEmployeesUI`) para não duplicar o
+  componente. Seleção é de exibição, vive em memória e não grava nada.
+- ✅ **Data de desligamento obrigatória ao inativar** — `askTerminationDate` no
+  botão "Inativar" e no formulário; valida data futura e anterior à admissão.
+  Alimenta `deactivatedAt`, que a Escala usa para exibir o funcionário até o mês
+  da saída — antes o sistema assumia sempre "hoje". `setEmployeeStatus` sem o 4º
+  parâmetro mantém o comportamento antigo (compatibilidade com importações).
+- ✅ **Duas suítes novas** — `verify-inativos-visibilidade.mjs` (25 asserções,
+  regras) e `verify-inativos-picker-ui.mjs` (17 asserções, **Chrome real** via
+  puppeteer: asserção de fonte não prova que um modal funciona).
+  `npm run validate` passou de 17 para **19 suítes**.
 
 ### Frente 2026-08-10 — Feriados: lista completa + editar/excluir (em produção)
 
@@ -177,8 +210,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Próximas tarefas
 
-- ⏳ **Push de `main` para `origin/main`** (2 commits: `62412f6` + `40e4e50`) —
-  não autorizado ainda.
+- Decisão em aberto do usuário: no Cadastro, o filtro **Status = Inativo** hoje
+  mostra os inativos mesmo sem marcar ninguém no seletor (o pedido explícito
+  vence a regra de ocultar). Se preferir o contrário, é uma linha em
+  `isEmployeeVisibleByStatus` (`js/funcionarios.js`).
 - Varrer as demais fixtures em busca de outras datas absolutas sujeitas a prazo
   (a regra nova em `PROJECT_RULES.md` cobre o futuro, não o passado).
 - Diagnóstico **somente leitura** de feriados órfãos (existem no bloco da empresa
@@ -186,42 +221,74 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de validação
 
-- ⚠️ **Validação visual em produção pelo usuário** (Ctrl+F5 para
-  `?v=20260810.01`), **somente leitura**: abrir Controle de Feriados →
-  *+ Cadastrar feriado* e conferir se o filtro "Ano" lista 2027. Se 2027 não
-  aparecer, os dados foram perdidos pelo merge antigo nas **duas** fontes e
-  precisam ser recadastrados — não há recuperação por código.
+- ⏳ **Validação visual em produção pelo usuário** (Ctrl+F5 para
+  `?v=20260822.03`), **somente leitura**: (a) Adonias Lima Santana sumiu do
+  Controle de Feriados e do Cadastro; (b) o botão "Mostrar funcionários inativos
+  (1)" traz ele de volta quando marcado, com a tag "Inativo" na linha de
+  feriados; (c) inativar um funcionário não conclui sem a data de desligamento.
+- ✅ Validado pelo usuário: remoção do "Excluir feriado" e do "+ Funcionário" da
+  tela principal do Controle de Feriados (deploys `20260822.01` e `.02`).
 - ✅ Validado pelo usuário no preview (`20260618.02`): logos das duas empresas
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
 
-- ✅ **Frente de Feriados (`20260810.01`) — commitada e deployada** em
-  `chez-pitu-rh.web.app`. Verificado em produção: `js/version.js` com
-  `APP_VERSION 20260810.01` e commit `62412f6`; `js/feriados.js` publicado
-  contém `listRegisteredHolidays`; `index.html` pede `?v=20260810.01`.
-- ⚠️ **Push pendente** para `origin/main` (o Hosting já está atualizado; o
-  GitHub, não).
-- ℹ️ **Lição do deploy `20260810.01`:** `npm run deploy` **não** incrementa
+- ✅ **Frente de inativos (`20260822.03`) — commitada, pushada e deployada** em
+  `chez-pitu-rh.web.app`. `js/version.js` com `APP_VERSION 20260822.03` e commit
+  `1e2105a`; `index.html` pede `?v=20260822.03` e carrega o novo
+  `js/inactive-employees.js`.
+- ✅ Sem pendência de push: `main` e `origin/main` sincronizados em `2a459a1`.
+- ℹ️ **Lição reforçada em 2026-08-22:** `npm run deploy` **não** incrementa
   `APP_VERSION` — ela é manual em `js/version.js` e o `bump-cache` apenas a
-  propaga para os `?v=`. O primeiro deploy saiu com o `?v=` antigo
-  (`20260806.03`), publicando JS novo sob URL já cacheada; foi preciso subir a
-  versão e republicar. **Sempre editar `APP_VERSION` antes de `npm run deploy`.**
+  propaga para os `?v=`. Aconteceu de novo no deploy `20260822.01`: o
+  `bump-cache` avisou "Nenhum ?v= alterado (já em 20260810.01)" e o JS novo foi
+  publicado sob URL já cacheada (`/js/**` tem `max-age=3600`); foi preciso subir
+  a versão e republicar. **Sempre editar `APP_VERSION` antes de `npm run deploy`.**
 - ⚠️ Infra: garantir que a regra de leitura `logos/{cnpj}/...` permaneça publicada
   no Firebase Storage (Console → Storage → Regras).
 
 ## Arquivos modificados não commitados (snapshot)
 
 ```
+ M CHANGELOG.md
  M PROJECT_STATUS.md
  M .claude/project-state.md
 ```
-> Apenas documentação de estado (sincronização de versão para `20260810.01`).
+> Apenas documentação de estado (sincronização de versão para `20260822.03`).
 > `*.md` está no `ignore` do `firebase.json` — não exige deploy.
+> Todo o código da sessão já está commitado e pushado (`2a459a1`).
 
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT
+- **Data:** 2026-08-22
+- **Versão:** 20260822.03
+- **Branch:** main (sincronizado com `origin/main`)
+- **Commits:** `9a5a16a` + `872a710` (deploy `.01`) · `101d1da` + `8a111bf`
+  (deploy `.02`) · `1e2105a` + `2a459a1` (deploy `.03`)
+- **Arquivos alterados:** js/inactive-employees.js (novo) · js/feriados.js ·
+  js/funcionarios.js · js/data.js · css/style.css · index.html · js/version.js ·
+  scripts/verify-inativos-visibilidade.mjs (novo) ·
+  scripts/verify-inativos-picker-ui.mjs (novo) · scripts/run-validate.mjs ·
+  PROJECT_RULES.md · PROJECT_HISTORY.md · CHANGELOG.md · PROJECT_STATUS.md ·
+  .claude/project-state.md
+- **Resumo:** Três entregas, cada uma commitada e deployada em sequência.
+  (1) "Excluir feriado" saiu da tela principal do Controle de Feriados — ação
+  destrutiva duplicada ao lado de "Excluir vínculo"; permanece só no modal
+  "Gerenciar feriados". (2) "+ Funcionário" saiu da tabela — redundante com o
+  botão global "+ Vincular funcionário a feriado", que é mais completo; a coluna
+  Ações ficou uniforme. (3) Regra fixa de funcionários inativos: inativo não
+  aparece no Cadastro nem em Feriados, com botão "Mostrar funcionários inativos
+  (N)" e seletor individual nas duas telas (módulo compartilhado
+  `js/inactive-employees.js`), e data de desligamento obrigatória ao inativar,
+  alimentando `deactivatedAt`. Compatibilidade preservada para chamadas legadas.
+  Testes: `npm test` 47/47; `npm run validate` 17/17 → **19/19** (2 suítes novas,
+  uma delas exercitando o seletor no Chrome real).
+- **Próximo passo:** Validação visual do usuário em produção (`?v=20260822.03`),
+  somente leitura. Decisão em aberto: manter ou não a exceção do filtro
+  Status = Inativo no Cadastro.
 
 ### CHECKPOINT
 - **Data:** 2026-08-10 21:11

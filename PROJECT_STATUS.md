@@ -9,32 +9,35 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260810.01 (Feriados: lista completa de cadastrados em todos os anos
-+ editar/excluir por identidade, com escopo por empresa)
-**Data:** 2026-08-10
+**Versão:** 20260822.03 (Funcionário inativo fora das telas operacionais + data
+de desligamento obrigatória; limpeza de ações da tela de Feriados)
+**Data:** 2026-08-22
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
 
-Data: 10/08/2026
-Versão: 20260810.01 (Firebase Hosting — chez-pitu-rh)
-Commits: `62412f6` (fix) + `40e4e50` (carimbo de build)
+Data: 22/08/2026
+Versão: 20260822.03 (Firebase Hosting — chez-pitu-rh)
+Commits: `1e2105a` (feat) + `2a459a1` (carimbo de build)
 
-Inclui: **lista completa de feriados cadastrados** no popup Gerenciar Feriados —
-une o calendário global e o bloco da empresa, sem recorte de ano (feriados de
-2027 não apareciam), com filtro de ano e coluna de vínculos; **editar/excluir
-pela identidade** do feriado (data + nome), atingindo as duas fontes, levando
-TODOS os vínculos na exclusão e gravando tombstones de feriado e de vínculo;
-**escopo por empresa** em editar/excluir (entrada de calendário compartilhada é
-dividida/reduzida — a outra empresa nunca perde dado por tabela); e a **correção
-do merge do calendário**, que fazia "remoto vence" e descartava silenciosamente
-feriados criados localmente e ainda não sincronizados.
+Inclui a frente de **funcionários inativos**: funcionário com status Inativo
+deixa de aparecer no Cadastro de Funcionários e no Controle de Feriados (o dado
+nunca é apagado — some apenas da tela); botão **"Mostrar funcionários inativos
+(N)"** nas duas telas, com seletor de checkbox individual para trazer de volta
+quem o usuário quiser, via o módulo compartilhado `js/inactive-employees.js`; e
+**data de desligamento obrigatória** ao inativar, tanto pelo botão "Inativar"
+quanto pelo formulário, validada contra data futura e contra data anterior à
+admissão. A data alimenta `deactivatedAt`, que a Escala já usa para exibir o
+funcionário até o mês da saída — antes o sistema assumia sempre "hoje".
 
-Também: manutenção da suíte de testes (fixtures com data fixa que venciam
-sozinhas), `npm run validate` passou a rodar **todas** as 17 suítes mesmo com
-falha e o `verify-print-escala` caiu de 8,7s para 2,7s.
+Na mesma data, dois ajustes anteriores na tela principal do Controle de
+Feriados (deploys `20260822.01` e `20260822.02`): saída do botão **"Excluir
+feriado"**, que duplicava fora do modal uma ação destrutiva ao lado de "Excluir
+vínculo", e do **"+ Funcionário"**, redundante com o botão global "+ Vincular
+funcionário a feriado". A coluna Ações ficou uniforme: data de compensação +
+"Excluir vínculo" em toda linha.
 
-**Cache-busting:** todos os `?v=` do index.html em `20260810.01` — usuários
+**Cache-busting:** todos os `?v=` do index.html em `20260822.03` — usuários
 recebem a nova versão automaticamente no próximo carregamento (Ctrl+F5 força).
 
 ## Regra fixa vigente
@@ -51,8 +54,10 @@ somente leitura. Ver `PROJECT_RULES.md`.
 Escala de Folga: OK (+ guarda anti auto-vínculo vencido)
 Vale Transporte: OK
 Ausências: OK
-Controle de Feriados: OK (+ exclusão definitiva de feriado e de vínculo)
-Cadastro: OK (+ confirmação inativação, exclusão 24h, auditoria)
+Controle de Feriados: OK (+ exclusão definitiva de feriado e de vínculo; só
+funcionários ativos, com seletor de inativos)
+Cadastro: OK (+ inativação com data de desligamento obrigatória, exclusão 24h,
+auditoria; só funcionários ativos, com seletor de inativos)
 Informações Contador: OK
 Dashboard: OK
 
@@ -60,7 +65,7 @@ Dashboard: OK
 
 **Unit/Functional Tests:**
 - npm test: 47/47 ✓
-- npm run validate: 183/183 ✓
+- npm run validate: 19/19 suítes ✓
 
 **Offline Recovery Tests:**
 - npm run test:offline: 15/15 ✓
@@ -71,8 +76,13 @@ Dashboard: OK
 - verify-auto-vinculo-vencido-guard.mjs: 4/4 ✓
 - verify-feriados-retroativos.mjs: 25/25 ✓
 - scripts/verify-inativo-escala.mjs: 12/12 ✓ (deactivatedAt + visibilidade na Escala)
+- scripts/verify-inativos-visibilidade.mjs: 25/25 ✓ (inativo fora das telas +
+  data de desligamento obrigatória)
+- scripts/verify-inativos-picker-ui.mjs: 17/17 ✓ (seletor de inativos exercitado
+  no Chrome real, via puppeteer)
 
-**Total:** 245/245 testes passando ✅
+**Portão de qualidade (22/08/2026):** `npm test` 47/47 e `npm run validate`
+19/19 suítes — ambos verdes antes do commit e do deploy ✅
 
 ## Fase 3A — Segurança Operacional
 
