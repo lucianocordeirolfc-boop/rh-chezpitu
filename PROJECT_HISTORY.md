@@ -7,6 +7,62 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-22 (3) — Funcionário inativo some das telas + data de desligamento obrigatória
+
+**Origem:** Adonias Lima Santana está Inativo no Cadastro e já não aparecia na
+Escala (que tem regra própria desde a entrega do `deactivatedAt`), mas seguia
+visível no Controle de Feriados e na própria lista do Cadastro. Não existia
+regra geral de visibilidade de inativos.
+
+**O que foi feito:**
+
+1. **Regra de visibilidade (nova, fixa).** Inativo não aparece no Cadastro nem
+   no Controle de Feriados. O dado nunca é apagado — some só da tela.
+   - Feriados: `applyInactiveVisibility` roda logo depois de `buildLines`, de
+     modo que contadores do topo, filtros e tabela vejam o mesmo conjunto.
+     Vínculo órfão ("Funcionário não encontrado") continua visível: é dado a
+     corrigir, não alguém desligado — daí o `Boolean(employee)` na marcação.
+   - Cadastro: `isEmployeeVisibleByStatus`. **Exceção deliberada:** com o filtro
+     Status = Inativo o usuário pediu explicitamente os inativos, e o pedido
+     vence a regra — senão a tela viria vazia e o filtro ficaria quebrado.
+
+2. **Botão "Mostrar funcionários inativos (N)"** nas duas telas, idêntico, com
+   um seletor de checkbox por funcionário: só quem for marcado reaparece. Para
+   não duplicar ~150 linhas em dois arquivos, virou o módulo compartilhado
+   `js/inactive-employees.js` (`window.InactiveEmployeesUI`), carregado no
+   index.html depois de company-ui.js. A seleção é de exibição, vive em memória
+   e não grava nada. Em Feriados a lista traz só os inativos **com vínculo de
+   feriado** — marcar quem não tem vínculo não mudaria nada na tela — e a linha
+   que volta ganha a tag "Inativo".
+
+3. **Data de desligamento obrigatória ao inativar.** O botão "Inativar" da lista
+   e a mudança de status pelo formulário passam por `askTerminationDate`, que só
+   conclui com data informada, não futura e não anterior à admissão. O antigo
+   `confirm()` sem data saiu. A data alimenta `deactivatedAt` — o mesmo campo que
+   a Escala usa para exibir o funcionário até o mês da saída. Antes o sistema
+   assumia "hoje"; agora registra o dia real.
+
+**Compatibilidade:** `setEmployeeStatus(id, status, company)` sem o 4º parâmetro
+mantém o comportamento antigo (data já registrada ou hoje), então importações e
+chamadas legadas seguem funcionando. `upsertEmployee` passou a respeitar um
+`deactivatedAt` explícito, com a mesma ordem de prioridade documentada no código.
+
+**Arquivos:** `js/inactive-employees.js` (novo), `js/feriados.js`,
+`js/funcionarios.js`, `js/data.js`, `css/style.css`, `index.html`,
+`scripts/verify-inativos-visibilidade.mjs` (novo),
+`scripts/verify-inativos-picker-ui.mjs` (novo), `scripts/run-validate.mjs`,
+`PROJECT_RULES.md`.
+
+**Testes:** `npm test` 47/47. `npm run validate` **19/19** suítes (17 + 2 novas).
+- `verify-inativos-visibilidade` (25 asserções): data informada gravada, fallback
+  legado preservado, as duas regras de visibilidade e amarras de fonte.
+- `verify-inativos-picker-ui` (17 asserções) roda o componente **no Chrome real**:
+  asserção de fonte não prova que um modal funciona, e o seletor é o coração do
+  pedido. Cobre abrir com um checkbox por inativo, ativo fora da lista,
+  marcar/desmarcar todos, Aplicar devolvendo só os marcados e Cancelar inerte.
+
+**Dados:** nada alterado. Adonias segue na base, com histórico completo.
+
 ## 2026-08-22 (2) — Feriados: "+ Funcionário" sai da tabela (redundante com o botão global)
 
 **Pedido:** ajustar o layout da tela principal do Controle de Feriados — o botão

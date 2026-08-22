@@ -92,6 +92,26 @@ Cada funcionário deve ter:
 
 employeeId é o vínculo principal do sistema.
 
+### Funcionário inativo (REGRA FIXA)
+
+Funcionário com status **Inativo** não aparece nas telas operacionais:
+Cadastro de Funcionários, Escala de Folga e Controle de Feriados.
+
+O dado nunca é apagado — some apenas da tela. Para consultar ou reativar, cada
+tela tem o botão **"Mostrar funcionários inativos (N)"**, que abre um seletor
+onde se marca individualmente quem deve reaparecer. A seleção é de exibição,
+vale só para aquela sessão e não altera nenhum registro.
+
+No Cadastro, o filtro **Status = Inativo** também traz os inativos: é um pedido
+explícito do usuário e vence a regra de ocultar.
+
+**Inativar exige a data de desligamento.** Tanto o botão "Inativar" da lista
+quanto a mudança de status pelo formulário abrem uma caixa de diálogo que só
+conclui com uma data informada — não futura e não anterior à admissão. A data é
+gravada em `deactivatedAt` e é o que a Escala usa para exibir o funcionário até
+o mês da saída (nunca em meses posteriores). Chamadas sem data (importações e
+código legado) mantêm o fallback antigo: data já registrada ou hoje.
+
 ## Escala de Folga
 
 A escala deve respeitar:
@@ -172,6 +192,10 @@ Regra:
 - Agendado: com data futura de compensação.
 - Compensado: já compensado.
 - Vencido: passou de 120 dias e não compensou.
+
+A tela principal mostra apenas funcionários **ativos** — o vínculo de quem foi
+desligado continua na base, mas só reaparece pelo botão "Mostrar funcionários
+inativos". Ver "Cadastro de Funcionários → Funcionário inativo (REGRA FIXA)".
 
 ## Exclusão de feriado (definitiva)
 

@@ -70,7 +70,10 @@
     department: "todos",
     role: "todos",
     status: "todos",
-    source: "todos"
+    source: "todos",
+    // Funcionários inativos ficam fora da lista por padrão. Aqui entram apenas
+    // os ids que o usuário marcou no seletor "Mostrar funcionários inativos".
+    visibleInactiveIds: new Set()
   };
 
   function esc(value) {
@@ -143,11 +146,24 @@
     return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }
 
+  /**
+   * Regra de visibilidade de inativos no Cadastro.
+   * Inativo não aparece, salvo se marcado no seletor. Exceção: quando o filtro
+   * Status está explicitamente em "Inativo", o usuário pediu a lista de
+   * inativos — o filtro explícito vence, senão a tela viria vazia.
+   */
+  function isEmployeeVisibleByStatus(employee) {
+    if (AppData.isEmployeeActive(employee)) return true;
+    if (listFilters.status === "Inativo") return true;
+    return listFilters.visibleInactiveIds.has(employee.id);
+  }
+
   function filterEmployees(employees) {
     const search = normalizeSearch(listFilters.search);
     const searchDigits = normalizeSearchDigits(listFilters.search);
 
     const filtered = employees.filter((employee) => {
+      if (!isEmployeeVisibleByStatus(employee)) return false;
       const searchable = normalizeSearch(
         [employee.name, employee.cpf, employee.role, employee.department, employee.company, employee.ctps].join(" ")
       );
@@ -768,7 +784,7 @@
       });
     }
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const formData = new FormData(form);
       const payload = Object.fromEntries(formData.entries());
@@ -803,18 +819,16 @@
       payload.source = existing?.source === "imported" ? "imported" : "manual";
       payload.vtDaily = AppData.parseVtDaily(payload.vtDaily);
 
-      // Fase 3A — Confirmação obrigatória ao inativar funcionário
+      // Fase 3A — Confirmação obrigatória ao inativar funcionário.
+      // Desde 22/08/2026 a confirmação exige a data de desligamento: sem data
+      // informada não há inativação (o campo alimenta deactivatedAt, usado pela
+      // Escala para saber até que mês o funcionário ainda aparece).
       if (existing && existing.status === "Ativo" && payload.status === "Inativo") {
-        const employeeName = esc(existing.name || "Funcionário");
-        const isConfirmed = window.confirm(
-          `Tem certeza que deseja INATIVAR ${employeeName}?\n\n` +
-          "O funcionário não aparecerá mais em listas e cálculos,\n" +
-          "mas os dados históricos serão preservados.\n\n" +
-          "Esta ação não pode ser desfeita facilmente."
-        );
-        if (!isConfirmed) {
-          return; // Cancelou, não salva
+        const terminationDate = await askTerminationDate(existing);
+        if (!terminationDate) {
+          return; // Cancelou: nada é salvo, nem as demais edições do formulário
         }
+        payload.deactivatedAt = terminationDate;
       }
 
       try {
@@ -913,6 +927,122 @@
     `
       )
       .join("");
+  }
+
+  /**
+   * Caixa de diálogo obrigatória ao inativar um funcionário.
+   * Resolve com a data de desligamento (ISO) ou com null se o usuário cancelar.
+   * Sem data informada não há inativação — é o carimbo que a Escala usa para
+   * saber até que mês o funcionário ainda aparece.
+   */
+  function askTerminationDate(employee) {
+    const employeeName = employee?.name || "Funcionário";
+    const admissionDate = String(employee?.admissionDate || "").trim();
+    return new Promise((resolve) => {
+      document.getElementById("terminationDatePicker")?.remove();
+
+      const picker = document.createElement("div");
+      picker.id = "terminationDatePicker";
+      picker.className = "co-holiday-picker";
+      picker.innerHTML = `
+        <p class="co-picker-title">Inativar funcionário</p>
+        <p class="co-picker-hint">
+          <strong>${esc(employeeName)}</strong> deixa de aparecer nas listas
+          e na escala futura. O histórico é preservado.
+          ${admissionDate ? `<br>Admissão: ${esc(AppData.formatDateBR(admissionDate))}.` : ""}
+        </p>
+        <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;font-weight:600">
+            Data de desligamento (obrigatória)
+            <input id="terminationDateInput" type="date" class="field-select" max="${esc(AppData.todayISO())}"${admissionDate ? ` min="${esc(admissionDate)}"` : ""} required>
+          </label>
+          <p id="terminationDateError" class="help-text" style="color:var(--danger,#c0392b);display:none;margin:0"></p>
+        </div>
+        <div class="co-picker-actions">
+          <button id="terminationCancel" class="secondary btn-sm" type="button">Cancelar</button>
+          <button id="terminationConfirm" class="primary btn-sm" type="button">Inativar</button>
+        </div>
+      `;
+
+      const backdrop = document.createElement("div");
+      backdrop.className = "modal-backdrop";
+      const wrapper = document.createElement("div");
+      wrapper.className = "modal-center";
+      wrapper.appendChild(picker);
+      backdrop.appendChild(wrapper);
+      document.body.appendChild(backdrop);
+
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        backdrop.remove();
+        resolve(value);
+      };
+
+      const input = picker.querySelector("#terminationDateInput");
+      const errorEl = picker.querySelector("#terminationDateError");
+      const showError = (message) => {
+        errorEl.textContent = message;
+        errorEl.style.display = "block";
+        input.focus();
+      };
+
+      picker.querySelector("#terminationCancel").addEventListener("click", () => finish(null));
+      picker.querySelector("#terminationConfirm").addEventListener("click", () => {
+        const value = String(input.value || "").trim();
+        if (!value) {
+          showError("Informe a data de desligamento para inativar o funcionário.");
+          return;
+        }
+        if (value > AppData.todayISO()) {
+          showError("A data de desligamento não pode ser futura.");
+          return;
+        }
+        if (admissionDate && value < admissionDate) {
+          showError(`A data de desligamento não pode ser anterior à admissão (${AppData.formatDateBR(admissionDate)}).`);
+          return;
+        }
+        finish(value);
+      });
+
+      input.focus();
+
+      setTimeout(() => {
+        const outsideClick = (event) => {
+          if (!wrapper.contains(event.target)) {
+            document.removeEventListener("mousedown", outsideClick);
+            finish(null);
+          }
+        };
+        document.addEventListener("mousedown", outsideClick);
+      }, 0);
+    });
+  }
+
+  function renderInactiveToggle(allEmployees) {
+    const inactives = window.InactiveEmployeesUI?.listInactive(allEmployees) || [];
+    const visibleCount = inactives.filter((employee) => listFilters.visibleInactiveIds.has(employee.id)).length;
+    return (
+      window.InactiveEmployeesUI?.toggleButtonHTML({
+        id: "btnShowInactiveEmployees",
+        total: inactives.length,
+        visibleCount
+      }) || ""
+    );
+  }
+
+  function openInactiveEmployeesPicker(container) {
+    const allEmployees = applyPageCompanyToEmployeeList(getAllEmployeesFlat());
+    window.InactiveEmployeesUI?.openPicker({
+      employees: allEmployees,
+      visibleIds: listFilters.visibleInactiveIds,
+      contextLabel: `Cadastro · ${AppData.getActiveCompany()}`,
+      onApply: (chosen) => {
+        listFilters.visibleInactiveIds = chosen;
+        window.App.renderCurrent();
+      }
+    });
   }
 
   function updateEmployeeList(container) {
@@ -1080,6 +1210,7 @@
       listFilters.role = "todos";
       listFilters.status = "todos";
       listFilters.source = "todos";
+      listFilters.visibleInactiveIds = new Set();
       window.App.renderCurrent();
     });
   }
@@ -1091,6 +1222,10 @@
 
     container.querySelector("#btnNewEmployee")?.addEventListener("click", () => {
       openEmployeePopup(container);
+    });
+
+    container.querySelector("#btnShowInactiveEmployees")?.addEventListener("click", () => {
+      openInactiveEmployeesPicker(container);
     });
 
     container.querySelector("#btnOpenAudit")?.addEventListener("click", () => {
@@ -1123,14 +1258,27 @@
         const inactivateBtn = event.target.closest("[data-inactivate]");
         if (inactivateBtn) {
           event.preventDefault();
-          if (!confirm("Inativar este funcionário? Ele deixa de aparecer na escala futura, mas o histórico é preservado.")) return;
-          try {
-            AppData.setEmployeeStatus(inactivateBtn.dataset.inactivate, "Inativo", inactivateBtn.dataset.company);
-          } catch (error) {
-            alert(error?.message || "Não foi possível inativar o funcionário.");
+          const employeeId = inactivateBtn.dataset.inactivate;
+          const company = inactivateBtn.dataset.company;
+          const employee = AppData.getCompanyData(company).employees.find((item) => item.id === employeeId);
+          if (!employee) {
+            alert("Funcionário não encontrado.");
             return;
           }
-          window.App.renderCurrent();
+          askTerminationDate(employee).then((terminationDate) => {
+            if (!terminationDate) return; // cancelou: nada é alterado
+            try {
+              AppData.setEmployeeStatus(employeeId, "Inativo", company, { terminationDate });
+            } catch (error) {
+              alert(error?.message || "Não foi possível inativar o funcionário.");
+              return;
+            }
+            window.App?.toast?.(
+              `${employee.name} inativado. Desligamento em ${AppData.formatDateBR(terminationDate)}.`,
+              "success"
+            );
+            window.App.renderCurrent();
+          });
           return;
         }
 
@@ -1261,7 +1409,10 @@
               <p class="eyebrow">Consulta</p>
               <h2>Lista de funcionários</h2>
             </div>
-            <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo funcionário</button>
+            <div class="func-table-card-actions">
+              ${renderInactiveToggle(allEmployees)}
+              <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo funcionário</button>
+            </div>
           </div>
           ${renderListToolbar(allEmployees, filteredEmployees.length, companyCount, allEmployees.length)}
           ${tableXScrollWrap(`

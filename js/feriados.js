@@ -8,7 +8,10 @@
     status: "todos",
     prazo: "todos",
     compDateFrom: "",
-    compDateTo: ""
+    compDateTo: "",
+    // Vínculos de funcionário inativo ficam fora da tela por padrão. Aqui entram
+    // apenas os ids marcados no seletor "Mostrar funcionários inativos".
+    visibleInactiveIds: new Set()
   };
 
   let searchDelegationReady = false;
@@ -139,6 +142,10 @@
           return {
             holiday,
             employee,
+            // Só marca como inativo quem existe no cadastro e está com status
+            // Inativo. Vínculo órfão (funcionário não encontrado) continua
+            // visível — é dado a corrigir, não alguém desligado.
+            employeeInactive: Boolean(employee) && !AppData.isEmployeeActive(employee),
             employeeId: item.employeeId,
             employeeName: employee?.name || "Funcionário não encontrado",
             department: employee?.department || "",
@@ -150,6 +157,64 @@
             company: companyLabel
           };
         });
+    });
+  }
+
+  /**
+   * Regra de visibilidade: o Controle de Feriados mostra apenas funcionários
+   * ativos. Um inativo só reaparece se marcado no seletor "Mostrar funcionários
+   * inativos". O vínculo continua na base — muda apenas o que a tela exibe.
+   *
+   * Aplicado logo depois de buildLines, para que os contadores do topo, os
+   * filtros e a tabela enxerguem exatamente o mesmo conjunto de linhas.
+   */
+  function applyInactiveVisibility(lines) {
+    return lines.filter((line) => {
+      if (!line.employeeInactive) return true;
+      return filterState.visibleInactiveIds.has(line.employeeId);
+    });
+  }
+
+  function buildVisibleLines(data, companyKey) {
+    return applyInactiveVisibility(buildLines(data, companyKey));
+  }
+
+  /**
+   * Inativos que têm vínculo de feriado nesta empresa — os únicos que o seletor
+   * tem como trazer de volta à tela. Um inativo sem vínculo nenhum não entra na
+   * lista porque marcá-lo não mudaria nada.
+   */
+  function inactiveEmployeesWithLinks(lines, data) {
+    const ids = new Set(lines.filter((line) => line.employeeInactive).map((line) => line.employeeId));
+    return (data.employees || []).filter((employee) => ids.has(employee.id));
+  }
+
+  function renderInactiveToggle(lines, data) {
+    const inactives = inactiveEmployeesWithLinks(lines, data);
+    const visibleCount = inactives.filter((employee) => filterState.visibleInactiveIds.has(employee.id)).length;
+    return (
+      window.InactiveEmployeesUI?.toggleButtonHTML({
+        id: "openInactiveHolidayEmployees",
+        total: inactives.length,
+        visibleCount,
+        // Mesma altura dos botões vizinhos desta toolbar (que não usam btn-sm).
+        className: "secondary"
+      }) || ""
+    );
+  }
+
+  function openInactiveEmployeesPicker() {
+    const company = AppData.getPrimaryPageCompany("feriados");
+    const data = AppData.getCompanyData(company);
+    const inactives = inactiveEmployeesWithLinks(buildLines(data, company), data);
+    window.InactiveEmployeesUI?.openPicker({
+      employees: inactives,
+      visibleIds: filterState.visibleInactiveIds,
+      contextLabel: `Controle de feriados · ${company}`,
+      onApply: (chosen) => {
+        filterState.visibleInactiveIds = chosen;
+        window.App.renderCurrent();
+      }
     });
   }
 
@@ -312,9 +377,12 @@
         const originNote = line.workedItem?.origin
           ? `<small class="help-text">${esc(line.workedItem.origin)}</small>`
           : "";
+        // Inativo só chega aqui quando o usuário pediu para exibi-lo; a marca
+        // deixa claro que aquela linha é de alguém desligado.
+        const inactiveNote = line.employeeInactive ? `<span class="pill muted">Inativo</span>` : "";
         return `
         <tr>
-          <td>${esc(line.employeeName)}${originNote}</td>
+          <td>${esc(line.employeeName)}${inactiveNote}${originNote}</td>
           <td>${esc(line.holiday.name)}</td>
           <td>${esc(line.department || "-")} / ${esc(line.company)}</td>
           <td>${formatDateBR(line.holiday.date)}</td>
@@ -338,9 +406,17 @@
   }
 
   function renderFilters(data) {
+    // Só ativos — mais os inativos que o usuário mandou exibir, senão o filtro
+    // não teria como selecionar quem está na tela.
     const employees = data.employees
-      .filter((employee) => AppData.isEmployeeActive(employee))
-      .map((employee) => ({ value: employee.id, label: employee.name }));
+      .filter(
+        (employee) =>
+          AppData.isEmployeeActive(employee) || filterState.visibleInactiveIds.has(employee.id)
+      )
+      .map((employee) => ({
+        value: employee.id,
+        label: AppData.isEmployeeActive(employee) ? employee.name : `${employee.name} (inativo)`
+      }));
     // Filtro "Feriado": cada feriado uma única vez — ignora soft-deletados e
     // deduplica por nome + data (defensivo, mesmo antes do dedup persistir).
     const seenHolidayKeys = new Set();
@@ -471,7 +547,7 @@
   function refreshTable(container) {
     const company = AppData.getPrimaryPageCompany("feriados");
     const data = AppData.getCompanyData(company);
-    const allLines = buildLines(data, company);
+    const allLines = buildVisibleLines(data, company);
     const filteredLines = applyFilters(allLines);
     const tbody = container.querySelector("[data-holiday-tbody]");
     if (tbody) {
@@ -1513,6 +1589,10 @@
       openHolidayRegisterPopup(container);
     });
 
+    container.querySelector("#openInactiveHolidayEmployees")?.addEventListener("click", () => {
+      openInactiveEmployeesPicker();
+    });
+
     ImportUtils.bindImportModal(container, "holidayImportModal", {
       buttonId: "importOldHolidays",
       run: () => runHolidayImport(container)
@@ -1856,7 +1936,8 @@
 
     const company = AppData.getPrimaryPageCompany("feriados");
     const data = AppData.getCompanyData(company);
-    const allLines = buildLines(data, company);
+    const rawLines = buildLines(data, company);
+    const allLines = applyInactiveVisibility(rawLines);
     const filteredLines = applyFilters(allLines);
     const lineStats = computeStatsFromLines(allLines);
     const autoPendingCount = window.ScaleRules?.countAutoPendingHolidays(company) || 0;
@@ -1868,6 +1949,7 @@
           ${renderQuickNav(allLines, lineStats, autoPendingCount)}
         </div>
         <div class="feriados-toolbar-actions">
+          ${renderInactiveToggle(rawLines, data)}
           <button type="button" class="primary" id="openLinkEmployeeHoliday">+ Vincular funcionário a feriado</button>
           <button type="button" class="primary" id="openHolidayRegister">+ Cadastrar feriado</button>
         </div>

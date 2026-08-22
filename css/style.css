@@ -1640,6 +1640,47 @@ small.progress-hint.progress-tone-info {
   justify-content: flex-end;
 }
 
+/* ─── Seletor "Mostrar funcionários inativos" ─── */
+.inactive-picker-list {
+  display: grid;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 12px 0;
+  padding: 4px 2px;
+  border-top: 1px solid var(--line, #e3e8f0);
+  border-bottom: 1px solid var(--line, #e3e8f0);
+}
+
+.inactive-picker-line {
+  align-items: flex-start;
+  padding: 6px 4px;
+  font-size: 0.85rem;
+}
+
+.inactive-picker-line small {
+  display: block;
+  font-weight: 500;
+}
+
+.inactive-picker-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Empurra Cancelar/Aplicar para a direita, deixando os atalhos à esquerda. */
+.inactive-picker-actions .link-button + .link-button {
+  margin-right: auto;
+}
+
+/* Ações do cabeçalho da lista de funcionários (inativos + novo funcionário). */
+.func-table-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .code-mm { background: #dce8ff; }
 .code-tm { background: #c4d4f8; }
 .code-nm { background: #a8bef0; }

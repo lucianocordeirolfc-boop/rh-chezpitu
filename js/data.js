@@ -2975,8 +2975,11 @@
     if (normalized.status === "Inativo") {
       const stillInactive =
         existing && String(existing.status || "").trim().toLowerCase() === "inativo";
+      // Data informada no formulário tem prioridade (o pop-up a exige ao passar
+      // de Ativo para Inativo); depois a já registrada; por último, hoje.
+      const informed = String(employee.deactivatedAt || "").trim();
       normalized.deactivatedAt =
-        stillInactive && existing.deactivatedAt ? existing.deactivatedAt : todayISO();
+        informed || (stillInactive && existing.deactivatedAt ? existing.deactivatedAt : todayISO());
     }
 
     // Carimbo de versão p/ sincronização newer-wins entre PCs (mergeEmployeesById).
@@ -3052,7 +3055,7 @@
   // Altera apenas o status (Ativo/Inativo) preservando todos os demais campos —
   // usado pelo botão "Inativar/Reativar" da lista. Registra auditoria e ajusta
   // deactivatedAt com a mesma regra do upsertEmployee. Retorna o funcionário.
-  function setEmployeeStatus(id, status, company) {
+  function setEmployeeStatus(id, status, company, options = {}) {
     const resolved = company || getPrimaryPageCompany("funcionarios");
     const data = getCompanyData(resolved);
     const employee = (data.employees || []).find((item) => item.id === id);
@@ -3063,7 +3066,11 @@
 
     employee.status = nextStatus;
     if (nextStatus === "Inativo") {
-      employee.deactivatedAt = employee.deactivatedAt || todayISO();
+      // Data de desligamento informada pelo usuário quando existir (a UI a
+      // exige). Sem ela, mantém o comportamento anterior: data já registrada
+      // ou hoje — importações e chamadas antigas continuam funcionando.
+      const informed = String(options.terminationDate || "").trim();
+      employee.deactivatedAt = informed || employee.deactivatedAt || todayISO();
     } else {
       delete employee.deactivatedAt;
     }
