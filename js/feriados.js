@@ -335,7 +335,6 @@
             ${isFirstHolidayRow ? `<button class="link-button" data-add-worked-employee="${esc(line.holiday.id)}" type="button">+ Funcionário</button>` : ""}
             ${line.employeeId ? `<input class="compact-date" type="date" data-compensation-date="${line.holiday.id}|${line.employeeId}" value="${esc(line.compensationDate)}" title="Data de compensação">` : ""}
             ${line.employeeId ? `<button class="link-button danger" data-unlink-holiday="${line.holiday.id}|${line.employeeId}" type="button">Excluir vínculo</button>` : ""}
-            ${isFirstHolidayRow ? `<button class="link-button danger" data-remove-holiday-perm="${esc(line.holiday.id)}" type="button" title="Excluir o feriado e todos os vínculos, definitivamente">Excluir feriado</button>` : ""}
           </td>
         </tr>
       `;
@@ -912,25 +911,8 @@
       });
     });
 
-    container.querySelectorAll("[data-remove-holiday-perm]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const holidayId = button.dataset.removeHolidayPerm;
-        const company = AppData.getPrimaryPageCompany("feriados");
-        const data = AppData.getCompanyData(company);
-        const holiday = (data.holidays || []).find((item) => item.id === holidayId);
-        if (!holiday) return;
-        if (!confirmDeleteHolidayPermanent(holiday)) return;
-        const result = AppData.removeCompanyHolidayPermanently(holidayId, { company });
-        if (result?.ok) {
-          window.App?.toast?.(
-            `Feriado "${result.name}" excluído definitivamente.`,
-            "success"
-          );
-        }
-        refreshTable(container);
-        window.App.renderCurrent();
-      });
-    });
+    // Excluir feriado permanente vive apenas no modal "Gerenciar feriados"
+    // (bindCompanyHolidayManager / data-popup-remove-holiday).
 
     container.querySelectorAll("[data-compensation-date]").forEach((input) => {
       input.addEventListener("change", () => {

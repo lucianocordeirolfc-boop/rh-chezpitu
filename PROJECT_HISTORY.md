@@ -7,6 +7,36 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-22 — Feriados: "Excluir feriado" sai da tela principal (fica só no modal)
+
+**Pedido:** na aba Controle de Feriados, tela principal, remover a ação
+**Excluir feriado**, deixando apenas **Excluir vínculo**. A exclusão definitiva
+permanece exatamente como já estava dentro do modal "Gerenciar feriados".
+
+**Causa da duplicidade:** o botão `data-remove-holiday-perm` era renderizado na
+primeira linha de cada feriado na tabela principal (`js/feriados.js`), além do
+`data-popup-remove-holiday` que já existia no modal. Duas portas para a mesma
+ação destrutiva (apaga o feriado e todos os vínculos), sendo que a da tabela
+ficava ao lado do "Excluir vínculo" — risco real de clique errado.
+
+**O que foi feito (2 pontos, só em `js/feriados.js`):**
+
+1. Removido o botão "Excluir feriado" da coluna de ações da tabela principal.
+   O "Excluir vínculo" (`data-unlink-holiday`), o "+ Funcionário" e o campo de
+   data de compensação seguem intactos.
+2. Removido o handler `[data-remove-holiday-perm]` de `bindTableActions`, que
+   ficaria órfão, com comentário apontando que a exclusão definitiva vive em
+   `bindCompanyHolidayManager` / `data-popup-remove-holiday`.
+
+**Preservado:** `confirmDeleteHolidayPermanent` e
+`AppData.removeCompanyHolidayPermanently` continuam existindo — são usados pelo
+modal. Nada mudou no popup, no calendário, nos filtros ou em outras abas.
+Alteração puramente de UI: nenhum dado registrado foi tocado.
+
+**Testes:** `npm test` 47/47. `npm run validate` 17/17 suítes — incluindo
+"Feriados — exclusão definitiva", "Feriados — lista completa/editar/excluir" e a
+asserção de que as linhas de funcionário só têm "Excluir vínculo".
+
 ## 2026-08-10 (3) — verify-print-escala: 8,7s → 2,7s sem perder fidelidade
 
 **Origem:** a suíte de impressão consumia 8,7s dos ~10,6s do `npm run validate`.
