@@ -9,12 +9,28 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260829.01 (Contador: pop-up "+ Lançamento" carregado com os dados
-do mês selecionado; tela de lançamentos sem coluna Ações)
+**Versão:** 20260829.02 (Contador: pop-up "+ Lançamento" com os dados do mês;
+grade de Lançamentos só com quem tem lançamento, em ordem alfabética)
 **Data:** 2026-08-29
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
+
+Data: 29/08/2026
+Versão: 20260829.02 (Firebase Hosting — chez-pitu-rh)
+Commits: `3a1cf80` (feat) + `6c7e701` (carimbo de build)
+
+Sub-aba **Lançamentos** (a aba Resumo não foi tocada): a grade passou a mostrar
+**só funcionários com lançamento no mês** — registro com os oito campos zerados
+não conta e sai da tela, embora continue gravado — em **ordem alfabética igual à
+da aba Resumo** (`localeCompare` pt-BR sobre o nome oficial, aplicado a uma
+cópia do array para não reordenar o dado gravado). Ao lado do botão
+"+ Lançamento" entrou a linha **"Somente funcionários com lançamentos no mês"**,
+centralizada no espaço entre o fim do botão e a borda da última coluna (Vales).
+
+**Cache-busting:** todos os `?v=` do index.html em `20260829.02`.
+
+## Deploy anterior
 
 Data: 29/08/2026
 Versão: 20260829.01 (Firebase Hosting — chez-pitu-rh)
@@ -33,9 +49,7 @@ lançamentos, com os botões editar/excluir — a edição é toda pelo pop-up
 submit passou a gravar na mesma empresa de onde leu (`getPrimaryPageCompany`),
 em vez de resolver de novo por `getActiveCompany`.
 
-**Cache-busting:** todos os `?v=` do index.html em `20260829.01`.
-
-## Deploy anterior
+## Deploy 20260822.03
 
 Data: 22/08/2026
 Versão: 20260822.03 (Firebase Hosting — chez-pitu-rh)
@@ -80,7 +94,8 @@ funcionários ativos, com seletor de inativos)
 Cadastro: OK (+ inativação com data de desligamento obrigatória, exclusão 24h,
 auditoria; só funcionários ativos, com seletor de inativos)
 Informações Contador: OK (+ pop-up "+ Lançamento" com a base do mês
-selecionado; tela de lançamentos sem coluna Ações)
+selecionado; tela de lançamentos sem coluna Ações, só com quem tem lançamento no
+mês e em ordem alfabética)
 Dashboard: OK
 
 ## Testes
@@ -93,8 +108,9 @@ Dashboard: OK
 - npm run test:offline: 15/15 ✓
 
 **Homologação da frente atual (`scripts/verify-*.mjs`, sandbox com fixtures):**
-- scripts/verify-contador-lancamento-popup.mjs: 46/46 ✓ (pop-up "+ Lançamento"
-  no Chrome real: base do mês, merge por funcionário e demais registros intactos)
+- scripts/verify-contador-lancamento-popup.mjs: 60/60 ✓ (pop-up "+ Lançamento"
+  no Chrome real: base do mês, merge por funcionário, demais registros intactos,
+  grade filtrada e ordenada, layout do aviso e aba Resumo preservada)
 - verify-exclusao-feriado-definitiva.mjs: 15/15 ✓
 - verify-vinculo-tombstone.mjs: 16/16 ✓
 - verify-auto-vinculo-vencido-guard.mjs: 4/4 ✓

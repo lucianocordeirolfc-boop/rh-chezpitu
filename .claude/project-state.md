@@ -8,12 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260822.03` (exibida como `v2026.08.22.03`) — fonte: `js/version.js`
+- **Versão atual:** `20260829.02` (exibida como `v2026.08.29.02`) — fonte: `js/version.js`
 - **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito)
-- **Último commit:** `2a459a1` — chore: carimbo de build 20260822.03 (deploy da regra de funcionarios inativos)
-- **Status geral:** 🟢 EM PRODUÇÃO — frente "Funcionários inativos + limpeza de
-  ações do Controle de Feriados" commitada, pushada e **deployada**
-  (`chez-pitu-rh.web.app`). Três deploys na data: `20260822.01`, `.02` e `.03`.
+- **Último commit:** `6c7e701` — chore: carimbo de build 20260829.02 (deploy da grade de Lancamentos filtrada e ordenada)
+- **Status geral:** 🟢 EM PRODUÇÃO — duas entregas no Contador na data
+  (`20260829.01` e `.02`), ambas commitadas, pushadas e **deployadas**
+  (`chez-pitu-rh.web.app`, verificadas por `curl`).
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -27,6 +27,68 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-08-29 (2) — Contador/Lançamentos: grade filtrada e ordenada (em produção)
+
+- ✅ **Só funcionários com lançamento no mês** (`20260829.02`, commit `3a1cf80`)
+  — `getLancamentosParaGrade` filtra por `hasAnyValue`: registro com os oito
+  campos zerados (ou `"00:00"`) não conta como lançamento e sai da grade. O dado
+  continua gravado — some apenas da tela. Com a coluna Ações fora, zerar um
+  lançamento pelo pop-up faz a linha sumir, em vez de deixar uma fileira de "—".
+- ✅ **Ordem alfabética igual à da aba Resumo** —
+  `getEmployeeName(...).localeCompare(nome, "pt-BR")`, o mesmo comparador e o
+  mesmo nome oficial que `getEmployeesForCompany` usa no Resumo. Ordena sobre
+  `slice()`: o array de `getLancamentos` é o próprio dado gravado e reordená-lo
+  no lugar alteraria o registro do usuário.
+- ✅ **Linha informativa "Somente funcionários com lançamentos no mês"**
+  (`span.contador-toolbar-note`) ao lado do botão "+ Lançamento": `flex: 1` +
+  `text-align: center` fazem o texto ocupar e se centralizar no espaço entre o
+  fim do botão e a borda direita da barra — a da última coluna (Vales). Itálico,
+  tom `--muted`, renderizada só nesta sub-aba.
+- ✅ **Aba Resumo intocada** — `renderResumoGrid` e `renderResumoPrintArea`
+  seguem listando todos os ativos (inclusive quem não tem lançamento) com a
+  linha de totais, e o aviso não aparece lá. Provado por asserção.
+- ✅ **Suíte de 46 → 60 asserções** — blocos 9 e 10 novos; o harness passou a
+  carregar `css/style.css`, sem o qual não se pode afirmar nada sobre layout.
+  Asserção **8d** nova na validação funcional.
+
+### Frente 2026-08-29 — Contador: pop-up "+ Lançamento" com a base do mês (em produção)
+
+- ✅ **Botão renomeado** (`20260829.01`, commit `252db7d`) — "+ Novo Lançamento"
+  virou **"+ Lançamento"** (`btnNovoLancamento` → `btnLancamento`); o texto de
+  estado vazio da tabela acompanhou.
+- ✅ **Pop-up carregado com o mês selecionado** — `buildLancamentoMap` monta
+  `employeeId → lançamento` do período que está na barra de ferramentas;
+  escolher o funcionário no `select` preenche os oito campos com o que já está
+  registrado (Jefferson/agosto: Consumo Interno 212,25 e Vales 250,00). Antes o
+  pop-up abria sempre zerado, mentindo sobre o estado do mês. Título passou a
+  ser "Lançamento — <Mês> <Ano>" e a lista marca com "•" quem já tem lançamento.
+- ✅ **Salvar altera só o funcionário selecionado** — o `record` virou um merge
+  (`Object.assign`) sobre o registro existente: `updatedAt` e campos legados
+  sobrevivem, e os lançamentos dos demais funcionários do mês ficam intactos
+  (`saveLancamento` já trocava apenas a entrada daquele `employeeId`). Depois de
+  gravar, o formulário **recarrega os valores salvos** e mantém o funcionário
+  selecionado, em vez de se limpar.
+- ✅ **Coluna "Ações" removida** da tabela de lançamentos, com os botões
+  editar/excluir e a delegação `bindContainerEvents` que só servia a eles; saiu
+  também a regra CSS órfã `.contador-table .cell-actions`. A edição passou a ser
+  toda pelo pop-up. `deleteLancamento` **mantida**, sem gatilho de UI, para uso
+  programático/recuperação.
+- ✅ **Gravação na mesma empresa da leitura** — o submit usava
+  `AppData.getActiveCompany()` enquanto a lista e os valores vinham de
+  `getPrimaryPageCompany("contador")`. Na prática coincidem
+  (`setActiveCompany` propaga para os `pageFilters`), mas com o pop-up agora
+  lendo dados do mês a divergência deixaria de ser teórica: ler de uma empresa e
+  gravar em outra. Passou a gravar em `company`. A regra "pop-up sem seletor de
+  empresa; empresa vem do contexto da aba" **não mudou** — mudou a linha que a
+  implementa, e a asserção 8 da validação funcional (que fixava o texto antigo)
+  foi atualizada, mais 8b (botão + base do mês) e 8c (tabela sem coluna Ações).
+- ✅ **Suíte nova** — `verify-contador-lancamento-popup.mjs` (46 asserções,
+  **Chrome real** sobre fixture em memória): rótulo do botão, tabela sem coluna
+  Ações, pop-up carregado pelo mês, troca de funcionário, salvar 300,00 no vale
+  do Jefferson deixando Ana e julho byte a byte iguais, lançamento novo para
+  quem não tinha nada e `saveState` chamado só nas gravações do usuário.
+  `npm run validate` passou de 19 para **20 suítes**.
 
 ### Frente 2026-08-22 — Funcionários inativos + limpeza de ações em Feriados (em produção)
 
@@ -210,6 +272,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Próximas tarefas
 
+- Contador: avaliar um botão de "limpar lançamento do mês" dentro do pop-up —
+  sem a coluna Ações não há exclusão pela interface. Menos urgente desde
+  `20260829.02`: zerar os campos já faz a linha sair da grade (o registro
+  permanece gravado). `deleteLancamento` existe e só precisaria do gatilho.
 - Decisão em aberto do usuário: no Cadastro, o filtro **Status = Inativo** hoje
   mostra os inativos mesmo sem marcar ninguém no seletor (o pedido explícito
   vence a regra de ocultar). Se preferir o contrário, é uma linha em
@@ -222,6 +288,13 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Pendências de validação
 
 - ⏳ **Validação visual em produção pelo usuário** (Ctrl+F5 para
+  `?v=20260829.02`), **somente leitura**: com agosto/2026 selecionado, abrir
+  "+ Lançamento", escolher Jefferson e conferir Consumo Interno 212,25 e Vales
+  250,00 já preenchidos; confirmar que a tabela não tem mais coluna Ações, que a
+  grade está em ordem alfabética como no Resumo e que o aviso "Somente
+  funcionários com lançamentos no mês" aparece ao lado do botão. Alterar valor e
+  salvar só quando quiser de fato registrar a mudança.
+- ⏳ **Validação visual em produção pelo usuário** (Ctrl+F5 para
   `?v=20260822.03`), **somente leitura**: (a) Adonias Lima Santana sumiu do
   Controle de Feriados e do Cadastro; (b) o botão "Mostrar funcionários inativos
   (1)" traz ele de volta quando marcado, com a tag "Inativo" na linha de
@@ -233,6 +306,16 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de deploy
 
+- ✅ **Grade de Lançamentos (`20260829.02`) — commitada, pushada e deployada**
+  em `chez-pitu-rh.web.app`. Commits `3a1cf80` (feat) + `6c7e701` (carimbo).
+  Verificado por `curl`: `index.html` serve `contador.js?v=20260829.02`, o JS
+  publicado contém `getLancamentosParaGrade` e `contador-toolbar-note`, e o
+  `style.css` publicado traz a regra `.contador-toolbar-note`.
+- ✅ **Frente do Contador (`20260829.01`) — commitada, pushada e deployada** em
+  `chez-pitu-rh.web.app`. Commits `252db7d` (feat) + `6bdf383` (carimbo) +
+  `d3da97b` (docs); `main` e `origin/main` sincronizados em `d3da97b`.
+  Verificado por `curl`: `index.html` serve `contador.js?v=20260829.01`, o
+  arquivo publicado contém `btnLancamento` e zero `btn-edit-lancamento`.
 - ✅ **Frente de inativos (`20260822.03`) — commitada, pushada e deployada** em
   `chez-pitu-rh.web.app`. `js/version.js` com `APP_VERSION 20260822.03` e commit
   `1e2105a`; `index.html` pede `?v=20260822.03` e carrega o novo
@@ -250,17 +333,85 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Arquivos modificados não commitados (snapshot)
 
 ```
- M CHANGELOG.md
- M PROJECT_STATUS.md
- M .claude/project-state.md
+(working tree limpo)
 ```
-> Apenas documentação de estado (sincronização de versão para `20260822.03`).
-> `*.md` está no `ignore` do `firebase.json` — não exige deploy.
-> Todo o código da sessão já está commitado e pushado (`2a459a1`).
+> Todo o código e a documentação da sessão estão commitados, pushados e em
+> produção (`20260829.02`). `*.md` está no `ignore` do `firebase.json` — não
+> exige deploy.
 
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT
+- **Data:** 2026-08-29 10:40
+- **Versão:** 20260829.02
+- **Branch:** main (sincronizado com `origin/main`)
+- **Commits:** `3a1cf80` (feat) + `6c7e701` (carimbo de build)
+- **Arquivos alterados:** js/contador.js · css/style.css ·
+  scripts/verify-contador-lancamento-popup.mjs ·
+  scripts/run-functional-validation.mjs · js/version.js · index.html ·
+  PROJECT_HISTORY.md · CHANGELOG.md · PROJECT_STATUS.md ·
+  .claude/project-state.md
+- **Resumo:** Sub-aba **Lançamentos** do Contador (a aba Resumo não foi tocada).
+  A grade vinha na ordem de gravação dos registros, sem relação com o Resumo.
+  Passou a mostrar **só funcionários com lançamento no mês** (`hasAnyValue`:
+  registro todo zerado ou `"00:00"` não conta e sai da tela, embora continue
+  gravado) em **ordem alfabética igual à do Resumo**
+  (`localeCompare` pt-BR sobre o nome oficial, aplicado a uma `slice()` — o
+  array de `getLancamentos` é o próprio dado gravado). Ao lado do botão
+  "+ Lançamento" entrou a linha **"Somente funcionários com lançamentos no
+  mês"**, que ocupa e se centraliza no espaço entre o fim do botão e a borda da
+  última coluna (Vales), em itálico e tom `--muted`.
+- **Testes:** npm test 47/47 · npm run validate 20/20 suítes ·
+  verify-contador-lancamento-popup 46/46 → **60/60** (blocos 9 e 10: ordem
+  alfabética, registro zerado fora da grade mas presente na base, layout do
+  aviso medido no Chrome com o CSS real, aba Resumo provada intacta). O harness
+  passou a carregar `css/style.css`; asserção 8d nova na validação funcional.
+- **Deploy:** publicado em `chez-pitu-rh.web.app` e verificado por `curl`
+  (`contador.js?v=20260829.02`, `getLancamentosParaGrade` e
+  `contador-toolbar-note` no JS, regra `.contador-toolbar-note` no CSS).
+- **Próximo passo:** Validação visual do usuário em produção (`?v=20260829.02`),
+  somente leitura. Ponto a confirmar: lançamento **todo zerado** deixa de
+  aparecer na grade — se preferir que continue visível, é remover o
+  `.filter(hasAnyValue)`.
+
+### CHECKPOINT
+- **Data:** 2026-08-29 09:53
+- **Versão:** 20260829.01
+- **Branch:** main (sincronizado com `origin/main`)
+- **Commits:** `252db7d` (feat) + `6bdf383` (carimbo de build) + `d3da97b` (docs)
+- **Arquivos alterados:** js/contador.js · css/style.css ·
+  scripts/verify-contador-lancamento-popup.mjs (novo) ·
+  scripts/run-functional-validation.mjs · scripts/run-validate.mjs ·
+  js/version.js · index.html · PROJECT_HISTORY.md · CHANGELOG.md ·
+  PROJECT_STATUS.md · .claude/project-state.md
+- **Resumo:** Informações Contador. O botão "+ Novo Lançamento" abria o pop-up
+  sempre zerado, mesmo com o mês selecionado ao lado já tendo lançamentos;
+  conferir ou corrigir um valor exigia fechar o pop-up e usar o lápis da coluna
+  Ações — duas portas para a mesma operação. Agora o botão se chama
+  **"+ Lançamento"** e o pop-up nasce com a base do **mês selecionado**:
+  `buildLancamentoMap` monta `employeeId → lançamento` do período e escolher o
+  funcionário preenche os oito campos com o que já está registrado (a lista
+  marca com "•" quem já tem lançamento). Salvar faz **merge** sobre o registro
+  existente — grava só o funcionário selecionado, preserva campos fora do
+  formulário e deixa os demais intactos — e o formulário recarrega os valores
+  gravados. A **coluna "Ações"** saiu da tabela, com os botões editar/excluir e
+  a delegação que só servia a eles; `deleteLancamento` permanece sem gatilho de
+  UI. O submit passou a gravar na mesma empresa de onde leu
+  (`getPrimaryPageCompany`) em vez de resolver de novo por `getActiveCompany`;
+  a regra "pop-up sem seletor de empresa" não mudou, e a asserção 8 da validação
+  funcional foi atualizada para a nova linha (mais 8b e 8c).
+- **Testes:** npm test 47/47 · npm run validate 19/19 → **20/20** suítes ·
+  verify-contador-lancamento-popup 46/46 (Chrome real sobre fixture em memória;
+  nenhuma base de produção lida ou escrita).
+- **Deploy:** publicado em `chez-pitu-rh.web.app` e verificado por `curl`
+  (`contador.js?v=20260829.01`, `btnLancamento` presente, `btn-edit-lancamento`
+  ausente). `APP_VERSION` bumpada manualmente antes do `npm run deploy`.
+- **Próximo passo:** Validação visual do usuário em produção (`?v=20260829.01`),
+  somente leitura: abrir "+ Lançamento" com agosto selecionado e conferir os
+  valores do Jefferson já preenchidos. Em aberto: criar (ou não) um botão de
+  "limpar lançamento do mês", já que a exclusão saiu da interface.
 
 ### CHECKPOINT
 - **Data:** 2026-08-22
