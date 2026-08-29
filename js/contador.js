@@ -116,6 +116,9 @@
     AppData.saveState();
   }
 
+  // Sem gatilho na interface desde a retirada da coluna "Ações" (a edição passa
+  // a ser feita pelo pop-up "+ Lançamento"). Mantida para uso programático /
+  // recuperação, jamais chamada automaticamente.
   function deleteLancamento(company, yearMonth, employeeId) {
     var data = AppData.getCompanyData(company);
     if (!data.contadorLancamentos || !data.contadorLancamentos[yearMonth]) return;
@@ -189,14 +192,13 @@
 
     if (!lancamentos.length) {
       return '<div class="empty-state"><strong>Nenhum lançamento neste mês.</strong>' +
-        '<span>Clique em "Novo Lançamento" para adicionar.</span></div>';
+        '<span>Clique em "+ Lançamento" para adicionar.</span></div>';
     }
 
     var headerCells = '<th>Funcionário</th>';
     LANCAMENTO_FIELDS.forEach(function (f) {
       headerCells += '<th>' + f.label.split(" (")[0] + '</th>';
     });
-    headerCells += '<th>Ações</th>';
 
     var rows = lancamentos.map(function (l) {
       var name = App.formatDisplayName(getEmployeeName(company, l.employeeId));
@@ -204,10 +206,6 @@
       LANCAMENTO_FIELDS.forEach(function (f) {
         cells += '<td class="cell-number">' + formatCellValue(l[f.key], f) + '</td>';
       });
-      cells += '<td class="cell-actions">' +
-        '<button class="btn-icon btn-edit-lancamento" data-emp="' + l.employeeId + '" title="Editar">✎</button>' +
-        '<button class="btn-icon btn-delete-lancamento" data-emp="' + l.employeeId + '" title="Excluir">✕</button>' +
-        '</td>';
       return '<tr>' + cells + '</tr>';
     }).join("");
 
@@ -217,16 +215,39 @@
       '</table></div>';
   }
 
-  function renderPopupFields(company, lancamento) {
+  // Mapa employeeId -> lancamento do mes: base para preencher o pop-up com o
+  // que ja esta registrado no periodo selecionado na barra de ferramentas.
+  function buildLancamentoMap(company, yearMonth) {
+    var map = {};
+    getLancamentos(company, yearMonth).forEach(function (l) {
+      if (l && l.employeeId) map[l.employeeId] = l;
+    });
+    return map;
+  }
+
+  // Valor do lancamento pronto para o input (0 e vazio viram campo em branco).
+  function fieldInputValue(lancamento, f) {
+    if (!lancamento) return "";
+    var val = lancamento[f.key];
+    // "00:00" e 0 são ausência de lançamento: o campo aparece em branco (ao
+    // salvar, normalizeHora devolve "00:00" para o campo vazio).
+    if (f.type === "time") return val && val !== "00:00" ? String(val) : "";
+    if (val === 0 || val == null || val === "") return "";
+    return String(val);
+  }
+
+  function renderPopupFields(company, yearMonth, lancMap, selectedId) {
     var employees = getEmployeesForCompany(company);
+    var selected = selectedId ? lancMap[selectedId] : null;
     var empOptions = '<option value="">— Selecione —</option>' +
       employees.map(function (e) {
-        var sel = lancamento && lancamento.employeeId === e.id ? " selected" : "";
-        return '<option value="' + e.id + '"' + sel + '>' + App.formatDisplayName(e.name) + '</option>';
+        var sel = selectedId === e.id ? " selected" : "";
+        var marca = lancMap[e.id] ? " •" : "";
+        return '<option value="' + e.id + '"' + sel + '>' + App.formatDisplayName(e.name) + marca + '</option>';
       }).join("");
 
     var fieldsHTML = LANCAMENTO_FIELDS.map(function (f) {
-      var val = lancamento ? (lancamento[f.key] || "") : "";
+      var val = fieldInputValue(selected, f);
       if (f.type === "time") {
         var timeVal = val || "";
         return '<label class="popup-field">' + f.label +
@@ -243,10 +264,13 @@
     return '<div class="popup-overlay" id="lancamentoPopup">' +
       '<div class="popup-card">' +
         '<div class="popup-header">' +
-          '<h3>' + (lancamento ? "Editar Lançamento" : "Novo Lançamento") + '</h3>' +
+          '<h3>Lançamento — ' + getMonthName(yearMonth) + '</h3>' +
           '<button class="popup-close" id="popupClose" type="button">✕</button>' +
         '</div>' +
         '<form id="lancamentoForm" class="popup-form">' +
+          '<p class="popup-hint">Selecione o funcionário para ver e editar o que já está lançado em ' +
+            getMonthName(yearMonth) + '. O sinal • marca quem já possui lançamento no mês. ' +
+            'Salvar altera apenas o funcionário selecionado.</p>' +
           '<label class="popup-field">Funcionário' +
             '<select id="popupEmployee" name="employeeId" required>' + empOptions + '</select>' +
           '</label>' +
@@ -260,17 +284,31 @@
     '</div>';
   }
 
-  function openPopup(container, company, yearMonth, lancamento) {
+  function openPopup(container, company, yearMonth) {
     var existing = document.getElementById("lancamentoPopup");
     if (existing) existing.remove();
 
-    document.body.insertAdjacentHTML("beforeend", renderPopupFields(company, lancamento));
+    var lancMap = buildLancamentoMap(company, yearMonth);
+
+    document.body.insertAdjacentHTML("beforeend", renderPopupFields(company, yearMonth, lancMap, ""));
 
     var popup = document.getElementById("lancamentoPopup");
     var form = document.getElementById("lancamentoForm");
     var employeeSelect = document.getElementById("popupEmployee");
 
     function closePopup() { popup.remove(); }
+
+    // Espelha no formulario o lancamento ja registrado no mes para o funcionario.
+    function fillFields(lanc) {
+      LANCAMENTO_FIELDS.forEach(function (f) {
+        var input = form.querySelector('[name="' + f.key + '"]');
+        if (input) input.value = fieldInputValue(lanc, f);
+      });
+    }
+
+    employeeSelect.addEventListener("change", function () {
+      fillFields(lancMap[employeeSelect.value] || null);
+    });
 
     // Máscara de digitação dos campos de horas (insere ":" automaticamente).
     form.querySelectorAll(".hora-input").forEach(function (input) {
@@ -297,7 +335,12 @@
         return;
       }
 
-      var record = { employeeId: empId };
+      // Merge sobre o registro existente: os campos fora do formulário (ex.:
+      // updatedAt e dados legados) são preservados, e os lançamentos dos demais
+      // funcionários do mês nunca são tocados.
+      var atual = lancMap[empId];
+      var record = atual ? Object.assign({}, atual) : {};
+      record.employeeId = empId;
       var erroCampo = null;
       LANCAMENTO_FIELDS.forEach(function (f) {
         var input = form.querySelector('[name="' + f.key + '"]');
@@ -319,16 +362,18 @@
       }
 
       // Fase 2 — empresa definida pela aba ativa, nunca por seletor do pop-up.
-      var targetCompany = AppData.getActiveCompany();
-      saveLancamento(targetCompany, yearMonth, record);
+      // Grava na mesma empresa de onde a lista e os valores foram lidos.
+      saveLancamento(company, yearMonth, record);
       App.toast("Lançamento salvo.", "success");
 
+      // Recarrega o mês e mantém o funcionário selecionado com os valores gravados.
+      lancMap = buildLancamentoMap(company, yearMonth);
       renderContent(container, yearMonth);
-
-      employeeSelect.value = "";
-      LANCAMENTO_FIELDS.forEach(function (f) {
-        var input = form.querySelector('[name="' + f.key + '"]');
-        if (input) input.value = f.type === "time" ? "" : "0";
+      fillFields(lancMap[empId] || null);
+      Array.prototype.forEach.call(employeeSelect.options, function (opt) {
+        if (opt.value === empId && opt.textContent.slice(-2) !== " •") {
+          opt.textContent += " •";
+        }
       });
     });
   }
@@ -508,41 +553,13 @@
     }
   }
 
-  function bindContainerEvents(container) {
-    if (container._contadorEventsBound) return;
-    container._contadorEventsBound = true;
-
-    container.addEventListener("click", function (e) {
-      var yearMonth = container._contadorYearMonth;
-      if (!yearMonth) return;
-      var company = AppData.getPrimaryPageCompany("contador");
-
-      var editBtn = e.target.closest(".btn-edit-lancamento");
-      if (editBtn) {
-        var empId = editBtn.dataset.emp;
-        var lancs = getLancamentos(company, yearMonth);
-        var existing = lancs.find(function (l) { return l.employeeId === empId; });
-        openPopup(container, company, yearMonth, existing || null);
-        return;
-      }
-      var deleteBtn = e.target.closest(".btn-delete-lancamento");
-      if (deleteBtn) {
-        if (!confirm("Excluir este lançamento?")) return;
-        deleteLancamento(company, yearMonth, deleteBtn.dataset.emp);
-        renderContent(container, yearMonth);
-        App.toast("Lançamento excluído.", "info");
-      }
-    });
-  }
-
-
   function renderContent(container, yearMonth) {
     var company = AppData.getPrimaryPageCompany("contador");
     var activeTab = container._contadorActiveTab || "lancamentos";
 
     var toolbarRight = '';
     if (activeTab === "lancamentos") {
-      toolbarRight = '<button class="btn btn-primary" id="btnNovoLancamento">+ Novo Lançamento</button>';
+      toolbarRight = '<button class="btn btn-primary" id="btnLancamento">+ Lançamento</button>';
     } else {
       toolbarRight = '<button class="btn btn-primary btn-sm" id="btnPrintResumo">Imprimir / PDF</button>';
     }
@@ -570,10 +587,10 @@
       bindResumoEvents(container, yearMonth);
     }
 
-    var novoBtn = document.getElementById("btnNovoLancamento");
-    if (novoBtn) {
-      novoBtn.addEventListener("click", function () {
-        openPopup(container, company, yearMonth, null);
+    var lancBtn = document.getElementById("btnLancamento");
+    if (lancBtn) {
+      lancBtn.addEventListener("click", function () {
+        openPopup(container, company, yearMonth);
       });
     }
 
@@ -596,7 +613,6 @@
   }
 
   function render(container) {
-    bindContainerEvents(container);
     var ym = currentYearMonth();
     renderContent(container, ym);
   }

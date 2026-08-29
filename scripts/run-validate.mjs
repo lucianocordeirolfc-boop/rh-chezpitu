@@ -45,6 +45,7 @@ const SUITES = [
   { name: "Inativos — visibilidade e data de desligamento", script: "scripts/verify-inativos-visibilidade.mjs" },
   { name: "Inativos — seletor no navegador", script: "scripts/verify-inativos-picker-ui.mjs" },
   { name: "Contador — sincronização", script: "scripts/verify-contador-sync.mjs" },
+  { name: "Contador — pop-up + Lançamento", script: "scripts/verify-contador-lancamento-popup.mjs" },
   { name: "Auditoria de status", script: "scripts/verify-auditoria-status.mjs" },
   { name: "Impressão da escala", script: "scripts/verify-print-escala.mjs" }
 ];

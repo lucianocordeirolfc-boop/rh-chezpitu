@@ -7,6 +7,64 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-29 — Contador: "+ Lançamento" abre com os dados do mês e a coluna Ações sai da tela
+
+**Origem:** pedido do usuário. O botão "+ Novo Lançamento" abria o pop-up sempre
+zerado, mesmo com o mês selecionado ao lado já tendo lançamentos (agosto/2026).
+Para conferir ou corrigir um valor era preciso fechar o pop-up e usar o lápis da
+coluna Ações da tabela — duas portas para a mesma operação, e a de dentro do
+pop-up mentia sobre o estado do mês.
+
+**O que foi feito:**
+
+1. **Botão renomeado** para "+ Lançamento" (id `btnLancamento`); o texto de
+   estado vazio da tabela acompanhou.
+
+2. **Pop-up nasce com a base do mês selecionado.** `buildLancamentoMap` monta
+   `employeeId -> lançamento` do período que está na barra de ferramentas;
+   escolher o funcionário no `select` preenche os oito campos com o que já
+   está registrado (Jefferson em agosto: Consumo Interno 212,25 e Vales 250,00).
+   Quem já tem lançamento no mês aparece marcado com "•" na lista. O título do
+   pop-up passou a ser "Lançamento — <Mês> <Ano>", deixando a base explícita.
+
+3. **Salvar altera só o funcionário selecionado.** O `record` agora é um merge
+   sobre o registro existente (`Object.assign`), então campos fora do
+   formulário (`updatedAt`, dados legados) sobrevivem e os lançamentos dos
+   demais funcionários do mês ficam intactos — `saveLancamento` já trocava
+   apenas a entrada daquele `employeeId`. Depois de gravar, o formulário
+   recarrega os valores salvos em vez de se limpar, e o funcionário continua
+   selecionado (era o comportamento pedido: "deve carregar essas informações").
+
+4. **Coluna "Ações" removida** da tabela de lançamentos, com os botões de editar
+   e excluir. A edição passou a ser inteiramente pelo pop-up. `bindContainerEvents`
+   (delegação de clique que só existia para esses dois botões) foi removida;
+   `deleteLancamento` foi mantida, sem gatilho de UI, para uso programático /
+   recuperação. Saiu também a regra CSS órfã `.contador-table .cell-actions`.
+
+5. **Gravação na mesma empresa da leitura.** O submit usava
+   `AppData.getActiveCompany()` enquanto a lista de funcionários e os valores
+   vinham de `getPrimaryPageCompany("contador")`. Na prática as duas coincidem
+   (`setActiveCompany` propaga para os `pageFilters`), mas com o pop-up agora
+   lendo dados do mês a divergência deixaria de ser teórica: ler de uma empresa
+   e gravar em outra. Passou a gravar em `company` — a mesma de onde leu. A
+   regra "pop-up sem seletor de empresa; empresa vem do contexto da aba" não
+   mudou; mudou a linha que a implementa, e a asserção 8 da validação funcional
+   (que fixava o texto `var targetCompany = AppData.getActiveCompany();`) foi
+   atualizada para checar a nova, mais duas asserções (8b/8c) para o botão e a
+   saída da coluna Ações.
+
+**Arquivos:** js/contador.js, css/style.css,
+scripts/verify-contador-lancamento-popup.mjs (novo),
+scripts/run-functional-validation.mjs, scripts/run-validate.mjs.
+
+**Testes:** `npm test` 47/47 ✓; `npm run validate` 20/20 suítes ✓;
+`scripts/verify-contador-lancamento-popup.mjs` 46/46 ✓ (Chrome real sobre
+fixture em memória — nenhuma base de produção lida ou escrita).
+
+**Pendências:** sem gatilho de exclusão na interface, um lançamento indesejado
+só pode ser zerado campo a campo (a linha continua na tabela, com "—"). Se o
+usuário quiser excluir de volta, a função já existe e só precisa de um botão.
+
 ## 2026-08-22 (3) — Funcionário inativo some das telas + data de desligamento obrigatória
 
 **Origem:** Adonias Lima Santana está Inativo no Cadastro e já não aparecia na

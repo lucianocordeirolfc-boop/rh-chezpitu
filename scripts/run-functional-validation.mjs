@@ -1728,12 +1728,36 @@ function validatePhase2Improvements(AppData) {
     "—"
   );
 
-  // 8. Contador — novo lançamento sem seletor de empresa
+  // 8. Contador — pop-up "+ Lançamento" sem seletor de empresa
   assert(
     area,
     !contador.includes('id="popupCompany"') &&
-      contador.includes("var targetCompany = AppData.getActiveCompany();"),
-    "Contador: pop-up de lançamento sem seletor de empresa; usa a aba ativa",
+      contador.includes('var company = AppData.getPrimaryPageCompany("contador");') &&
+      contador.includes("saveLancamento(company, yearMonth, record);"),
+    "Contador: pop-up de lançamento sem seletor de empresa; grava na empresa da aba",
+    ["js/contador.js"],
+    "—"
+  );
+
+  // 8b. Contador — botão "+ Lançamento" e pop-up carregado com o mês selecionado
+  assert(
+    area,
+    contador.includes('id="btnLancamento">+ Lançamento<') &&
+      !contador.includes("Novo Lançamento") &&
+      contador.includes("function buildLancamentoMap(company, yearMonth)") &&
+      contador.includes("renderPopupFields(company, yearMonth, lancMap"),
+    "Contador: botão '+ Lançamento' abre o pop-up com os lançamentos do mês selecionado",
+    ["js/contador.js"],
+    "—"
+  );
+
+  // 8c. Contador — tela principal sem coluna/botões de ação
+  assert(
+    area,
+    !contador.includes("btn-edit-lancamento") &&
+      !contador.includes("btn-delete-lancamento") &&
+      !contador.includes("<th>Ações</th>"),
+    "Contador: tabela de lançamentos sem coluna Ações (editar/excluir saíram da tela)",
     ["js/contador.js"],
     "—"
   );

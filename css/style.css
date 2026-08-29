@@ -2992,11 +2992,6 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   min-width: 80px;
 }
 
-.contador-table .cell-actions {
-  text-align: center;
-  white-space: nowrap;
-}
-
 .btn-icon {
   background: none;
   border: none;

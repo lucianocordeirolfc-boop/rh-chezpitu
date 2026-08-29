@@ -1,3 +1,16 @@
+2026-08-29 — Contador: "+ Lançamento" abre com os dados do mês selecionado; coluna Ações sai da tela
+- [MELHORIA] Botão "+ Novo Lançamento" virou "+ Lançamento" (id btnNovoLancamento -> btnLancamento); o texto de estado vazio da tabela acompanhou
+- [CORREÇÃO] O pop-up abria sempre zerado, mesmo com o mês selecionado ao lado já tendo lançamentos: agora buildLancamentoMap monta employeeId -> lançamento do mês da barra de ferramentas e escolher o funcionário preenche os oito campos com o que já está registrado (Jefferson/agosto: Consumo Interno 212,25 e Vales 250,00)
+- [NOVO] Título do pop-up "Lançamento — <Mês> <Ano>" e marcação "•" na lista para quem já tem lançamento no mês, deixando a base explícita
+- [CORREÇÃO] Salvar faz merge sobre o registro existente (Object.assign): campos fora do formulário (updatedAt, dados legados) sobrevivem, e os lançamentos dos demais funcionários do mês continuam intactos
+- [MELHORIA] Depois de gravar, o formulário recarrega os valores salvos e mantém o funcionário selecionado, em vez de se limpar
+- [REMOÇÃO] Coluna "Ações" da tabela de lançamentos, com os botões editar/excluir — a edição passou a ser toda pelo pop-up. bindContainerEvents (delegação que só servia a esses botões) e a regra CSS órfã .contador-table .cell-actions removidas; deleteLancamento mantida sem gatilho de UI, para uso programático/recuperação
+- [CORREÇÃO] O submit gravava em AppData.getActiveCompany() enquanto a lista e os valores vinham de getPrimaryPageCompany("contador"); com o pop-up agora lendo dados do mês, ler de uma empresa e gravar em outra deixaria de ser risco teórico. Passa a gravar em company — a mesma da leitura. A regra "pop-up sem seletor de empresa" não mudou
+- [TESTE] scripts/verify-contador-lancamento-popup.mjs (46 asserções, Chrome real sobre fixture em memória): rótulo do botão, tabela sem coluna Ações, pop-up carregado pelo mês, troca de funcionário, salvar 300,00 no vale do Jefferson deixando Ana e julho byte a byte iguais, lançamento novo para quem não tinha nada e saveState chamado só nas gravações do usuário
+- [TESTE] Validação funcional: asserção 8 atualizada para a nova linha de gravação, mais 8b (botão + pop-up com base no mês) e 8c (tabela sem coluna Ações). Suíte nova registrada em run-validate.mjs
+- Arquivos: js/contador.js, css/style.css, scripts/verify-contador-lancamento-popup.mjs (novo), scripts/run-functional-validation.mjs, scripts/run-validate.mjs
+- npm test 47/47; npm run validate 20/20 suítes
+
 2026-08-22 (3) — Funcionário inativo sai das telas operacionais + data de desligamento obrigatória
 - [CORREÇÃO] Adonias Lima Santana estava Inativo no Cadastro e já não aparecia na Escala (que tem regra própria via deactivatedAt), mas seguia visível no Controle de Feriados e na própria lista do Cadastro: não existia regra geral de visibilidade de inativos
 - [NOVO] REGRA FIXA — funcionário Inativo não aparece no Cadastro de Funcionários nem no Controle de Feriados. O dado nunca é apagado, some apenas da tela (PROJECT_RULES.md → "Cadastro de Funcionários → Funcionário inativo")
