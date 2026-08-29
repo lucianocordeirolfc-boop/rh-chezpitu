@@ -9,12 +9,33 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260822.03 (Funcionário inativo fora das telas operacionais + data
-de desligamento obrigatória; limpeza de ações da tela de Feriados)
-**Data:** 2026-08-22
+**Versão:** 20260829.01 (Contador: pop-up "+ Lançamento" carregado com os dados
+do mês selecionado; tela de lançamentos sem coluna Ações)
+**Data:** 2026-08-29
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
+
+Data: 29/08/2026
+Versão: 20260829.01 (Firebase Hosting — chez-pitu-rh)
+Commits: `252db7d` (feat) + `6bdf383` (carimbo de build)
+
+Informações Contador: o botão **"+ Novo Lançamento"** virou **"+ Lançamento"** e
+o pop-up passou a nascer com a base do **mês selecionado na barra ao lado** —
+escolher o funcionário traz os oito campos preenchidos com o que já está
+registrado no período (e a lista marca com "•" quem já tem lançamento no mês).
+Salvar faz **merge** sobre o registro existente: grava só o funcionário
+selecionado, preserva campos fora do formulário (`updatedAt`, dados legados) e
+deixa os lançamentos dos demais intactos; o formulário recarrega os valores
+gravados em vez de se limpar. A **coluna "Ações"** saiu da tabela de
+lançamentos, com os botões editar/excluir — a edição é toda pelo pop-up
+(`deleteLancamento` permanece, sem gatilho de UI, para uso programático). O
+submit passou a gravar na mesma empresa de onde leu (`getPrimaryPageCompany`),
+em vez de resolver de novo por `getActiveCompany`.
+
+**Cache-busting:** todos os `?v=` do index.html em `20260829.01`.
+
+## Deploy anterior
 
 Data: 22/08/2026
 Versão: 20260822.03 (Firebase Hosting — chez-pitu-rh)
@@ -37,8 +58,8 @@ vínculo", e do **"+ Funcionário"**, redundante com o botão global "+ Vincular
 funcionário a feriado". A coluna Ações ficou uniforme: data de compensação +
 "Excluir vínculo" em toda linha.
 
-**Cache-busting:** todos os `?v=` do index.html em `20260822.03` — usuários
-recebem a nova versão automaticamente no próximo carregamento (Ctrl+F5 força).
+Usuários recebem a nova versão automaticamente no próximo carregamento
+(Ctrl+F5 força).
 
 ## Regra fixa vigente
 
@@ -58,19 +79,22 @@ Controle de Feriados: OK (+ exclusão definitiva de feriado e de vínculo; só
 funcionários ativos, com seletor de inativos)
 Cadastro: OK (+ inativação com data de desligamento obrigatória, exclusão 24h,
 auditoria; só funcionários ativos, com seletor de inativos)
-Informações Contador: OK
+Informações Contador: OK (+ pop-up "+ Lançamento" com a base do mês
+selecionado; tela de lançamentos sem coluna Ações)
 Dashboard: OK
 
 ## Testes
 
 **Unit/Functional Tests:**
 - npm test: 47/47 ✓
-- npm run validate: 19/19 suítes ✓
+- npm run validate: 20/20 suítes ✓
 
 **Offline Recovery Tests:**
 - npm run test:offline: 15/15 ✓
 
 **Homologação da frente atual (`scripts/verify-*.mjs`, sandbox com fixtures):**
+- scripts/verify-contador-lancamento-popup.mjs: 46/46 ✓ (pop-up "+ Lançamento"
+  no Chrome real: base do mês, merge por funcionário e demais registros intactos)
 - verify-exclusao-feriado-definitiva.mjs: 15/15 ✓
 - verify-vinculo-tombstone.mjs: 16/16 ✓
 - verify-auto-vinculo-vencido-guard.mjs: 4/4 ✓
@@ -81,8 +105,8 @@ Dashboard: OK
 - scripts/verify-inativos-picker-ui.mjs: 17/17 ✓ (seletor de inativos exercitado
   no Chrome real, via puppeteer)
 
-**Portão de qualidade (22/08/2026):** `npm test` 47/47 e `npm run validate`
-19/19 suítes — ambos verdes antes do commit e do deploy ✅
+**Portão de qualidade (29/08/2026):** `npm test` 47/47 e `npm run validate`
+20/20 suítes — ambos verdes antes do commit e do deploy ✅
 
 ## Fase 3A — Segurança Operacional
 
