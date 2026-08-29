@@ -7,6 +7,29 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-29 (3) — Homologação aprovada pelo usuário (Contador)
+
+Entrada de registro, sem alteração de código.
+
+O usuário validou em produção as duas entregas desta data e respondeu **"tudo
+aprovado"**:
+
+- `20260829.01` — botão "+ Lançamento", pop-up carregado com os dados do mês
+  selecionado, salvamento por merge (só o funcionário selecionado muda) e saída
+  da coluna "Ações" da tela de lançamentos.
+- `20260829.02` — grade da sub-aba Lançamentos só com funcionários que têm
+  lançamento no mês, em ordem alfabética igual à da aba Resumo, com a linha
+  "Somente funcionários com lançamentos no mês" ao lado do botão.
+
+Aprovado explicitamente o critério de exibição em aberto no relatório anterior:
+**lançamento com os oito campos zerados não aparece na grade**; o registro
+continua gravado na base e volta a aparecer assim que qualquer campo receber
+valor.
+
+Nenhuma pendência aberta desta frente. Melhoria opcional registrada para o
+futuro: botão de "limpar lançamento do mês" dentro do pop-up, já que a exclusão
+não tem mais gatilho na interface (`deleteLancamento` permanece no código).
+
 ## 2026-08-29 (2) — Contador/Lançamentos: grade só com quem tem lançamento, em ordem alfabética
 
 **Origem:** pedido do usuário, na sequência da entrega anterior do mesmo dia.

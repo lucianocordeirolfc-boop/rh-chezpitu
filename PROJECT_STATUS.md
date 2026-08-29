@@ -82,6 +82,11 @@ altera feriados lançados, escala, VT, ausências, lançamentos do Contador ou
 cadastro. Teste em fixtures/`scripts/verify-*.mjs`; validação em produção é
 somente leitura. Ver `PROJECT_RULES.md`.
 
+**Validação em produção:** ✅ as duas entregas de 29/08/2026 (`20260829.01` e
+`20260829.02`) foram **aprovadas pelo usuário** em produção, inclusive o
+critério de que lançamento com todos os campos zerados não aparece na grade da
+sub-aba Lançamentos (o registro continua gravado).
+
 **Próximo deploy recomendado:** conforme novas demandas.
 
 ## Módulos

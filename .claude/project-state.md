@@ -272,10 +272,11 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Próximas tarefas
 
-- Contador: avaliar um botão de "limpar lançamento do mês" dentro do pop-up —
-  sem a coluna Ações não há exclusão pela interface. Menos urgente desde
-  `20260829.02`: zerar os campos já faz a linha sair da grade (o registro
-  permanece gravado). `deleteLancamento` existe e só precisaria do gatilho.
+- Contador (opcional, sem pedido em aberto): botão de "limpar lançamento do
+  mês" dentro do pop-up — sem a coluna Ações não há exclusão pela interface.
+  Pouco urgente desde `20260829.02`: zerar os campos já faz a linha sair da
+  grade, e o usuário aprovou esse comportamento em 2026-08-29.
+  `deleteLancamento` existe e só precisaria do gatilho.
 - Decisão em aberto do usuário: no Cadastro, o filtro **Status = Inativo** hoje
   mostra os inativos mesmo sem marcar ninguém no seletor (o pedido explícito
   vence a regra de ocultar). Se preferir o contrário, é uma linha em
@@ -287,13 +288,13 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de validação
 
-- ⏳ **Validação visual em produção pelo usuário** (Ctrl+F5 para
-  `?v=20260829.02`), **somente leitura**: com agosto/2026 selecionado, abrir
-  "+ Lançamento", escolher Jefferson e conferir Consumo Interno 212,25 e Vales
-  250,00 já preenchidos; confirmar que a tabela não tem mais coluna Ações, que a
-  grade está em ordem alfabética como no Resumo e que o aviso "Somente
-  funcionários com lançamentos no mês" aparece ao lado do botão. Alterar valor e
-  salvar só quando quiser de fato registrar a mudança.
+- ✅ **Validado pelo usuário em produção (2026-08-29):** as duas entregas do
+  Contador — `20260829.01` (pop-up "+ Lançamento" carregado com os dados do mês
+  selecionado; coluna Ações fora da tela) e `20260829.02` (grade só com quem tem
+  lançamento no mês, em ordem alfabética, com a linha informativa ao lado do
+  botão). **"tudo aprovado"**. Aprovado junto o critério de exibição: lançamento
+  com os oito campos zerados **não** aparece na grade (o registro continua
+  gravado).
 - ⏳ **Validação visual em produção pelo usuário** (Ctrl+F5 para
   `?v=20260822.03`), **somente leitura**: (a) Adonias Lima Santana sumiu do
   Controle de Feriados e do Cadastro; (b) o botão "Mostrar funcionários inativos
@@ -342,6 +343,31 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-08-29 11:05
+- **Versão:** 20260829.02 (em produção)
+- **Branch:** main (sincronizado com `origin/main` em `ed47be2`)
+- **Commits da sessão:** `252db7d` + `6bdf383` + `d3da97b` (entrega `.01`) ·
+  `3a1cf80` + `6c7e701` + `ed47be2` (entrega `.02`)
+- **Resumo:** Sessão dedicada ao módulo **Informações Contador**, com duas
+  entregas publicadas e **aprovadas pelo usuário em produção** ("tudo
+  aprovado"). (1) `20260829.01`: botão "+ Lançamento" e pop-up carregado com a
+  base do mês selecionado, salvando por merge (só o funcionário selecionado
+  muda) e recarregando os valores gravados; coluna "Ações" fora da tela; submit
+  passou a gravar na mesma empresa de onde leu. (2) `20260829.02`: grade da
+  sub-aba Lançamentos só com quem tem lançamento no mês (registro todo zerado
+  sai da tela, mas continua gravado), em ordem alfabética igual à do Resumo, com
+  a linha "Somente funcionários com lançamentos no mês" ao lado do botão. A aba
+  **Resumo não foi tocada** em nenhuma das duas.
+- **Testes:** npm test 47/47 · npm run validate 19/19 → **20/20** suítes ·
+  verify-contador-lancamento-popup **60/60** (suíte nova, Chrome real sobre
+  fixture em memória). Nenhum dado de produção foi lido para escrita ou alterado
+  em teste — REGRA FIXA de imutabilidade respeitada.
+- **Estado final:** working tree limpo, `main` = `origin/main` = `ed47be2`,
+  produção em `?v=20260829.02` verificada por `curl`.
+- **Próximo passo:** nenhuma pendência aberta desta sessão. Melhoria opcional em
+  aberto: botão de "limpar lançamento do mês" no pop-up.
 
 ### CHECKPOINT
 - **Data:** 2026-08-29 10:40
