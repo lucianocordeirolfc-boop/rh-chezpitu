@@ -2976,6 +2976,18 @@ td.code-dom { background: #fff7e6; color: #b45309; }
   gap: 8px;
 }
 
+/* Aviso da sub-aba Lançamentos: ocupa o espaço que sobra à direita do botão
+   "+ Lançamento" e se centraliza nele, até a borda da última coluna (Vales). */
+.contador-toolbar-note {
+  flex: 1;
+  min-width: 180px;
+  text-align: center;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 .contador-table th,
 .contador-table td {
   white-space: nowrap;

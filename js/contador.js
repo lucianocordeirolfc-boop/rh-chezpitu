@@ -187,8 +187,35 @@
       '</div>';
   }
 
+  // Um registro só conta como "funcionário com lançamento no mês" quando tem
+  // ao menos um valor preenchido: tudo zerado (ou "00:00") é ausência de
+  // lançamento, e a grade da sub-aba Lançamentos não deve exibi-lo. O dado
+  // continua gravado — some apenas da tela.
+  function hasAnyValue(lanc) {
+    if (!lanc) return false;
+    return LANCAMENTO_FIELDS.some(function (f) {
+      var val = lanc[f.key];
+      if (f.type === "time") return Boolean(val) && val !== "00:00";
+      return (parseFloat(val) || 0) !== 0;
+    });
+  }
+
+  // Linhas da sub-aba Lançamentos: só quem tem lançamento no mês, na MESMA
+  // ordem alfabética da aba Resumo (localeCompare pt-BR sobre o nome oficial).
+  // Usa slice() antes de ordenar — o array devolvido por getLancamentos é o
+  // próprio dado gravado e não pode ser reordenado no lugar.
+  function getLancamentosParaGrade(company, yearMonth) {
+    return getLancamentos(company, yearMonth)
+      .filter(hasAnyValue)
+      .slice()
+      .sort(function (a, b) {
+        return getEmployeeName(company, a.employeeId)
+          .localeCompare(getEmployeeName(company, b.employeeId), "pt-BR");
+      });
+  }
+
   function renderLancamentosTable(company, yearMonth) {
-    var lancamentos = getLancamentos(company, yearMonth);
+    var lancamentos = getLancamentosParaGrade(company, yearMonth);
 
     if (!lancamentos.length) {
       return '<div class="empty-state"><strong>Nenhum lançamento neste mês.</strong>' +
@@ -559,7 +586,8 @@
 
     var toolbarRight = '';
     if (activeTab === "lancamentos") {
-      toolbarRight = '<button class="btn btn-primary" id="btnLancamento">+ Lançamento</button>';
+      toolbarRight = '<button class="btn btn-primary" id="btnLancamento">+ Lançamento</button>' +
+        '<span class="contador-toolbar-note">Somente funcionários com lançamentos no mês</span>';
     } else {
       toolbarRight = '<button class="btn btn-primary btn-sm" id="btnPrintResumo">Imprimir / PDF</button>';
     }

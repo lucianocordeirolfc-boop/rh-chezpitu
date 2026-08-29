@@ -11,6 +11,12 @@
  *  - depois de salvar, o formulário recarrega os valores gravados;
  *  - a tabela principal não tem mais coluna "Ações" nem botões editar/excluir.
  *
+ * E a frente de 29/08/2026 (2), na sub-aba Lançamentos:
+ *  - a grade mostra só funcionários com lançamento no mês (registro todo zerado
+ *    não conta), em ordem alfabética — a mesma da aba Resumo;
+ *  - linha informativa ao lado do botão "+ Lançamento";
+ *  - a aba Resumo continua listando TODOS os funcionários ativos.
+ *
  * Roda sobre um AppData de mentira, 100% em memória (fixture): nenhuma base de
  * produção — localStorage real ou Firebase — é lida ou escrita.
  *
@@ -44,6 +50,7 @@ const FIXTURE = {
     { id: "emp-jefferson", name: "Jefferson Teste", status: "Ativo" },
     { id: "emp-ana", name: "Ana Teste", status: "Ativo" },
     { id: "emp-bruno", name: "Bruno Teste", status: "Ativo" },
+    { id: "emp-zenaide", name: "Zenaide Teste", status: "Ativo" },
     { id: "emp-antigo", name: "Antigo Teste", status: "Inativo", deactivatedAt: "2026-05-31" }
   ],
   contadorLancamentos: {
@@ -61,6 +68,14 @@ const FIXTURE = {
         falta: 1, horaExtra: "10:30", gratificacao: 100, comissoes: 0,
         consumoInterno: 33.5, domingoMulher: 0, adNoturno: "02:00", vales: 80,
         updatedAt: 1000
+      },
+      {
+        // Registro existente, porém todo zerado: não é "funcionário com
+        // lançamento no mês" — some da grade, mas continua gravado.
+        employeeId: "emp-zenaide",
+        falta: 0, horaExtra: "00:00", gratificacao: 0, comissoes: 0,
+        consumoInterno: 0, domingoMulher: 0, adNoturno: "00:00", vales: 0,
+        updatedAt: 1000
       }
     ],
     "2026-07": [
@@ -76,8 +91,11 @@ const FIXTURE = {
 };
 
 const moduleSrc = fs.readFileSync(path.join(root, "js/contador.js"), "utf8");
+// CSS real do projeto: sem ele não dá para afirmar nada sobre o layout da barra.
+const css = fs.readFileSync(path.join(root, "css/style.css"), "utf8");
 
-const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head><body>
+const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<style>${css}</style></head><body>
 <div id="host"></div>
 <script>
   // ── AppData de mentira: só o que o módulo Contador consome, tudo em memória.
@@ -237,7 +255,7 @@ try {
   assert(salvo.registro && salvo.registro.updatedAt > 1000, "updatedAt foi recarimbado (merge entre PCs)");
   assert(salvo.anaIntacta, "lançamento da Ana permaneceu idêntico");
   assert(salvo.julhoIntacto, "lançamentos de julho permaneceram idênticos");
-  assert(salvo.totalAgosto === 2, `nenhum registro extra criado em agosto (${salvo.totalAgosto})`);
+  assert(salvo.totalAgosto === 3, `nenhum registro extra criado em agosto (${salvo.totalAgosto})`);
   assert(salvo.valorNoForm === "300" && salvo.consumoNoForm === "212.25", "formulário recarrega os valores salvos");
   assert(salvo.selecionado === "emp-jefferson", "funcionário continua selecionado depois de salvar");
   assert(salvo.aindaAberto, "pop-up continua aberto para o próximo lançamento");
@@ -272,7 +290,7 @@ try {
   assert(novo.bruno && novo.bruno.horaExtra === "00:00", "campos de hora em branco viram 00:00");
   assert(novo.jeff && novo.jeff.vales === 300, "lançamento do Jefferson seguiu com 300");
   assert(novo.anaIntacta, "lançamento da Ana continua intacto");
-  assert(novo.total === 3, `agosto passou a ter 3 lançamentos (${novo.total})`);
+  assert(novo.total === 4, `agosto passou a ter 4 lançamentos (${novo.total})`);
   assert(novo.marcado.endsWith(" •"), "opção do funcionário passa a exibir o • depois de salvar");
 
   // ── 7. Trocar o mês na barra troca a base do pop-up ──
@@ -306,8 +324,73 @@ try {
     saves: window.__saveCount
   }));
   assert(final.julho, "abrir o pop-up em julho não gravou nada");
-  assert(final.agosto.join(",") === "emp-ana,emp-bruno,emp-jefferson", `base final íntegra (${final.agosto.join(",")})`);
+  assert(final.agosto.join(",") === "emp-ana,emp-bruno,emp-jefferson,emp-zenaide",
+    `base final íntegra, o registro zerado incluído (${final.agosto.join(",")})`);
   assert(final.saves === 2, `saveState chamado só nas duas gravações do usuário (${final.saves})`);
+  // ── 9. Sub-aba Lançamentos: só quem tem lançamento, em ordem alfabética ──
+  console.log("[9] Grade da sub-aba Lançamentos");
+  const grade = await page.evaluate(() => {
+    const popup = document.getElementById("lancamentoPopup");
+    if (popup) popup.remove();
+    const mes = document.getElementById("contadorMonth");
+    mes.value = "08";
+    mes.dispatchEvent(new Event("change"));
+    return {
+      nomes: [...document.querySelectorAll(".contador-table tbody .cell-name")].map((td) => td.textContent.trim()),
+      nota: document.querySelector(".contador-toolbar-note")
+        ? document.querySelector(".contador-toolbar-note").textContent
+        : null,
+      notaDepoisDoBotao:
+        document.getElementById("btnLancamento").nextElementSibling ===
+        document.querySelector(".contador-toolbar-note"),
+      zenaideNaBase: Boolean(window.__lanc("2026-08", "emp-zenaide"))
+    };
+  });
+  assert(grade.nomes.join(" | ") === "Ana Teste | Bruno Teste | Jefferson Teste",
+    `grade em ordem alfabética, como no Resumo (${grade.nomes.join(" | ")})`);
+  assert(!grade.nomes.includes("Zenaide Teste"),
+    "funcionário com lançamento todo zerado não aparece na grade");
+  assert(grade.zenaideNaBase, "o registro zerado continua gravado na base (só sumiu da tela)");
+  assert(grade.nota === "Somente funcionários com lançamentos no mês",
+    `linha informativa presente (${grade.nota})`);
+  assert(grade.notaDepoisDoBotao, "linha informativa vem logo ao lado do botão + Lançamento");
+
+  const layoutNota = await page.evaluate(() => {
+    const nota = document.querySelector(".contador-toolbar-note");
+    const style = getComputedStyle(nota);
+    const btn = document.getElementById("btnLancamento").getBoundingClientRect();
+    const box = nota.getBoundingClientRect();
+    const barra = document.querySelector(".contador-toolbar").getBoundingClientRect();
+    return {
+      textAlign: style.textAlign,
+      italico: style.fontStyle,
+      comecaDepoisDoBotao: box.left >= btn.right - 1,
+      vaiAteAFaixaDaBarra: Math.abs(box.right - barra.right) <= 2,
+      mesmaLinha: Math.abs(box.top - btn.top) < 40
+    };
+  });
+  assert(layoutNota.textAlign === "center", "texto centralizado no espaço que sobra");
+  assert(layoutNota.italico === "italic", "renderizada em itálico (destaque do aviso)");
+  assert(layoutNota.comecaDepoisDoBotao, "começa depois do fim do botão + Lançamento");
+  assert(layoutNota.vaiAteAFaixaDaBarra, "ocupa o espaço até a borda direita da barra (coluna Vales)");
+  assert(layoutNota.mesmaLinha, "fica na mesma linha do botão");
+
+  // ── 10. Aba Resumo intocada ──
+  console.log("[10] Aba Resumo não mudou");
+  const resumo = await page.evaluate(() => {
+    document.querySelector('.contador-tab[data-tab="resumo"]').click();
+    return {
+      nomes: [...document.querySelectorAll(".resumo-table tbody .resumo-name-cell")].map((td) => td.textContent.trim()),
+      nota: Boolean(document.querySelector(".contador-toolbar-note")),
+      imprimir: Boolean(document.getElementById("btnPrintResumo")),
+      total: Boolean(document.querySelector(".resumo-total-row"))
+    };
+  });
+  assert(resumo.nomes.join(" | ") === "Ana Teste | Bruno Teste | Jefferson Teste | Zenaide Teste",
+    `Resumo segue listando TODOS os ativos, inclusive o zerado (${resumo.nomes.join(" | ")})`);
+  assert(!resumo.nota, "linha informativa não aparece na aba Resumo");
+  assert(resumo.imprimir, "Resumo mantém o botão Imprimir / PDF");
+  assert(resumo.total, "Resumo mantém a linha de totais");
 } finally {
   await browser.close();
 }

@@ -1,3 +1,14 @@
+2026-08-29 (2) — Contador/Lançamentos: grade só com quem tem lançamento, em ordem alfabética
+- [MELHORIA] A grade da sub-aba Lançamentos vinha na ordem de gravação dos registros, sem relação com a aba Resumo. Passa a ordenar por getEmployeeName(...).localeCompare(nome, "pt-BR") — mesmo comparador e mesmo nome oficial usados por getEmployeesForCompany no Resumo, de modo que as duas telas listam na mesma sequência
+- [MELHORIA] getLancamentosParaGrade filtra por hasAnyValue: registro com os oito campos zerados (ou "00:00") não conta como "funcionário com lançamento no mês" e sai da grade. O dado continua gravado — some apenas da tela. Com a coluna Ações fora, zerar um lançamento pelo pop-up agora faz a linha sumir, em vez de deixar uma fileira de "—"
+- [SEGURANÇA DE DADOS] A ordenação é feita sobre slice(): o array devolvido por getLancamentos é o próprio dado gravado, e reordená-lo no lugar alteraria o registro do usuário
+- [NOVO] Linha informativa "Somente funcionários com lançamentos no mês" (span.contador-toolbar-note) ao lado do botão "+ Lançamento": flex:1 + text-align:center, ocupando e centralizando-se no espaço entre o fim do botão e a borda direita da barra (última coluna, Vales). Itálico, tom --muted. Só na sub-aba Lançamentos
+- [PRESERVADO] Aba Resumo intacta: renderResumoGrid e renderResumoPrintArea seguem listando TODOS os ativos (inclusive quem não tem lançamento) com a linha de totais, e o aviso não aparece lá
+- [TESTE] verify-contador-lancamento-popup.mjs 46 -> 60 asserções (blocos 9 e 10): ordem alfabética, registro zerado fora da grade mas presente na base, texto/posição/centralização do aviso medidos no Chrome com o CSS real e a aba Resumo provada intacta. O harness passou a carregar css/style.css — sem o CSS real não se afirma nada sobre layout
+- [TESTE] Validação funcional: asserção 8d nova (grade filtrada + ordenada + aviso na barra, com o Resumo preservado)
+- Arquivos: js/contador.js, css/style.css, scripts/verify-contador-lancamento-popup.mjs, scripts/run-functional-validation.mjs
+- npm test 47/47; npm run validate 20/20 suítes
+
 2026-08-29 — Contador: "+ Lançamento" abre com os dados do mês selecionado; coluna Ações sai da tela
 - [MELHORIA] Botão "+ Novo Lançamento" virou "+ Lançamento" (id btnNovoLancamento -> btnLancamento); o texto de estado vazio da tabela acompanhou
 - [CORREÇÃO] O pop-up abria sempre zerado, mesmo com o mês selecionado ao lado já tendo lançamentos: agora buildLancamentoMap monta employeeId -> lançamento do mês da barra de ferramentas e escolher o funcionário preenche os oito campos com o que já está registrado (Jefferson/agosto: Consumo Interno 212,25 e Vales 250,00)

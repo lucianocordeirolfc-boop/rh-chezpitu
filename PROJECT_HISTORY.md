@@ -7,6 +7,56 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-08-29 (2) — Contador/Lançamentos: grade só com quem tem lançamento, em ordem alfabética
+
+**Origem:** pedido do usuário, na sequência da entrega anterior do mesmo dia.
+A grade da sub-aba Lançamentos vinha na ordem de gravação dos registros, sem
+relação com a ordem da aba Resumo, e não deixava claro por que alguns
+funcionários não apareciam.
+
+**O que foi feito (apenas na sub-aba Lançamentos — a aba Resumo não foi tocada):**
+
+1. **Só funcionários com lançamento no mês.** `getLancamentosParaGrade` filtra
+   por `hasAnyValue`: registro cujos oito campos estão zerados (ou `"00:00"`)
+   **não** é "funcionário com lançamento" e sai da grade. Isso ficou possível
+   depois que a coluna Ações saiu — o usuário zera um lançamento pelo pop-up e a
+   linha some sozinha, em vez de ficar uma fileira de "—". O registro continua
+   gravado: some da tela, nunca da base.
+
+2. **Ordem alfabética igual à do Resumo.** Ordenação por
+   `getEmployeeName(...).localeCompare(nome, "pt-BR")` — o mesmo comparador e o
+   mesmo nome oficial que `getEmployeesForCompany` usa na aba Resumo, de modo
+   que as duas telas listam na mesma sequência. A ordenação é feita sobre uma
+   cópia (`slice()`): o array devolvido por `getLancamentos` é o próprio dado
+   gravado e reordená-lo no lugar seria alterar o registro do usuário.
+
+3. **Linha informativa "Somente funcionários com lançamentos no mês"** ao lado
+   do botão "+ Lançamento" (`span.contador-toolbar-note`). O CSS usa
+   `flex: 1` + `text-align: center`, então ela ocupa o espaço que sobra entre o
+   fim do botão e a borda direita da barra — que é a borda da última coluna
+   (Vales) — e se centraliza nele. Em itálico e no tom `--muted`, para informar
+   sem competir com o botão. Renderizada só quando a sub-aba ativa é
+   Lançamentos.
+
+**Aba Resumo:** inalterada — `renderResumoGrid` e `renderResumoPrintArea`
+continuam listando **todos** os funcionários ativos (inclusive quem não tem
+lançamento) com a linha de totais, e o aviso não aparece lá. Coberto por
+asserção na suíte.
+
+**Arquivos:** js/contador.js, css/style.css,
+scripts/verify-contador-lancamento-popup.mjs, scripts/run-functional-validation.mjs.
+
+**Testes:** `npm test` 47/47 ✓; `npm run validate` 20/20 suítes ✓;
+`verify-contador-lancamento-popup.mjs` 46/46 → **60/60 ✓** (blocos 9 e 10 novos:
+ordem alfabética, registro zerado fora da grade mas presente na base, texto e
+posição/centralização do aviso medidos no Chrome com o CSS real, e a aba Resumo
+provada intacta). O harness da suíte passou a carregar `css/style.css` — sem o
+CSS real não se pode afirmar nada sobre layout.
+
+**Pendências:** nenhuma nova. Segue em aberto (da entrega anterior) a decisão
+sobre criar um botão de "limpar lançamento do mês" no pop-up — agora com menos
+urgência, já que zerar os campos faz a linha sair da grade.
+
 ## 2026-08-29 — Contador: "+ Lançamento" abre com os dados do mês e a coluna Ações sai da tela
 
 **Origem:** pedido do usuário. O botão "+ Novo Lançamento" abria o pop-up sempre

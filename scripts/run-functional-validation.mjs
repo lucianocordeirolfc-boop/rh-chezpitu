@@ -1762,6 +1762,22 @@ function validatePhase2Improvements(AppData) {
     "—"
   );
 
+  // 8d. Contador — sub-aba Lançamentos: só quem tem lançamento, em ordem
+  //     alfabética, com o aviso ao lado do botão. A aba Resumo NÃO muda:
+  //     segue listando todos os ativos via getEmployeesForCompany.
+  assert(
+    area,
+    contador.includes("function getLancamentosParaGrade(company, yearMonth)") &&
+      contador.includes(".filter(hasAnyValue)") &&
+      contador.includes('var lancamentos = getLancamentosParaGrade(company, yearMonth);') &&
+      contador.includes('class="contador-toolbar-note">Somente funcionários com lançamentos no mês<') &&
+      /\.contador-toolbar-note\s*\{[^}]*text-align:\s*center/.test(styleCss) &&
+      contador.includes("var employees = getEmployeesForCompany(company);"),
+    "Contador Lançamentos: grade só com quem tem lançamento no mês, em ordem alfabética, com o aviso na barra (Resumo intacto)",
+    ["js/contador.js", "css/style.css"],
+    "—"
+  );
+
   // === Modal Cadastrar Feriado — alto (~85vh), lista priorizada, rolagem única ===
   assert(
     area,
