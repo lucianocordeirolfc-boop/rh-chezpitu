@@ -127,6 +127,54 @@ Trocar empresa não pode apagar dados.
 
 Trocar mês não pode apagar dados.
 
+## Impressão da Escala — geometria da folha (REGRA FIXA)
+
+Vigente desde 2026-09-07 (`20260907.01`). Ver `PROJECT_HISTORY.md` →
+"Escala impressa: folha inteira e layout igual nas duas empresas".
+
+**1. A geometria da folha mora FORA de `@media print`.**
+As medidas, fontes e colunas da folha ficam no bloco `#scalePrintContainer` de
+`css/escala-print.css`, sem media query. Dentro de `@media print` só entra regra
+de **página** (esconder o resto do app, travar o body e o container em
+297×210mm).
+
+Motivo: `applyPrintFitScale` (`js/escala.js`) mede `scrollHeight` com o
+container já no DOM, mas ainda em mídia `screen`. Se a geometria estiver dentro
+de `@media print`, a medição enxerga o layout de tela — cabeçalho e logo
+maiores, campos `.no-print` ainda visíveis, rodapé mais espaçado — e devolve uma
+altura maior que a real (foram 811px contra 755px). O fator sai menor que 1 sem
+necessidade e a folha encolhe **duas vezes**: uma pelo CSS de impressão, outra
+pelo `transform: scale()`.
+
+**2. Toda dimensão HORIZONTAL é compensada pelo fator de auto-fit.**
+Largura da folha, margens laterais e coluna de nomes são escritas como
+`calc(<medida> / var(--scale-print-fit, 1))`; o `transform: scale(fator)` as
+devolve ao tamanho impresso pretendido. A altura do quadro varia (número de
+funcionários e de setores); a largura, não — são sempre 30/31 dias mais a coluna
+de nomes. Só **altura de linha e corpo de fonte** acompanham a redução.
+
+Sem isso, encolher para caber nos 210mm encolhe junto a largura e sobra faixa
+branca à direita — e, como a sobra depende do tamanho do quadro, cada empresa
+sai com colunas de larguras diferentes.
+
+**3. As duas empresas têm a MESMA geometria impressa.**
+Chez Pitu e Pengold só podem diferir em **cor** (cabeçalho da tabela, faixa de
+setor, título, nome legal). Coluna de nomes (26mm), coluna de dia, corpo de
+fonte, altura de linha e fator de auto-fit têm de ser idênticos para o mesmo
+quadro. Coberto por asserção em `scripts/verify-print-escala.mjs`.
+
+**4. As regras de pré-visualização não podem alcançar a folha.**
+Os blocos `@media screen and (max-width: …)` que reduzem a prévia devem ser
+escopados em `.scale-print-preview-scroll`. Sem escopo, os `margin-right` /
+`margin-bottom` negativos da prévia contaminam a medição em telas estreitas.
+
+**5. O harness mede antes de marcar o body.**
+`scripts/verify-print-escala.mjs` tem de reproduzir a ordem real de
+`printScale`: medir em mídia `screen`, sem `body.printing-scale`, e só então
+marcar o body e emular `print`. Marcar antes de medir esconde exatamente a
+classe de bug descrita no item 1. A suíte exige medição `screen` = medição
+`print`.
+
 ## Códigos da Escala
 
 Códigos importantes:

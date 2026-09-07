@@ -9,12 +9,62 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260829.02 (Contador: pop-up "+ Lançamento" com os dados do mês;
-grade de Lançamentos só com quem tem lançamento, em ordem alfabética)
-**Data:** 2026-08-29
+**Versão:** 20260907.01 (Escala de Folga impressa: folha inteira e layout
+idêntico entre Chez Pitu e Pengold)
+**Data:** 2026-09-07
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
+
+Data: 07/09/2026
+Versão: 20260907.01 (Firebase Hosting — chez-pitu-rh)
+Commits: `ed21969` (fix) + `4ea49f5` (carimbo de build)
+
+**Escala de Folga — versão impressa.** A folha passou a usar toda a largura do
+A4 e as duas empresas saem com a mesma geometria. Nos PDFs de referência de
+Setembro/2026, Chez Pitu ocupava **256,1mm** e Pengold **280,0mm** dos 297mm,
+com colunas de dia de larguras diferentes.
+
+Duas causas somadas: (1) o **auto-fit media o layout de tela** — a geometria de
+impressão vivia dentro de `@media print`, então `applyPrintFitScale` enxergava
+cabeçalho e logo maiores, campos `.no-print` ainda visíveis e rodapé mais
+espaçado, devolvendo 811px contra 755px reais; o fator saía menor que 1 sem
+necessidade e a folha encolhia **duas vezes**; (2) a **redução era uniforme** —
+o `transform: scale()` encolhia junto a largura, que não precisa ceder (são
+sempre 30/31 dias mais a coluna de nomes). Como a sobra depende de quantas
+linhas e setores cada empresa tem, cada uma recebia um fator diferente.
+
+Correção: a geometria da folha saiu de `@media print` para um bloco próprio
+ancorado em `#scalePrintContainer` (criado e removido por `printScale`), de modo
+que a medição enxergue o que vai para o papel; as regras de pré-visualização
+foram escopadas em `.scale-print-preview-scroll`; largura, margens laterais e
+coluna de nomes passaram a ser **compensadas pelo fator**
+(`calc(297mm / var(--scale-print-fit))`); a coluna de nomes ficou **fixa em
+26mm**, independente da densidade; a margem lateral caiu de 4mm para 2,5mm; e
+`applyPrintFitScale` virou um ponto fixo de 3 rodadas com conferência final de
+altura (nunca cortar funcionário nem gerar 2ª página).
+
+Resultado medido no vetor dos PDFs: **297,0mm de largura usada nas duas
+empresas**, coluna de nome **26mm** e coluna de dia **8,86mm** em todos os
+quadros testados (8, 17, 20, 30, 40 e 48 funcionários). Nos dois PDFs de 17
+funcionários, as **76 bordas verticais da grade caem no mesmo x** — só as cores
+do tema diferem.
+
+Homologação: `scripts/verify-print-escala.mjs` reescrito para reproduzir o fluxo
+real (marcava `body.printing-scale` **antes** de medir, e por isso o bug passava
+batido), com asserções novas de medição `screen` = `print`, ocupação ≥97% da
+folha e comparação direta Chez Pitu × Pengold — **119 asserções, 0 falhas**
+(antes 55). `npm test` 47/47 e `npm run validate` 20/20 suítes, tudo com
+fixtures: nenhum dado de produção foi lido ou alterado.
+
+**Pendência mantida de propósito:** na vertical a folha segue alinhada ao topo
+(Pengold com 15 funcionários usa ~176mm dos 210mm). Preencher a sobra exigiria
+esticar as linhas, o que faria a altura de linha variar entre as empresas — o
+oposto do layout idêntico pedido.
+
+**Cache-busting:** todos os `?v=` do index.html em `20260907.01`.
+
+## Deploy 20260829.02
 
 Data: 29/08/2026
 Versão: 20260829.02 (Firebase Hosting — chez-pitu-rh)
@@ -30,7 +80,7 @@ centralizada no espaço entre o fim do botão e a borda da última coluna (Vales
 
 **Cache-busting:** todos os `?v=` do index.html em `20260829.02`.
 
-## Deploy anterior
+## Deploy 20260829.01
 
 Data: 29/08/2026
 Versão: 20260829.01 (Firebase Hosting — chez-pitu-rh)
@@ -82,16 +132,19 @@ altera feriados lançados, escala, VT, ausências, lançamentos do Contador ou
 cadastro. Teste em fixtures/`scripts/verify-*.mjs`; validação em produção é
 somente leitura. Ver `PROJECT_RULES.md`.
 
-**Validação em produção:** ✅ as duas entregas de 29/08/2026 (`20260829.01` e
-`20260829.02`) foram **aprovadas pelo usuário** em produção, inclusive o
-critério de que lançamento com todos os campos zerados não aparece na grade da
-sub-aba Lançamentos (o registro continua gravado).
+**Validação em produção:** ⏳ a entrega de 07/09/2026 (`20260907.01` — escala
+impressa) aguarda conferência visual do usuário: gerar Setembro/2026 nas duas
+empresas (Ctrl+F5) e comparar com os PDFs de referência. ✅ as duas entregas de
+29/08/2026 (`20260829.01` e `20260829.02`) foram **aprovadas pelo usuário** em
+produção, inclusive o critério de que lançamento com todos os campos zerados não
+aparece na grade da sub-aba Lançamentos (o registro continua gravado).
 
 **Próximo deploy recomendado:** conforme novas demandas.
 
 ## Módulos
 
-Escala de Folga: OK (+ guarda anti auto-vínculo vencido)
+Escala de Folga: OK (+ guarda anti auto-vínculo vencido; impressão usando a
+folha A4 inteira, com a mesma geometria nas duas empresas)
 Vale Transporte: OK
 Ausências: OK
 Controle de Feriados: OK (+ exclusão definitiva de feriado e de vínculo; só
@@ -113,6 +166,11 @@ Dashboard: OK
 - npm run test:offline: 15/15 ✓
 
 **Homologação da frente atual (`scripts/verify-*.mjs`, sandbox com fixtures):**
+- scripts/verify-print-escala.mjs: 119/119 ✓ (impressão da escala no Chrome
+  real: 1 única página A4 paisagem em quadros de 8 a 48 funcionários, ninguém
+  cortado, auto-fit medido no layout impresso — medição `screen` = medição
+  `print` —, grade ocupando ≥97% dos 297mm e geometria idêntica entre Chez Pitu
+  e Pengold com o mesmo quadro)
 - scripts/verify-contador-lancamento-popup.mjs: 60/60 ✓ (pop-up "+ Lançamento"
   no Chrome real: base do mês, merge por funcionário, demais registros intactos,
   grade filtrada e ordenada, layout do aviso e aba Resumo preservada)
@@ -126,7 +184,7 @@ Dashboard: OK
 - scripts/verify-inativos-picker-ui.mjs: 17/17 ✓ (seletor de inativos exercitado
   no Chrome real, via puppeteer)
 
-**Portão de qualidade (29/08/2026):** `npm test` 47/47 e `npm run validate`
+**Portão de qualidade (07/09/2026):** `npm test` 47/47 e `npm run validate`
 20/20 suítes — ambos verdes antes do commit e do deploy ✅
 
 ## Fase 3A — Segurança Operacional

@@ -8,12 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260829.02` (exibida como `v2026.08.29.02`) — fonte: `js/version.js`
+- **Versão atual:** `20260907.01` (exibida como `v2026.09.07.01`) — fonte: `js/version.js`
 - **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito)
-- **Último commit:** `6c7e701` — chore: carimbo de build 20260829.02 (deploy da grade de Lancamentos filtrada e ordenada)
-- **Status geral:** 🟢 EM PRODUÇÃO — duas entregas no Contador na data
-  (`20260829.01` e `.02`), ambas commitadas, pushadas e **deployadas**
-  (`chez-pitu-rh.web.app`, verificadas por `curl`).
+- **Último commit:** `4ea49f5` — chore: carimbo de build 20260907.01 (deploy da escala impressa em folha inteira)
+- **Status geral:** 🟢 EM PRODUÇÃO — correção da impressão da Escala de Folga
+  (`20260907.01`) commitada, pushada e **deployada** (`chez-pitu-rh.web.app`,
+  verificada por `curl`). Aguarda validação visual do usuário.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -27,6 +27,52 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-09-07 — Escala impressa: folha inteira e layout igual nas duas empresas (em produção)
+
+- ✅ **Auto-fit passou a medir o layout impresso** (`20260907.01`, commit
+  `ed21969`) — a geometria da folha saiu de `@media print` para um bloco próprio
+  em `css/escala-print.css`, ancorado em `#scalePrintContainer` (container criado
+  e removido por `printScale`, então as regras só valem durante a impressão).
+  Antes, `applyPrintFitScale` media na tela um layout que não era o impresso
+  (cabeçalho e logo maiores, campos `.no-print` visíveis, rodapé mais espaçado) e
+  devolvia altura ~8% a 12% maior que a real — **811px medidos contra 755px
+  reais**. O fator saía menor que 1 sem necessidade e a folha encolhia **duas
+  vezes**. Em `@media print` ficaram só as regras de página; fora da impressão o
+  container fica fora da viewport (`position: fixed; left: -20000px`), com
+  largura definida, para medir sem piscar na tela.
+- ✅ **Regras de pré-visualização escopadas** — os blocos
+  `@media screen and (max-width: 1366px/1180px)` passaram a mirar
+  `.scale-print-preview-scroll .scale-print-area`. Antes alcançavam também a
+  folha de impressão (`margin-right: -110mm`, `margin-bottom: -72mm`) e
+  contaminavam a medição em telas estreitas.
+- ✅ **Compensação horizontal** — folha, margens laterais e coluna de nomes são
+  desenhadas divididas pelo fator (`calc(297mm / var(--scale-print-fit))`) e o
+  `transform: scale(fator)` as devolve ao tamanho impresso pretendido. Antes a
+  redução para caber nos 210mm de altura encolhia junto a **largura**, que não
+  precisa ceder (são sempre 30/31 dias + a coluna de nomes): com 30 funcionários
+  só 80,4% da largura da folha era usada.
+- ✅ **Coluna de nomes fixa em 26mm impressos**, independente da faixa de
+  densidade (antes 26/23/20mm conforme o número de funcionários). As faixas de
+  densidade seguem ajustando **altura de linha e corpo de fonte** — que é o que
+  precisa ceder para caber. Margem lateral da folha de 4mm para 2,5mm.
+- ✅ **`applyPrintFitScale` virou ponto fixo de 3 rodadas** (`js/escala.js`), já
+  que o fator entra na própria largura da folha e alargar muda o conteúdo medido.
+  Ao final confere se `contentH × fator` ainda cabe nos 210mm e aperta o fator se
+  não couber — nunca cortar funcionário nem gerar 2ª página.
+- 📐 **Resultado medido no vetor dos PDFs:** largura usada passou de **256,1mm
+  (Chez Pitu)** e **280,0mm (Pengold)** para **297,0mm nas duas**; coluna de dia
+  de ≈7,8mm / ≈8,6mm para **8,86mm nas duas**; coluna de nome de 23mm (variável)
+  para **26mm fixos**. Nome 26mm e dia 8,86mm em **todos** os quadros testados
+  (8, 17, 20, 30, 40 e 48 funcionários). Nos dois PDFs de 17 funcionários, as
+  **76 bordas verticais da grade caem no mesmo x** — só as cores do tema diferem.
+- ✅ **Harness reescrito** — `scripts/verify-print-escala.mjs` marcava
+  `body.printing-scale` **antes** de medir, e por isso o bug passava batido.
+  Agora reproduz o fluxo real (mede em mídia `screen`, sem a classe; só depois
+  marca o body e emula `print`). Asserções novas: medição `screen` = medição
+  `print`; grade ocupa ≥97% dos 297mm; e comparação direta Chez Pitu × Pengold
+  com o mesmo quadro (17 e 30 funcionários) exigindo coluna de nome, coluna de
+  dia, fonte, altura de linha e fator **idênticos**. **119 asserções** (antes 55).
 
 ### Frente 2026-08-29 (2) — Contador/Lançamentos: grade filtrada e ordenada (em produção)
 
@@ -272,6 +318,11 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Próximas tarefas
 
+- Escala impressa — **decisão em aberto do usuário**: na vertical a folha
+  continua alinhada ao topo (Pengold com 15 funcionários usa ~176mm dos 210mm).
+  Preencher essa sobra exigiria esticar as linhas, o que faria a **altura de
+  linha variar entre as empresas** — o oposto do layout idêntico pedido em
+  2026-09-07. Mantido de propósito; só mexer se o usuário aceitar a troca.
 - Contador (opcional, sem pedido em aberto): botão de "limpar lançamento do
   mês" dentro do pop-up — sem a coluna Ações não há exclusão pela interface.
   Pouco urgente desde `20260829.02`: zerar os campos já faz a linha sair da
@@ -288,6 +339,13 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de validação
 
+- ⏳ **Validação visual em produção pelo usuário** (Ctrl+F5 para
+  `?v=20260907.01`), **somente leitura**: gerar a Escala de Folga de
+  Setembro/2026 nas duas empresas e conferir contra os PDFs de referência —
+  (a) grade encostando nas duas bordas laterais; (b) colunas de dia mais largas
+  (8,86mm nas duas, contra ≈7,8mm da Chez Pitu antes); (c) nomes com 26mm;
+  (d) os dois PDFs sobrepostos batendo coluna a coluna, mudando só as cores do
+  tema.
 - ✅ **Validado pelo usuário em produção (2026-08-29):** as duas entregas do
   Contador — `20260829.01` (pop-up "+ Lançamento" carregado com os dados do mês
   selecionado; coluna Ações fora da tela) e `20260829.02` (grade só com quem tem
@@ -307,6 +365,14 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de deploy
 
+- ✅ **Escala impressa (`20260907.01`) — commitada, pushada e deployada** em
+  `chez-pitu-rh.web.app`. Commits `ed21969` (fix) + `4ea49f5` (carimbo); `main` e
+  `origin/main` sincronizados em `4ea49f5`. Verificado por `curl`: o
+  `js/version.js` publicado traz `APP_VERSION 20260907.01`,
+  `BUILD_COMMIT ed21969` e `BUILD_DATE 2026-09-07`, e o `css/escala-print.css`
+  publicado contém o bloco `#scalePrintContainer` (50 ocorrências) com as
+  compensações `calc(297mm / var(--scale-print-fit, 1))` e
+  `calc(26mm / var(--scale-print-fit, 1))`.
 - ✅ **Grade de Lançamentos (`20260829.02`) — commitada, pushada e deployada**
   em `chez-pitu-rh.web.app`. Commits `3a1cf80` (feat) + `6c7e701` (carimbo).
   Verificado por `curl`: `index.html` serve `contador.js?v=20260829.02`, o JS
@@ -337,12 +403,53 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (working tree limpo)
 ```
 > Todo o código e a documentação da sessão estão commitados, pushados e em
-> produção (`20260829.02`). `*.md` está no `ignore` do `firebase.json` — não
+> produção (`20260907.01`). `*.md` está no `ignore` do `firebase.json` — não
 > exige deploy.
 
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-09-07 20:46
+- **Versão:** 20260907.01 (em produção)
+- **Branch:** main (sincronizado com `origin/main` em `4ea49f5`)
+- **Arquivos alterados:** `css/escala-print.css`, `js/escala.js`,
+  `scripts/verify-print-escala.mjs`, `js/version.js`, `index.html`,
+  `PROJECT_HISTORY.md`, `.claude/project-state.md`
+- **Resumo:** Impressão da Escala de Folga passou a usar a folha inteira e a sair
+  com layout idêntico nas duas empresas. O usuário enviou dois PDFs de
+  Setembro/2026; medindo os vetores, Chez Pitu ocupava 256,1mm e Pengold 280,0mm
+  dos 297mm, com colunas de dia de larguras diferentes. **Duas causas somadas:**
+  (1) o auto-fit media o layout de tela — a geometria de impressão vivia dentro
+  de `@media print` e a medição via cabeçalho/logo maiores, campos `.no-print`
+  visíveis e rodapé mais espaçado, devolvendo 811px contra 755px reais; o fator
+  saía menor que 1 sem necessidade e a folha encolhia duas vezes; (2) a redução
+  era uniforme — o `transform: scale()` encolhia junto a largura, que não precisa
+  ceder. Como a sobra depende de quantas linhas e setores cada empresa tem, cada
+  uma recebia um fator diferente. **Correção:** geometria da folha movida para um
+  bloco `#scalePrintContainer` fora de `@media print`; regras de pré-visualização
+  escopadas em `.scale-print-preview-scroll`; largura, margens laterais e coluna
+  de nomes compensadas pelo fator via `calc(… / var(--scale-print-fit))`; coluna
+  de nomes fixa em 26mm independente da densidade; margem lateral de 4mm para
+  2,5mm; `applyPrintFitScale` virou ponto fixo de 3 rodadas com conferência final
+  de altura. **Resultado:** 297,0mm de largura usada nas duas empresas, nome 26mm
+  e dia 8,86mm em todos os quadros testados (8 a 48 funcionários); nos dois PDFs
+  de 17 funcionários as 76 bordas verticais da grade caem no mesmo x.
+  **Homologação:** `verify-print-escala.mjs` reescrito para reproduzir o fluxo
+  real (marcava `printing-scale` antes de medir, e por isso o bug passava
+  batido), com asserções novas de medição `screen` = `print`, ocupação ≥97% da
+  folha e comparação direta Chez Pitu × Pengold — 119 asserções, 0 falhas (antes
+  55). `npm test` 47/47 e `npm run validate` 20/20 suítes. Tudo com fixtures:
+  nenhum dado de produção foi lido ou alterado. Commits `ed21969` (fix) e
+  `4ea49f5` (carimbo), deploy verificado por `curl`.
+- **Próximo passo:** aguardar a validação visual do usuário em produção
+  (Ctrl+F5 para `?v=20260907.01`, somente leitura): gerar Setembro/2026 nas duas
+  empresas e comparar com os PDFs de referência. Pendência conhecida e mantida de
+  propósito: na vertical a folha segue alinhada ao topo (Pengold usa ~176mm dos
+  210mm); preencher exigiria esticar as linhas e faria a altura de linha variar
+  entre as empresas.
+
 
 ### CHECKPOINT — ENCERRAMENTO DA SESSÃO
 - **Data:** 2026-08-29 11:05
