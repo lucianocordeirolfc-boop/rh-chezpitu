@@ -173,12 +173,61 @@ const INLINE_CSS = CSS_FILES.map(
   (file) => `/* ===== css/${file} ===== */\n${fs.readFileSync(path.join(root, "css", file), "utf8")}`
 ).join("\n");
 
+/**
+ * O `<body>` NÃO nasce com `printing-scale`, de propósito: `printScale`
+ * (js/escala.js) monta o container, MEDE, e só então marca o body e chama
+ * `window.print()`. Marcar antes escondia o bug em que o auto-fit media o
+ * layout de tela e aplicava o fator no layout de impressão.
+ */
 function buildHtml(areaHtml) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
   <style>${INLINE_CSS}</style>
   <style>@page { size: A4 landscape; margin: 0; }</style>
-  </head><body class="printing-scale">${areaHtml}</body></html>`;
+  </head><body>${areaHtml}</body></html>`;
 }
+
+/**
+ * Replica applyPrintFitScale (js/escala.js): ponto fixo sobre o fator de
+ * auto-fit, que o CSS usa tanto para reduzir (transform) quanto para compensar
+ * a largura da folha. Qualquer mudança lá precisa ser refletida aqui.
+ */
+const MEASURE_FIT = () => {
+  const MM = 96 / 25.4;
+  const pageH = 210 * MM, safety = 6;
+  const maxH = pageH - safety;
+  const area = document.querySelector(".scale-print-area");
+  const prev = {
+    height: area.style.height, minHeight: area.style.minHeight,
+    maxHeight: area.style.maxHeight, overflow: area.style.overflow,
+    transform: area.style.transform
+  };
+  area.style.height = "auto";
+  area.style.minHeight = "0";
+  area.style.maxHeight = "none";
+  area.style.overflow = "visible";
+  area.style.transform = "none";
+
+  let scale = 1;
+  let contentH = 0;
+  for (let round = 0; round < 3; round += 1) {
+    area.style.setProperty("--scale-print-fit", String(scale));
+    contentH = area.scrollHeight;
+    const next = Math.min(1, contentH > 0 ? maxH / contentH : 1);
+    if (Math.abs(next - scale) < 0.001) { scale = next; break; }
+    scale = next;
+  }
+  area.style.setProperty("--scale-print-fit", String(scale));
+  contentH = area.scrollHeight;
+  if (contentH > 0 && contentH * scale > maxH) scale = maxH / contentH;
+
+  area.style.height = prev.height;
+  area.style.minHeight = prev.minHeight;
+  area.style.maxHeight = prev.maxHeight;
+  area.style.overflow = prev.overflow;
+  area.style.transform = prev.transform;
+  area.style.setProperty("--scale-print-fit", String(scale));
+  return { scale, contentH, pageH: Math.round(pageH) };
+};
 
 function countPdfPages(pdfPath) {
   const buf = fs.readFileSync(pdfPath);
@@ -220,25 +269,24 @@ async function runCase(page, label, cfg) {
   // "load" basta: com o CSS embutido a página não faz nenhuma requisição, e
   // `load` só dispara depois de aplicar todas as folhas de estilo.
   await page.goto("file:///" + htmlPath.replace(/\\/g, "/"), { waitUntil: "load" });
-  await page.emulateMediaType("print");
 
-  // Replica applyPrintFitScale (js/escala.js): mede a altura natural do conteúdo
-  // e calcula o fator de auto-fit para caber em UMA folha A4 paisagem.
-  const fit = await page.evaluate(() => {
-    const MM = 96 / 25.4;
-    const pageW = 297 * MM, pageH = 210 * MM, safety = 6;
-    const area = document.querySelector(".scale-print-area");
-    const contentH = area.scrollHeight;
-    const contentW = area.scrollWidth;
-    const scale = Math.min(
-      1,
-      contentH > 0 ? (pageH - safety) / contentH : 1,
-      contentW > 0 ? pageW / contentW : 1
-    );
-    area.style.setProperty("--scale-print-fit", String(scale));
-    document.getElementById("scalePrintContainer")?.style.setProperty("--scale-print-fit", String(scale));
-    return { scale, contentH, pageH: Math.round(pageH) };
-  });
+  // ── Fluxo REAL (printScale) ──────────────────────────────────────────────
+  // 1) mede com o container já no DOM, ainda em mídia SCREEN e sem o body
+  //    marcado — exatamente o momento em que applyPrintFitScale roda no app.
+  const fit = await page.evaluate(MEASURE_FIT);
+
+  // 2) mede de novo já em mídia PRINT. Os dois valores TÊM de bater: a
+  //    geometria da folha vive fora de `@media print` (escala-print.css,
+  //    bloco #scalePrintContainer) justamente para isso. Divergência aqui
+  //    significa auto-fit calculado sobre um layout que não é o impresso —
+  //    a causa das faixas brancas e do layout diferente entre as empresas.
+  await page.evaluate((s) => {
+    document.querySelector(".scale-print-area").style.setProperty("--scale-print-fit", String(s));
+    document.getElementById("scalePrintContainer")?.style.setProperty("--scale-print-fit", String(s));
+    document.body.classList.add("printing-scale");
+  }, fit.scale);
+  await page.emulateMediaType("print");
+  const fitPrint = await page.evaluate(MEASURE_FIT);
 
   // Com a escala aplicada, mede visibilidade real dentro da página (sem corte).
   const m = await page.evaluate(() => {
@@ -259,6 +307,10 @@ async function runCase(page, label, cfg) {
     const dayLastRect = headThs[headThs.length - 1].getBoundingClientRect();
     const nameToDayRatio = day01W > 0 ? nameW / day01W : 0;
     const gridFillPct = Math.round(((dayLastRect.right - tableRect.left) / tableRect.width) * 100);
+    // Ocupação da LARGURA DA FOLHA (297mm): é aqui que aparecia a faixa branca
+    // à direita quando o auto-fit encolhia a folha sem necessidade.
+    const MM = 96 / 25.4;
+    const pageFillPct = Math.round((tableRect.width / (297 * MM)) * 1000) / 10;
     const lastBottoms = {
       legend: document.querySelector(".scale-print-legend")?.getBoundingClientRect().bottom || 0,
       instructions: document.querySelector(".scale-print-instructions")?.getBoundingClientRect().bottom || 0,
@@ -278,6 +330,12 @@ async function runCase(page, label, cfg) {
       footerBottom: Math.round(Math.max(lastBottoms.legend, lastBottoms.instructions, lastBottoms.sign)),
       nameToDayRatio: Math.round(nameToDayRatio * 10) / 10,
       gridFillPct,
+      pageFillPct,
+      // Geometria comparável entre empresas (em mm, já com a escala aplicada).
+      colNameMM: Math.round((nameW / MM) * 100) / 100,
+      colDayMM: Math.round((day01W / MM) * 100) / 100,
+      cellFontPX: Math.round(parseFloat(getComputedStyle(headThs[1]).fontSize) * 100) / 100,
+      rowHeightPX: Math.round((names[0]?.getBoundingClientRect().height || 0) * 100) / 100,
       pageH
     };
   });
@@ -286,12 +344,23 @@ async function runCase(page, label, cfg) {
   await page.pdf({ path: pdfPath, preferCSSPageSize: true, printBackground: true });
   const pages = countPdfPages(pdfPath);
 
-  lines.push(`  (funcionários=${totalCount}, escala=${fit.scale.toFixed(3)}, conteúdo=${Math.round(fit.contentH)}px, páginas PDF=${pages}, rodapé.bottom=${m.footerBottom}px, pageH=${m.pageH}px, razão nome/dia=${m.nameToDayRatio}, grade preenche=${m.gridFillPct}%) -> ${pdfPath}`);
+  lines.push(`  (funcionários=${totalCount}, escala=${fit.scale.toFixed(3)}, conteúdo=${Math.round(fit.contentH)}px, páginas PDF=${pages}, rodapé.bottom=${m.footerBottom}px, pageH=${m.pageH}px, razão nome/dia=${m.nameToDayRatio}, grade preenche=${m.gridFillPct}% da tabela e ${m.pageFillPct}% da folha, nome=${m.colNameMM}mm, dia=${m.colDayMM}mm) -> ${pdfPath}`);
 
   check(`Todos os ${totalCount} funcionários renderizados`, m.employeeRows === totalCount);
   check(`Nenhum funcionário cortado (todos dentro da página)`, m.overflowingRows === 0);
   check(`Coluna de funcionários sem inchar (razão nome/dia ${m.nameToDayRatio} < 5)`, m.nameToDayRatio > 0 && m.nameToDayRatio < 5);
   check(`Grade aproveita a largura (dia 01 logo após o nome; preenche ${m.gridFillPct}% ≥ 97%)`, m.gridFillPct >= 97);
+  // Auto-fit medido no layout certo: a altura vista em mídia screen (momento em
+  // que applyPrintFitScale roda) tem de ser a mesma vista em mídia print.
+  check(
+    `Auto-fit mede o layout IMPRESSO (screen ${Math.round(fit.contentH)}px = print ${Math.round(fitPrint.contentH)}px)`,
+    Math.abs(fit.contentH - fitPrint.contentH) <= 1
+  );
+  // Sem encolhimento indevido, a grade ocupa a folha inteira na horizontal.
+  check(
+    `Grade usa a largura da folha (${m.pageFillPct}% de 297mm ≥ 97%)`,
+    m.pageFillPct >= 97
+  );
   check(`Todos os ${cfg.employeesByDept.length} setores presentes (nenhum cortado)`, m.sectorCount === cfg.employeesByDept.length);
   check("Container travado em 210mm (overflow hidden)", m.contOverflow === "hidden" && m.contHeight === m.pageH);
   check("Área com max-height livre para o auto-fit (max-height: none)", m.areaMaxHeight === "none");
@@ -299,7 +368,7 @@ async function runCase(page, label, cfg) {
   check("Observações presentes", m.hasObs);
   check("Assinatura presente", m.hasSign);
   check(`PDF em 1 ÚNICA página A4 paisagem`, pages === 1);
-  return { lines, casePass, caseFail };
+  return { lines, casePass, caseFail, geometry: m, scale: fit.scale };
 }
 
 (async () => {
@@ -327,7 +396,14 @@ async function runCase(page, label, cfg) {
     ["Chez Pitu Junho-2026 (20 func.)", { ...CHEZ, employeesByDept: buildEmployees(20) }],
     ["Chez Pitu Junho-2026 (8 func.)", { ...CHEZ, employeesByDept: buildEmployees(8) }],
     ["Pengold Junho-2026 (40 func.)", { ...PENGOLD, employeesByDept: buildEmployees(40) }],
-    ["Pengold Junho-2026 (8 func.)", { ...PENGOLD, employeesByDept: buildEmployees(8) }]
+    ["Pengold Junho-2026 (8 func.)", { ...PENGOLD, employeesByDept: buildEmployees(8) }],
+    // Pares com o MESMO quadro nas duas empresas: a geometria impressa tem de
+    // sair idêntica (só as cores do tema mudam). É o cenário reclamado —
+    // as duas escalas saíam com colunas e fontes diferentes.
+    ["Chez Pitu — par 17 func.", { ...CHEZ, employeesByDept: buildEmployees(17) }],
+    ["Pengold — par 17 func.", { ...PENGOLD, employeesByDept: buildEmployees(17) }],
+    ["Chez Pitu — par 30 func.", { ...CHEZ, employeesByDept: buildEmployees(30) }],
+    ["Pengold — par 30 func.", { ...PENGOLD, employeesByDept: buildEmployees(30) }]
   ];
 
   // Os casos são independentes (aba própria, arquivo próprio), então rodam em
@@ -341,6 +417,25 @@ async function runCase(page, label, cfg) {
     pass += report.casePass;
     fail += report.caseFail;
   });
+
+  // ── Chez Pitu × Pengold: mesma geometria impressa ────────────────────────
+  // Com o mesmo quadro, tudo o que mede tem de bater. Só as cores do tema
+  // (cabeçalho da tabela, faixa de setor, título) podem diferir.
+  const byLabel = Object.fromEntries(CASES.map(([label], i) => [label, reports[i]]));
+  const PAIRS = [
+    ["17 func.", "Chez Pitu — par 17 func.", "Pengold — par 17 func."],
+    ["30 func.", "Chez Pitu — par 30 func.", "Pengold — par 30 func."]
+  ];
+  console.log("\n[Chez Pitu × Pengold — layout idêntico]");
+  for (const [nome, a, b] of PAIRS) {
+    const ga = byLabel[a].geometry, gb = byLabel[b].geometry;
+    const campos = ["colNameMM", "colDayMM", "cellFontPX", "rowHeightPX", "pageFillPct"];
+    const diferentes = campos.filter((k) => Math.abs(ga[k] - gb[k]) > 0.01);
+    const escalaIgual = Math.abs(byLabel[a].scale - byLabel[b].scale) < 0.001;
+    const ok = diferentes.length === 0 && escalaIgual;
+    if (ok) { pass += 1; console.log(`  ✓ ${nome}: escala ${byLabel[a].scale.toFixed(3)}, nome ${ga.colNameMM}mm, dia ${ga.colDayMM}mm, linha ${ga.rowHeightPX}px — idênticos`); }
+    else { fail += 1; console.log(`  ✗ ${nome}: divergem em ${diferentes.join(", ") || "escala"} — CP=${JSON.stringify(ga)} PG=${JSON.stringify(gb)}`); }
+  }
 
   await browser.close();
   console.log(`\n=== RESUMO IMPRESSÃO: ${pass} passou, ${fail} falhou ===`);

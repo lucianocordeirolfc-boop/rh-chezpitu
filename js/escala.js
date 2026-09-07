@@ -930,20 +930,34 @@
     if (notesField && notesPrint) notesPrint.textContent = notesField.value || "";
   }
 
-  // Auto-fit: garante que a escala caiba em UMA única página A4 paisagem.
-  // Mede a altura real do conteúdo (liberando a trava de 210mm da pré-visualização)
-  // e calcula um fator de escala para que o quadro inteiro — grade completa, todos
-  // os funcionários, observações, assinatura, legenda e instruções — caiba na folha,
-  // sem cortar ninguém e sem gerar 2ª página. O fator vai para a variável CSS
-  // --scale-print-fit, consumida apenas em @media print (a tela não é afetada).
+  // Auto-fit: garante que a escala caiba em UMA única página A4 paisagem
+  // OCUPANDO A LARGURA INTEIRA DA FOLHA.
+  //
+  // A altura do quadro varia (número de funcionários e de setores); a largura,
+  // não — são sempre 30/31 dias mais a coluna de nomes. Por isso o ajuste é
+  // feito em duas partes:
+  //
+  //   1. fator de escala (`--scale-print-fit`): reduz o conteúdo até caber nos
+  //      210mm de altura, sem cortar ninguém e sem 2ª página;
+  //   2. compensação horizontal: o CSS (escala-print.css, bloco
+  //      `#scalePrintContainer`) desenha a folha, as margens laterais e a coluna
+  //      de nomes divididas pelo mesmo fator, e o `transform: scale(fator)`
+  //      devolve tudo ao tamanho impresso pretendido. Sem isso, a redução
+  //      vertical encolhia junto a largura e sobrava uma faixa branca à direita
+  //      — quanto maior o quadro, maior a faixa. Como o encolhimento dependia do
+  //      tamanho do quadro, Chez Pitu e Pengold saíam com colunas diferentes.
+  //
+  // Efeito: nome 26mm e coluna de dia ~8,9mm em QUALQUER quadro e nas duas
+  // empresas. Só a altura das linhas e o corpo da fonte acompanham o fator —
+  // que é o que de fato precisa ceder para caber na folha.
   function applyPrintFitScale(printContainer) {
     const area = printContainer?.querySelector(".scale-print-area");
     if (!area) return;
 
     const MM = 96 / 25.4; // px por mm @96dpi
-    const pageW = 297 * MM;
     const pageH = 210 * MM;
     const safety = 6; // folga anti-corte (px) para arredondamentos do navegador
+    const maxH = pageH - safety;
 
     // Libera a trava de altura/overflow da prévia para medir o conteúdo natural.
     const prev = {
@@ -959,8 +973,27 @@
     area.style.overflow = "visible";
     area.style.transform = "none";
 
-    const contentH = area.scrollHeight;
-    const contentW = area.scrollWidth;
+    // O fator entra na própria largura da folha (297mm ÷ fator), então mudar o
+    // fator muda o conteúdo medido: alargar faz o texto quebrar menos linhas e
+    // encurtar um pouco, o que permite um fator maior. Três rodadas de ponto
+    // fixo bastam para estabilizar. `scrollHeight` é medida de layout — o
+    // `transform` da folha não interfere.
+    let scale = 1;
+    let contentH = 0;
+    for (let round = 0; round < 3; round += 1) {
+      area.style.setProperty("--scale-print-fit", String(scale));
+      contentH = area.scrollHeight;
+      const next = Math.min(1, contentH > 0 ? maxH / contentH : 1);
+      if (Math.abs(next - scale) < 0.001) { scale = next; break; }
+      scale = next;
+    }
+
+    // Confere na largura final: se a última rodada deixou o conteúdo acima dos
+    // 210mm, aperta o fator até caber. Melhor perder um pouco de corpo de letra
+    // do que cortar funcionário ou gerar uma 2ª página.
+    area.style.setProperty("--scale-print-fit", String(scale));
+    contentH = area.scrollHeight;
+    if (contentH > 0 && contentH * scale > maxH) scale = maxH / contentH;
 
     // Restaura o estado original (a escala é aplicada via CSS var, só na impressão).
     area.style.height = prev.height;
@@ -968,12 +1001,6 @@
     area.style.maxHeight = prev.maxHeight;
     area.style.overflow = prev.overflow;
     area.style.transform = prev.transform;
-
-    const scale = Math.min(
-      1,
-      contentH > 0 ? (pageH - safety) / contentH : 1,
-      contentW > 0 ? pageW / contentW : 1
-    );
 
     area.style.setProperty("--scale-print-fit", String(scale));
     printContainer.style.setProperty("--scale-print-fit", String(scale));

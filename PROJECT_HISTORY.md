@@ -7,6 +7,99 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-09-07 — Escala impressa: folha inteira e layout igual nas duas empresas
+
+Problema:
+Nos PDFs enviados pelo usuário (Setembro/2026), a escala impressa não usava a
+folha toda e as duas empresas saíam com layouts diferentes. Medindo os vetores
+dos PDFs: Chez Pitu ocupava **256,1mm** dos 297mm de largura (fator de auto-fit
+≈ 0,89) e Pengold **280,0mm** (≈ 0,98) — faixas brancas à direita, colunas de dia
+com larguras diferentes (≈7,8mm contra ≈8,6mm) e corpos de fonte diferentes.
+
+Causa raiz (duas, somadas):
+
+1. **O auto-fit media o layout errado.** `applyPrintFitScale` (js/escala.js) roda
+   ANTES de `document.body.classList.add("printing-scale")` e, de qualquer forma,
+   na tela — mas toda a geometria de impressão vivia dentro de `@media print`.
+   A medição enxergava o layout de tela (cabeçalho e logo maiores, campos
+   `.no-print` ainda visíveis, rodapé mais espaçado) e devolvia uma altura ~8% a
+   12% maior que a real. O fator saía menor que 1 sem necessidade e a folha era
+   encolhida DUAS vezes: uma pelo CSS de impressão, outra pelo `transform`.
+   Reproduzido em Chrome headless: 811px medidos na tela contra 755px reais.
+   As regras `@media screen and (max-width: …)` da pré-visualização (que aplicam
+   `margin-right: -110mm` / `margin-bottom: -72mm`) também alcançavam a folha de
+   impressão e contaminavam a medição em telas de até 1366px.
+2. **A redução era uniforme.** Mesmo com a medição certa, quando o quadro é
+   grande e precisa encolher para caber nos 210mm de altura, o
+   `transform: scale()` encolhia junto a LARGURA — que não precisava ceder, já
+   que são sempre 30/31 dias mais a coluna de nomes. Quanto maior o quadro, maior
+   a faixa branca (com 30 funcionários, só 80,4% da largura da folha).
+
+Como o excedente depende de quantas linhas e setores cada empresa tem, cada uma
+recebia um fator diferente — daí os dois layouts diferentes.
+
+Correção:
+
+- `css/escala-print.css` — a geometria da folha saiu de `@media print` para um
+  bloco próprio, sem media query, ancorado em `#scalePrintContainer` (container
+  criado e removido por `printScale`, então as regras só valem durante a
+  impressão). Agora a medição enxerga exatamente o que vai para o papel. Em
+  `@media print` ficaram apenas as regras de PÁGINA. Fora da impressão o
+  container fica fora da viewport (`position: fixed; left: -20000px`), com
+  largura definida — mede sem piscar na tela. As regras de pré-visualização em
+  telas estreitas foram escopadas em `.scale-print-preview-scroll`.
+- **Compensação horizontal** — a folha, as margens laterais e a coluna de nomes
+  são desenhadas divididas pelo fator (`calc(297mm / var(--scale-print-fit))`) e
+  o `transform: scale(fator)` as devolve ao tamanho impresso pretendido. A
+  largura deixa de ceder junto com a altura.
+- **Coluna de nomes fixa em 26mm impressos**, independente da faixa de densidade
+  (antes 26/23/20mm conforme o número de funcionários). As faixas de densidade
+  seguem ajustando ALTURA de linha e corpo de fonte — que é o que precisa ceder.
+- Margem lateral da folha de 4mm para 2,5mm.
+- `js/escala.js` — `applyPrintFitScale` virou um ponto fixo de 3 rodadas: o fator
+  entra na própria largura da folha, então alargar muda o conteúdo medido.
+  Ao final confere se `contentH × fator` ainda cabe nos 210mm e aperta o fator se
+  não couber (nunca cortar funcionário nem gerar 2ª página).
+
+Resultado (medido no vetor dos PDFs gerados):
+
+| | antes | depois |
+|---|---|---|
+| Largura usada — Chez Pitu | 256,1mm | 297,0mm |
+| Largura usada — Pengold | 280,0mm | 297,0mm |
+| Coluna de dia — Chez Pitu | ≈7,8mm | 8,86mm |
+| Coluna de dia — Pengold | ≈8,6mm | 8,86mm |
+| Coluna de nomes | 23mm (variava) | 26mm (fixa) |
+
+Nome 26mm e dia 8,86mm em **todos** os quadros testados (8, 17, 20, 30, 40 e 48
+funcionários) e nas duas empresas. Comparando os vetores dos dois PDFs de 17
+funcionários, todas as 76 bordas verticais da grade caem exatamente no mesmo x.
+Só as cores do tema diferem entre as empresas, como previsto.
+
+Regra:
+A geometria da folha de impressão da escala mora FORA de `@media print`
+(`#scalePrintContainer`, em `css/escala-print.css`), porque `applyPrintFitScale`
+precisa medi-la. Regra dentro de `@media print` só se for de página. Toda
+dimensão HORIZONTAL da folha é compensada pelo fator de auto-fit; só altura de
+linha e corpo de fonte acompanham a redução.
+
+Validação:
+- `scripts/verify-print-escala.mjs` reescrito para reproduzir o fluxo real
+  (mede em mídia `screen`, sem `printing-scale`; só depois marca o body e emula
+  `print`) — antes ele marcava o body ANTES de medir, e por isso o bug passava.
+  Asserções novas: medição em `screen` = medição em `print`; grade ocupa ≥97% dos
+  297mm; e comparação direta Chez Pitu × Pengold com o mesmo quadro (17 e 30
+  funcionários) exigindo coluna de nome, coluna de dia, fonte, altura de linha e
+  fator idênticos. **119 asserções, 0 falhas** (antes 55).
+- `npm test`: 47/47. `npm run validate`: 20 suítes, 20 aprovadas.
+- Homologação com fixtures; nenhum dado de produção foi lido ou alterado.
+
+Pendência:
+Na vertical a folha continua alinhada ao topo: com poucos funcionários sobra
+espaço no rodapé (Pengold com 15 funcionários usa ~176mm dos 210mm). Preencher
+essa sobra exigiria esticar as linhas, o que faria a altura de linha variar entre
+as empresas — o oposto do layout idêntico pedido. Mantido de propósito.
+
 ## 2026-08-29 (3) — Homologação aprovada pelo usuário (Contador)
 
 Entrada de registro, sem alteração de código.
