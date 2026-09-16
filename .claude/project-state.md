@@ -8,12 +8,13 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260907.01` (exibida como `v2026.09.07.01`) — fonte: `js/version.js`
+- **Versão atual:** `20260916.01` (exibida como `v2026.09.16.01`) — fonte: `js/version.js`
 - **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito)
-- **Último commit:** `4ea49f5` — chore: carimbo de build 20260907.01 (deploy da escala impressa em folha inteira)
-- **Status geral:** 🟢 EM PRODUÇÃO — correção da impressão da Escala de Folga
-  (`20260907.01`) commitada, pushada e **deployada** (`chez-pitu-rh.web.app`,
-  verificada por `curl`). Aguarda validação visual do usuário.
+- **Último commit:** `0f69614` — chore: carimbo de build 20260916.01 (deploy da correcao de sincronizacao)
+- **Status geral:** 🟢 EM PRODUÇÃO — correção CRÍTICA da sincronização entre
+  computadores (`20260916.01`) commitada (`5de11b4` + `0f69614`), **deployada**
+  em `chez-pitu-rh.web.app` e **pushada** para `origin/main`. Aguarda validação
+  do usuário no computador que estava com o erro de sincronização.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 

@@ -9,14 +9,18 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260907.01 (Escala de Folga impressa: folha inteira e layout
-idêntico entre Chez Pitu e Pengold)
-**Data:** 2026-09-07
+**Versão:** 20260916.01 (sincronização entre computadores: envio recusado pelo
+Firebase deixava o PC surdo)
+**Data:** 2026-09-16
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
-## Frente atual — aguardando autorização de commit/deploy (16/09/2026)
+## Último Deploy
 
-**Sincronização entre computadores (CRÍTICO — corrigido, não publicado).** Em
+Data: 16/09/2026
+Versão: 20260916.01 (Firebase Hosting — chez-pitu-rh)
+Commits: `5de11b4` (fix) + `0f69614` (carimbo de build)
+
+**Sincronização entre computadores (CRÍTICO).** Em
 outros computadores o sistema parava de sincronizar: selo preso em
 "Sincronizando…", as alterações da máquina não subiam e as dos outros PCs não
 desciam.
@@ -50,10 +54,17 @@ suíte.
 
 Detalhamento completo em `PROJECT_HISTORY.md` → 2026-09-16 e 2026-09-16 (2).
 
-**Pendente:** commit, bump de `APP_VERSION` e deploy — todos aguardando
-autorização do usuário.
+**Publicado.** Commit, bump de `APP_VERSION`, deploy no Firebase Hosting e push
+para `origin/main` concluídos. Usuários recebem a nova versão no próximo
+carregamento (Ctrl+F5 força).
 
-## Último Deploy
+**Pendente:** validação do usuário no computador que estava com o erro — abrir
+com Ctrl+F5 e conferir o selo **"Sincronizado"** (o tombstone com chave inválida
+é migrado sozinho no primeiro carregamento).
+
+**Cache-busting:** todos os `?v=` do index.html em `20260916.01`.
+
+## Deploy 20260907.01
 
 Data: 07/09/2026
 Versão: 20260907.01 (Firebase Hosting — chez-pitu-rh)
@@ -171,8 +182,9 @@ altera feriados lançados, escala, VT, ausências, lançamentos do Contador ou
 cadastro. Teste em fixtures/`scripts/verify-*.mjs`; validação em produção é
 somente leitura. Ver `PROJECT_RULES.md`.
 
-**Validação em produção:** ⏳ a entrega de 07/09/2026 (`20260907.01` — escala
-impressa) aguarda conferência visual do usuário: gerar Setembro/2026 nas duas
+**Validação em produção:** ⏳ a entrega de 16/09/2026 (`20260916.01` —
+sincronização) aguarda conferência do usuário no computador afetado. ⏳ a entrega
+de 07/09/2026 (`20260907.01` — escala impressa) aguarda conferência visual: gerar Setembro/2026 nas duas
 empresas (Ctrl+F5) e comparar com os PDFs de referência. ✅ as duas entregas de
 29/08/2026 (`20260829.01` e `20260829.02`) foram **aprovadas pelo usuário** em
 produção, inclusive o critério de que lançamento com todos os campos zerados não
