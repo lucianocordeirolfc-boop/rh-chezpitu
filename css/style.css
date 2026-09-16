@@ -407,6 +407,15 @@ button.stat-chip.module-company-chip.is-active {
   color: #a32b2b;
 }
 
+/* Relógio do computador fora do horário do servidor: o estado da sincronização
+   continua valendo (a cor de fundo é a do status), mas a borda e o texto ficam
+   em tom de alerta para o usuário perceber sem precisar abrir o console. */
+.sync-status[data-clock="skew"] {
+  border-color: #e0a63c;
+  color: #8a5a12;
+  font-weight: 800;
+}
+
 .app-version-badge {
   display: inline-flex;
   align-items: center;

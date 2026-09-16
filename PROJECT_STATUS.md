@@ -14,6 +14,45 @@ idêntico entre Chez Pitu e Pengold)
 **Data:** 2026-09-07
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
+## Frente atual — aguardando autorização de commit/deploy (16/09/2026)
+
+**Sincronização entre computadores (CRÍTICO — corrigido, não publicado).** Em
+outros computadores o sistema parava de sincronizar: selo preso em
+"Sincronizando…", as alterações da máquina não subiam e as dos outros PCs não
+desciam.
+
+Causa raiz: os tombstones de exclusão definitiva montam a chave com o **nome do
+feriado digitado pelo usuário**, e `normalizeSearchText` não remove
+`.` `#` `$` `/` `[` `]` — exatamente os caracteres proibidos em chave do Realtime
+Database. Um feriado como *"Sto. Antônio"* ou *"Carnaval 16/02"* excluído pelo
+usuário tornava o payload inválido, e `ref.update()` passava a **lançar de forma
+síncrona**. Como `save()` não tinha `try/catch` e só liberava `pushing` no
+`.finally()`, o flag ficava `true` para sempre e o listener em tempo real
+(`if (pushing) return;`) deixava o computador **surdo** — a exceção ainda subia
+para a ação de UI. Segundo gatilho do mesmo efeito: `employeeId: undefined` no
+índice `holidaysWorked` (vínculo legado gravado só por nome).
+
+Corrigido com escape injetivo de chave (`ImportUtils.escapeRtdbKey`), migração
+não-destrutiva das chaves já gravadas (o PC travado se cura sozinho no primeiro
+carregamento), rede de segurança no payload, `save()` que nunca lança,
+fim da guarda `pushing` (eco identificado por dispositivo) e relógio de
+referência do servidor (`.info/serverTimeOffset`) para o desempate newer-wins.
+
+Na mesma frente entraram três melhorias: **envio incremental** (só os nós
+alterados, em caminhos por empresa — `sistemaRH/funcionarios/Chez Pitu`; 30
+caminhos no 1º envio da sessão contra **3** numa edição de funcionário, e
+gravação sem mudança nenhuma não grava), **aviso de relógio no selo**
+(`Sincronizado ⚠ relógio 2h 15min atrasado` acima de 60s de desvio, com dica e
+um único toast) e **escape estendido** a `coveragePrincipalBindings` — o último
+mapa sincronizado que montava chave com nome —, agora com a regra escrita em
+`PROJECT_RULES.md` → "Chaves do Firebase" e uma guarda contra regressão futura na
+suíte.
+
+Detalhamento completo em `PROJECT_HISTORY.md` → 2026-09-16 e 2026-09-16 (2).
+
+**Pendente:** commit, bump de `APP_VERSION` e deploy — todos aguardando
+autorização do usuário.
+
 ## Último Deploy
 
 Data: 07/09/2026
@@ -160,12 +199,19 @@ Dashboard: OK
 
 **Unit/Functional Tests:**
 - npm test: 47/47 ✓
-- npm run validate: 20/20 suítes ✓
+- npm run validate: 21/21 suítes ✓
 
 **Offline Recovery Tests:**
 - npm run test:offline: 15/15 ✓
 
 **Homologação da frente atual (`scripts/verify-*.mjs`, sandbox com fixtures):**
+- scripts/verify-sync-chaves.mjs: 73/73 ✓ (chaves do RTDB, migração das chaves
+  legadas, payload saneado, `save()` que não deixa o PC surdo, alteração de outro
+  PC durante o save, eco do próprio envio, relógio do servidor, envio
+  incremental, reenvio após falha, aviso de relógio no selo e guarda contra
+  regressão futura com texto perigoso em todos os campos digitáveis) — mais a
+  prova ponta a ponta com o SDK real do Firebase 10.12.2, que passou a
+  **aceitar** o payload do cenário que antes lançava
 - scripts/verify-print-escala.mjs: 119/119 ✓ (impressão da escala no Chrome
   real: 1 única página A4 paisagem em quadros de 8 a 48 funcionários, ninguém
   cortado, auto-fit medido no layout impresso — medição `screen` = medição

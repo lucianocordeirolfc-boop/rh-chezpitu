@@ -2,6 +2,34 @@
   const STORAGE_KEY = "chezPituPeopleSystem.v1";
   const LEGACY_VT_BACKUP_KEY = "chezPituVtBackup.v1";
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // RELÓGIO DE REFERÊNCIA (todos os computadores no mesmo tempo)
+  //
+  // Todo o desempate da sincronização é "newer-wins" por carimbo de tempo
+  // (updatedAt, deletedAt, manualScaleMeta…). Usar o relógio do PC fazia com que
+  // uma máquina atrasada perdesse SEMPRE o desempate: o que o usuário acabara de
+  // digitar voltava sozinho ao valor antigo do outro computador.
+  //
+  // `now()` aplica o desvio entre o relógio local e o do servidor do Firebase
+  // (.info/serverTimeOffset, informado por FirebaseSync.setSyncClockOffset).
+  // Sem Firebase disponível o desvio é 0 e o comportamento é o de antes.
+  // ───────────────────────────────────────────────────────────────────────────
+  let syncClockOffsetMs = 0;
+
+  function now() {
+    return Date.now() + syncClockOffsetMs;
+  }
+
+  function setSyncClockOffset(offsetMs) {
+    const parsed = Number(offsetMs);
+    syncClockOffsetMs = Number.isFinite(parsed) ? parsed : 0;
+    return syncClockOffsetMs;
+  }
+
+  function getSyncClockOffset() {
+    return syncClockOffsetMs;
+  }
+
   /**
    * Versão do esquema persistido sob STORAGE_KEY. O leitor (loadState) tolera
    * tanto o payload completo legado (sem schemaVersion) quanto os payloads
@@ -92,7 +120,7 @@
   }
 
   function uid(prefix) {
-    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    return `${prefix}-${now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   }
 
   // Janela em que um funcionário recém-cadastrado ainda pode ser EXCLUÍDO.
@@ -106,7 +134,7 @@
     const createdAt = Number(employee.createdAt);
     // Sem carimbo de criação (cadastros anteriores a esta regra) => não excluível.
     if (!createdAt) return false;
-    return Date.now() - createdAt <= EMPLOYEE_DELETE_WINDOW_MS;
+    return now() - createdAt <= EMPLOYEE_DELETE_WINDOW_MS;
   }
 
   // ── Trilha de auditoria de funcionários ──────────────────────────────────
@@ -138,7 +166,7 @@
     auditSeq += 1;
     state.auditLog.push({
       id: uid("audit"),
-      at: Date.now(),
+      at: now(),
       seq: auditSeq,
       action,
       employeeId: info.employeeId || "",
@@ -401,7 +429,7 @@
       const hist = Array.isArray(targetState.companyInfoHistory[company])
         ? targetState.companyInfoHistory[company]
         : [];
-      hist.unshift({ info: snapshot, at: snapshot.updatedAt || Date.now() });
+      hist.unshift({ info: snapshot, at: snapshot.updatedAt || now() });
       targetState.companyInfoHistory[company] = hist.slice(0, COMPANY_INFO_HISTORY_LIMIT);
     }
   }
@@ -756,13 +784,13 @@
   }
 
   /** Marca uma exclusão (só na ação do usuário). Mantém sempre o deletedAt maior. */
-  function recordTombstone(collection, company, id, when = Date.now()) {
+  function recordTombstone(collection, company, id, when = now()) {
     if (!collection || !company || !id) return;
     const store = ensureTombstoneStore(state);
     if (!store[collection]) store[collection] = {};
     if (!store[collection][company]) store[collection][company] = {};
     const prev = Number(store[collection][company][id]) || 0;
-    store[collection][company][id] = Math.max(prev, Number(when) || Date.now());
+    store[collection][company][id] = Math.max(prev, Number(when) || now());
   }
 
   /** União de dois registros de tombstones; por id mantém o deletedAt mais recente. */
@@ -835,36 +863,72 @@
   // ─────────────────────────────────────────────────────────────────────────
   const HOLIDAY_TOMBSTONE_CALENDAR_SCOPE = "__calendar__";
 
+  /**
+   * Chave da exclusão definitiva. O nome vem digitado pelo usuário, então a
+   * chave é ESCAPADA para o Realtime Database — nomes como "Sto. Antônio" ou
+   * "Carnaval 16/02" geravam chave inválida e faziam ref.update() lançar,
+   * derrubando toda a sincronização daquele computador.
+   */
   function holidayTombstoneKey(date, name) {
+    return ImportUtils.escapeRtdbKey(legacyHolidayTombstoneKey(date, name));
+  }
+
+  /** Formato anterior ao escape (sem escapar). Mantido só para leitura/migração. */
+  function legacyHolidayTombstoneKey(date, name) {
     return `${String(date || "").trim()}|${normalizeSearchText(name)}`;
+  }
+
+  /**
+   * Migra chaves gravadas antes do escape (com . # $ / [ ]) para o formato
+   * escapado, preservando sempre o deletedAt maior. Não apaga exclusão alguma:
+   * a identidade (data + nome) é a mesma, só a grafia da chave muda. Chaves já
+   * escapadas são ignoradas (não há duplo escape).
+   */
+  function migrateTombstoneKeysToRtdbSafe(store) {
+    if (!store || typeof store !== "object") return store;
+    Object.keys(store).forEach((scope) => {
+      const bucket = store[scope];
+      if (!bucket || typeof bucket !== "object") return;
+      Object.keys(bucket).forEach((key) => {
+        if (!ImportUtils.hasForbiddenRtdbKeyChars(key)) return;
+        const safeKey = ImportUtils.escapeRtdbKey(key);
+        bucket[safeKey] = Math.max(Number(bucket[safeKey]) || 0, Number(bucket[key]) || 0);
+        delete bucket[key];
+      });
+    });
+    return store;
   }
 
   function ensureHolidayTombstoneStore(targetState) {
     if (!targetState.holidayTombstones || typeof targetState.holidayTombstones !== "object") {
       targetState.holidayTombstones = {};
     }
-    return targetState.holidayTombstones;
+    return migrateTombstoneKeysToRtdbSafe(targetState.holidayTombstones);
   }
 
   /** Marca uma exclusão definitiva (só na ação do usuário). Mantém o deletedAt maior. */
-  function recordHolidayTombstone(scope, date, name, when = Date.now(), targetState = state) {
+  function recordHolidayTombstone(scope, date, name, when = now(), targetState = state) {
     if (!scope || !date || !name) return;
     const store = ensureHolidayTombstoneStore(targetState);
     if (!store[scope]) store[scope] = {};
     const key = holidayTombstoneKey(date, name);
     const prev = Number(store[scope][key]) || 0;
-    store[scope][key] = Math.max(prev, Number(when) || Date.now());
+    store[scope][key] = Math.max(prev, Number(when) || now());
   }
 
+  // Leitura tolerante: aceita a chave escapada (formato atual) e a legada, para
+  // que nenhuma exclusão já registrada deixe de valer após a migração.
   function isHolidayTombstoned(scope, date, name, targetState = state) {
-    const store = targetState.holidayTombstones;
-    return Boolean(store && store[scope] && store[scope][holidayTombstoneKey(date, name)]);
+    const bucket = targetState.holidayTombstones?.[scope];
+    if (!bucket) return false;
+    return Boolean(bucket[holidayTombstoneKey(date, name)] || bucket[legacyHolidayTombstoneKey(date, name)]);
   }
 
   function clearHolidayTombstone(scope, date, name, targetState = state) {
-    const store = targetState.holidayTombstones;
-    if (!store || !store[scope]) return;
-    delete store[scope][holidayTombstoneKey(date, name)];
+    const bucket = targetState.holidayTombstones?.[scope];
+    if (!bucket) return;
+    delete bucket[holidayTombstoneKey(date, name)];
+    delete bucket[legacyHolidayTombstoneKey(date, name)];
   }
 
   /** Limpa o tombstone de um feriado (data+nome) em TODAS as empresas e no calendário. */
@@ -923,7 +987,13 @@
   // escopo por empresa. Sem isto, o auto-vínculo da escala
   // (syncAutoHolidaysWorkedForMonth) e a UNIÃO do merge recriam o vínculo removido.
   // ─────────────────────────────────────────────────────────────────────────
+  /** Escapada para o RTDB pelo mesmo motivo do tombstone de feriado. */
   function workedLinkTombstoneKey(date, name, employeeId) {
+    return ImportUtils.escapeRtdbKey(legacyWorkedLinkTombstoneKey(date, name, employeeId));
+  }
+
+  /** Formato anterior ao escape. Mantido só para leitura/migração. */
+  function legacyWorkedLinkTombstoneKey(date, name, employeeId) {
     return `${String(date || "").trim()}|${normalizeSearchText(name)}|${String(employeeId || "").trim()}`;
   }
 
@@ -931,27 +1001,32 @@
     if (!targetState.workedLinkTombstones || typeof targetState.workedLinkTombstones !== "object") {
       targetState.workedLinkTombstones = {};
     }
-    return targetState.workedLinkTombstones;
+    return migrateTombstoneKeysToRtdbSafe(targetState.workedLinkTombstones);
   }
 
-  function recordWorkedLinkTombstone(company, date, name, employeeId, when = Date.now(), targetState = state) {
+  function recordWorkedLinkTombstone(company, date, name, employeeId, when = now(), targetState = state) {
     if (!company || !date || !name || !employeeId) return;
     const store = ensureWorkedLinkTombstoneStore(targetState);
     if (!store[company]) store[company] = {};
     const key = workedLinkTombstoneKey(date, name, employeeId);
     const prev = Number(store[company][key]) || 0;
-    store[company][key] = Math.max(prev, Number(when) || Date.now());
+    store[company][key] = Math.max(prev, Number(when) || now());
   }
 
   function isWorkedLinkTombstoned(company, date, name, employeeId, targetState = state) {
-    const store = targetState.workedLinkTombstones;
-    return Boolean(store && store[company] && store[company][workedLinkTombstoneKey(date, name, employeeId)]);
+    const bucket = targetState.workedLinkTombstones?.[company];
+    if (!bucket) return false;
+    return Boolean(
+      bucket[workedLinkTombstoneKey(date, name, employeeId)] ||
+        bucket[legacyWorkedLinkTombstoneKey(date, name, employeeId)]
+    );
   }
 
   function clearWorkedLinkTombstone(company, date, name, employeeId, targetState = state) {
-    const store = targetState.workedLinkTombstones;
-    if (!store || !store[company]) return;
-    delete store[company][workedLinkTombstoneKey(date, name, employeeId)];
+    const bucket = targetState.workedLinkTombstones?.[company];
+    if (!bucket) return;
+    delete bucket[workedLinkTombstoneKey(date, name, employeeId)];
+    delete bucket[legacyWorkedLinkTombstoneKey(date, name, employeeId)];
   }
 
   function mergeWorkedLinkTombstoneStores(localStore = {}, remoteStore = {}) {
@@ -2364,7 +2439,14 @@
     // Firebase ocorre SEMPRE, mesmo que o cache local esteja cheio/indisponível.
     persistStateToLocal(state);
     if (window.FirebaseSync?.isReady()) {
-      window.FirebaseSync.save(state);
+      // Uma falha de sincronização NUNCA pode interromper a ação do usuário: o
+      // dado já está no estado e no cache local, e o FirebaseSync reporta o erro
+      // no selo de status. (Antes, uma exceção do RTDB subia até a UI.)
+      try {
+        window.FirebaseSync.save(state);
+      } catch (error) {
+        console.error("[AppData] Falha ao enviar ao Firebase:", error);
+      }
     }
   }
 
@@ -2693,7 +2775,7 @@
       return false;
     }
 
-    candidate.updatedAt = Date.now();
+    candidate.updatedAt = now();
     candidate.updatedBy = window.AppAuth?.getUser?.()?.email || candidate.updatedBy || "";
     data.companyInfo = normalizeCompanyInfoShape(candidate, resolved);
     backupCompanyInfoInState(state, resolved, data.companyInfo);
@@ -2716,7 +2798,7 @@
     }
 
     data.companyInfo = normalizeCompanyInfoShape(
-      { ...existing, logoDataUrl: value, updatedAt: Date.now() },
+      { ...existing, logoDataUrl: value, updatedAt: now() },
       resolved
     );
     backupCompanyInfoInState(state, resolved, data.companyInfo);
@@ -2953,7 +3035,7 @@
       // Carimbo de criação (imutável): define a janela de 24h em que o
       // funcionário ainda pode ser excluído. Preserva o valor do registro
       // existente; só é definido no primeiro cadastro. Ver canDeleteEmployee.
-      createdAt: existing?.createdAt || employee.createdAt || Date.now(),
+      createdAt: existing?.createdAt || employee.createdAt || now(),
       fixedDayHistory: normalizeFixedDayHistory(existing)
     };
 
@@ -2983,7 +3065,7 @@
     }
 
     // Carimbo de versão p/ sincronização newer-wins entre PCs (mergeEmployeesById).
-    normalized.updatedAt = Date.now();
+    normalized.updatedAt = now();
 
     const index = data.employees.findIndex((item) => item.id === normalized.id);
     if (index >= 0) {
@@ -3013,15 +3095,15 @@
 
   function removeEmployeeFromCompany(company, id, shouldSave = true) {
     const data = getCompanyData(company);
-    const now = Date.now();
+    const deletedAt = now();
     // Tombstones: o funcionário e, em cascata, suas férias e ausências — para que
     // o merge com outro PC não ressuscite o funcionário nem registros órfãos.
-    recordTombstone("employees", company, id, now);
+    recordTombstone("employees", company, id, deletedAt);
     (data.vacations || []).forEach((vacation) => {
-      if (vacation.employeeId === id && vacation.id) recordTombstone("vacations", company, vacation.id, now);
+      if (vacation.employeeId === id && vacation.id) recordTombstone("vacations", company, vacation.id, deletedAt);
     });
     (data.absences || []).forEach((absence) => {
-      if (absence.employeeId === id && absence.id) recordTombstone("absences", company, absence.id, now);
+      if (absence.employeeId === id && absence.id) recordTombstone("absences", company, absence.id, deletedAt);
     });
     data.employees = data.employees.filter((employee) => employee.id !== id);
     data.vacations = data.vacations.filter((vacation) => vacation.employeeId !== id);
@@ -3074,7 +3156,7 @@
     } else {
       delete employee.deactivatedAt;
     }
-    employee.updatedAt = Date.now();
+    employee.updatedAt = now();
 
     recordAudit(nextStatus === "Inativo" ? "inativacao" : "reativacao", {
       employeeId: id,
@@ -3108,7 +3190,7 @@
       String(vacation.note || "").trim() || employeeName
     );
     // Carimbo de versão p/ sincronização newer-wins (só na escrita do usuário).
-    if (target) target.updatedAt = Date.now();
+    if (target) target.updatedAt = now();
     runScaleIntegrations(monthsTouchedByRange(vacation.startDate, vacation.endDate));
     saveState();
   }
@@ -3136,7 +3218,7 @@
     existing.startDate = vacation.startDate;
     existing.endDate = vacation.endDate;
     existing.note = String(vacation.note || "").trim() || employeeName;
-    existing.updatedAt = Date.now();
+    existing.updatedAt = now();
 
     clearManualScaleCodeInRange(data, existing.employeeId, existing.startDate, existing.endDate, "FÉRIAS");
 
@@ -3161,7 +3243,7 @@
       endDate: absence.endDate,
       cid: absence.cid || "",
       note: absence.note || "",
-      updatedAt: Date.now()
+      updatedAt: now()
     });
     runScaleIntegrations(monthsTouchedByRange(absence.startDate, absence.endDate));
     saveState();
@@ -3257,7 +3339,7 @@
     existing.endDate = absence.endDate;
     existing.cid = absence.cid || "";
     existing.note = absence.note || "";
-    existing.updatedAt = Date.now();
+    existing.updatedAt = now();
 
     const months = new Set([
       ...monthsTouchedByRange(oldStart, oldEnd),
@@ -3282,7 +3364,7 @@
       name,
       date,
       workedEmployees: holiday.workedEmployees || [],
-      updatedAt: Date.now()
+      updatedAt: now()
     });
     saveState();
   }
@@ -3364,7 +3446,7 @@
     holiday.isDeleted = true;
     // Carimbo de versão para que o soft-delete VENÇA o merge entre PCs
     // (mergeHolidayLists usa updatedAt como newer-wins do campo-base).
-    holiday.updatedAt = Date.now();
+    holiday.updatedAt = now();
 
     saveState();
     return true;
@@ -3382,7 +3464,7 @@
     delete holiday.deletedAt;
     holiday.isDeleted = false;
     // Restauração também precisa vencer o merge: carimba versão mais recente.
-    holiday.updatedAt = Date.now();
+    holiday.updatedAt = now();
 
     saveState();
     return true;
@@ -4082,7 +4164,7 @@
 
     holiday.name = nextName;
     holiday.date = nextDate;
-    holiday.updatedAt = Date.now();
+    holiday.updatedAt = now();
     (holiday.workedEmployees || []).forEach((item) => syncWorkedEmployeeStatus(item, holiday.date));
 
     if (options.save !== false) {
@@ -4549,7 +4631,7 @@
   function stampMapMeta(metaMap, valueMap, key) {
     if (!metaMap) return;
     if (Object.prototype.hasOwnProperty.call(valueMap || {}, key)) {
-      metaMap[key] = Date.now();
+      metaMap[key] = now();
     } else {
       delete metaMap[key];
     }
@@ -5134,6 +5216,11 @@
     setRemoteState,
     mergeRemoteIntoLocal,
     readLocalStateSnapshot,
+    now,
+    setSyncClockOffset,
+    getSyncClockOffset,
+    holidayTombstoneKey,
+    workedLinkTombstoneKey,
     measureStorageUsage,
     STORAGE_KEY,
     getManualScaleEntry,

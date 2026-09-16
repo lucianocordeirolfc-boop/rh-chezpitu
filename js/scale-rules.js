@@ -128,26 +128,46 @@
     return Math.round((matched / tokens.length) * 70);
   }
 
+  /**
+   * A chave do vínculo é montada com NOME (principal.nameKey) e vai para o
+   * Realtime Database. Nome com "." ou "/" geraria chave proibida e o RTDB
+   * recusaria o envio inteiro — por isso passa pelo mesmo escape dos demais
+   * mapas sincronizados. Ver PROJECT_RULES.md → "Chaves do Firebase".
+   */
+  function bindingKey(nameKey) {
+    return ImportUtils.escapeRtdbKey(nameKey);
+  }
+
   function ensureBindings(state) {
     if (!state.coveragePrincipalBindings || typeof state.coveragePrincipalBindings !== "object") {
       state.coveragePrincipalBindings = {};
     }
+    // Migração não-destrutiva das chaves gravadas antes do escape.
+    Object.keys(state.coveragePrincipalBindings).forEach((key) => {
+      if (!ImportUtils.hasForbiddenRtdbKeyChars(key)) return;
+      const safeKey = bindingKey(key);
+      if (!state.coveragePrincipalBindings[safeKey]) {
+        state.coveragePrincipalBindings[safeKey] = state.coveragePrincipalBindings[key];
+      }
+      delete state.coveragePrincipalBindings[key];
+    });
     return state.coveragePrincipalBindings;
   }
 
   function savePrincipalBinding(state, principal, found) {
     const bindings = ensureBindings(state);
-    bindings[principal.nameKey] = {
+    bindings[bindingKey(principal.nameKey)] = {
       employeeId: found.employee.id,
       company: found.company,
       matchedName: found.employee.name,
-      updatedAt: Date.now()
+      updatedAt: AppData.now()
     };
   }
 
   function findPrincipalAcrossCompanies(principal, state) {
     const bindings = ensureBindings(state);
-    const saved = bindings[principal.nameKey];
+    // Leitura tolerante: chave escapada (atual) ou legada.
+    const saved = bindings[bindingKey(principal.nameKey)] || bindings[principal.nameKey];
     if (saved?.employeeId && saved?.company) {
       const data = AppData.getCompanyData(saved.company);
       const employee = (data.employees || []).find((item) => item.id === saved.employeeId);

@@ -1,4 +1,30 @@
 (function () {
+  // ───────────────────────────────────────────────────────────────────────────
+  // CHAVES DO REALTIME DATABASE
+  //
+  // O RTDB recusa chaves que contenham  .  #  $  /  [  ]  ou caracteres de
+  // controle — e a recusa é SÍNCRONA (ref.update() lança). Chaves compostas a
+  // partir de texto digitado pelo usuário (ex.: tombstone de feriado
+  // "2026-06-13|sto. antonio") derrubavam toda a sincronização do computador.
+  //
+  // escapeRtdbKey troca cada caractere proibido pelo seu código ("%2E", "%2F"…),
+  // incluindo o próprio "%", o que torna o escape injetivo (dois nomes
+  // diferentes nunca colidem na mesma chave).
+  // ───────────────────────────────────────────────────────────────────────────
+  const RTDB_ESCAPE_RE = /[%.#$\/\[\]\u0000-\u001f\u007f]/g;
+  const RTDB_FORBIDDEN_RE = /[.#$\/\[\]\u0000-\u001f\u007f]/;
+
+  function escapeRtdbKey(value) {
+    return String(value ?? "").replace(RTDB_ESCAPE_RE, (char) =>
+      "%" + char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")
+    );
+  }
+
+  /** true quando a chave, como está, seria recusada pelo RTDB. */
+  function hasForbiddenRtdbKeyChars(value) {
+    return RTDB_FORBIDDEN_RE.test(String(value ?? ""));
+  }
+
   function stripAccents(value) {
     return String(value || "")
       .normalize("NFD")
@@ -365,6 +391,8 @@
 
   window.ImportUtils = {
     bindImportModal,
+    escapeRtdbKey,
+    hasForbiddenRtdbKeyChars,
     downloadBlob,
     downloadCSV,
     downloadJSON,

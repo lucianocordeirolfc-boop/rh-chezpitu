@@ -7,6 +7,162 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-09-16 (2) — Sincronização: envio incremental, aviso de relógio e escape em toda chave
+
+Continuação direta da entrada anterior (mesma frente, ainda não publicada). Três
+melhorias que saíram do diagnóstico:
+
+**1. Envio incremental — só o que mudou.** `save()` reescrevia a árvore inteira
+(19 nós de topo) a cada `saveState()`, ou seja, toda a base trafegava a cada
+gravação, e um nó como `sistemaRH/funcionarios` era reescrito por completo mesmo
+quando só uma empresa havia mudado — o que fazia um PC sobrepor o bloco da outra
+empresa gravado por outro PC.
+
+- `buildUpdatePaths` passou a desdobrar os nós indexados por empresa
+  (`empresas`, `empresasBackup`, `empresasHistory`, `funcionarios`, `escalas`,
+  `escalasMeta`, `ferias`, `feriados`, `vtDescontos`, `holidaysWorked`,
+  `contadorLancamentos`) em caminhos por empresa —
+  `sistemaRH/funcionarios/Chez Pitu`. Alteração numa empresa **não toca** na
+  outra.
+- `buildChangedUpdates` compara cada caminho com o último envio confirmado da
+  sessão (`stableStringify`, chaves ordenadas, para não acusar mudança por ordem
+  de chave) e envia só o que diferiu. `configuracoes` (carimbo de versão +
+  `updatedBy`) acompanha toda gravação real.
+- **Gravação sem mudança nenhuma não grava**: além do tráfego, evita acordar os
+  outros computadores com um snapshot idêntico ao que já têm.
+- O cache do "já enviado" é marcado **no disparo** (não na confirmação): uma ação
+  do usuário costuma chamar `saveState()` mais de uma vez, e sem isso o mesmo
+  bloco era reenviado enquanto o servidor não confirmava — flagrado pela suíte,
+  que media 2 envios para uma única edição. Em caso de falha, o rollback desfaz
+  só o que ainda corresponde àquele envio, e a alteração volta na gravação
+  seguinte.
+- Primeiro envio da sessão continua completo (o cache nasce vazio). Medido na
+  suíte: 30 caminhos no primeiro envio, **3** numa edição de funcionário.
+- Nada é apagado: caminho ausente não é enviado (nunca `null`).
+
+**2. O selo avisa quando o relógio do PC está fora de hora.** O desvio em relação
+ao servidor já era corrigido nos carimbos, mas só aparecia no console. Acima de
+60s o selo passa a exibir `Sincronizado ⚠ relógio 2h 15min atrasado`, com
+`data-clock="skew"` (borda/texto em tom de alerta, `css/style.css`), dica
+explicando que a sincronização usa o horário do servidor e que vale acertar a
+data/hora do Windows, e **um único** aviso em toast. O aviso sobrevive à troca de
+status e some sozinho quando o usuário acerta o relógio.
+
+**3. Escape estendido a toda chave montada com texto do usuário.**
+`coveragePrincipalBindings` (chave = nome do titular de cobertura, em
+`js/scale-rules.js`) era o último mapa sincronizado que montava chave a partir de
+nome — hoje os nomes são constantes sem caractere proibido, mas um nome como
+"Maria de F. Souza" derrubaria a sincronização do mesmo jeito. Passou a usar
+`ImportUtils.escapeRtdbKey`, com migração não-destrutiva e leitura tolerante,
+igual aos tombstones. A regra virou norma escrita em `PROJECT_RULES.md` →
+"Chaves do Firebase", e a suíte ganhou uma **guarda contra regressão futura**:
+monta um estado completo (empresa, funcionário, feriado, escala, ausência,
+exclusão de feriado e de vínculo) com o texto `Jr. #1 [chefe] 50%/dia $` em todos
+os campos digitáveis e exige payload limpo **antes** da rede de segurança —
+provando também que o texto do usuário continua íntegro no valor (só a chave é
+escapada).
+
+**Testes:** `scripts/verify-sync-chaves.mjs` 45 → **73 asserções** (blocos 12 a
+16: envio incremental, reenvio após falha, selo do relógio, escape do vínculo de
+cobertura e a guarda de texto perigoso). `npm test` 47/47, `npm run validate`
+21/21 suítes, `npm run test:offline` 15/15. Prova ponta a ponta com o SDK real do
+Firebase 10.12.2 refeita com os caminhos por empresa, incluindo uma empresa
+chamada "Empresa S.A. / Filial" → caminho
+`sistemaRH/funcionarios/Empresa S%2EA%2E %2F Filial`, **aceito** pelo SDK.
+
+## 2026-09-16 — Sincronização parava por completo em outros computadores
+
+Problema (CRÍTICO): em outros computadores o sistema parava de sincronizar. O
+selo do topo ficava preso em **"Sincronizando…"**, as alterações feitas na
+máquina não chegavam ao Firebase e as alterações dos outros PCs não chegavam
+nela. No console: `update failed: values argument contains an invalid key (...)`.
+
+Causa raiz (três, encadeadas):
+
+1. **Chave inválida no Realtime Database, montada com texto do usuário.** Os
+   tombstones de exclusão definitiva usam o nome do feriado dentro da própria
+   chave — `holidayTombstoneKey` = `data|nomeNormalizado` (js/data.js) e
+   `workedLinkTombstoneKey` = `data|nome|employeeId`. `normalizeSearchText` só
+   tira acento e caixa; **não remove `.` `#` `$` `/` `[` `]`**, que são
+   exatamente os caracteres proibidos em chave do RTDB. Bastava o usuário ter
+   excluído um feriado (ou um vínculo) com nome como *"Sto. Antônio"*,
+   *"N. Sra. dos Navegantes"* ou *"Carnaval 16/02"* para o payload ficar
+   inválido para sempre naquele PC. Confirmado contra o SDK real 10.12.2:
+   `THROW SÍNCRONO: update failed: values argument contains an invalid key
+   (2026-06-13|sto. antonio) in property 'sistemaRH.tombstones.__holidayTombstones.Chez Pitu'`.
+2. **`employeeId: undefined` no índice `holidaysWorked`.** `buildHolidaysWorkedIndex`
+   (js/firebase-sync.js) copiava `item.employeeId` sem fallback — todos os outros
+   campos têm `|| ""`. Um vínculo legado gravado só por nome derruba o envio
+   inteiro pelo mesmo mecanismo (`contains undefined in property ...`).
+3. **O efeito era permanente.** `save()` não tinha `try/catch` em volta do
+   `update()` e só devolvia `pushing = false` no `.finally()` da promessa. Como o
+   erro do RTDB é **síncrono**, o `.finally()` nunca rodava e `pushing` ficava
+   `true` para sempre; o listener em tempo real começa com `if (pushing) return;`
+   — ou seja, o computador ficava **surdo**: nada mais entrava e nada mais saía,
+   e a exceção ainda subia para a ação de UI que chamou `saveState()`.
+
+Dois riscos estruturais encontrados na mesma investigação, com o mesmo sintoma:
+
+4. **Corrida da janela de 900ms.** Mesmo sem erro nenhum, o `if (pushing) return;`
+   descartava qualquer snapshot que chegasse durante um save local. Como o evento
+   `value` só dispara quando o dado muda, a alteração feita no outro computador
+   se perdia **para sempre** — e o save seguinte deste PC gravava a árvore inteira
+   por cima, apagando-a. Reproduzido.
+5. **Relógio do computador.** Todo o desempate *newer-wins* usava `Date.now()`
+   local (`updatedAt`, `deletedAt`, `manualScaleMeta`, metas do VT). Num PC com a
+   hora atrasada, o que o usuário acabara de digitar perdia do dado velho e
+   **voltava sozinho**. Reproduzido: com 2h de atraso, o cargo recém-digitado foi
+   revertido pelo valor de 1h antes do outro PC.
+
+Correção:
+
+- `js/import-utils.js` — novo `escapeRtdbKey` / `hasForbiddenRtdbKeyChars`: troca
+  cada caractere proibido pelo código (`%2E`, `%2F`, `%23`, `%24`, `%5B`, `%5D`),
+  inclusive o próprio `%`, o que torna o escape **injetivo** (dois nomes
+  diferentes nunca colidem na mesma chave).
+- `js/data.js` — as duas chaves de tombstone passam a ser escapadas.
+  **Migração não-destrutiva:** `ensure*TombstoneStore` converte as chaves já
+  gravadas no formato antigo, preservando o `deletedAt` maior, e a leitura é
+  tolerante (`is*Tombstoned` / `clear*Tombstone` aceitam a chave nova e a
+  legada). Nenhuma exclusão já registrada deixa de valer, e nada é apagado: a
+  identidade (data + nome) é a mesma, só a grafia da chave muda. O PC que estava
+  travado se cura sozinho no primeiro carregamento.
+- `js/firebase-sync.js` — `employeeId: item.employeeId || ""` (mesmo tratamento
+  dos demais campos do índice); `buildUpdates` ganhou uma **rede de segurança**
+  (`sanitizeForRtdb`) que omite `undefined`/`NaN`/função e escapa chave inválida
+  antes do envio, registrando tudo no console. Nó inteiro inválido **não é
+  enviado** — mandar `null` apagaria o nó no servidor.
+- `js/firebase-sync.js` — `save()` **nunca lança**: `try/catch` em volta do
+  `update()` (a validação do SDK é síncrona), status "Erro de sincronização" com
+  a mensagem real e retorno de promessa resolvida. `js/data.js` protege também o
+  `saveState()`, para que uma falha de sincronização jamais interrompa a ação do
+  usuário.
+- `js/firebase-sync.js` — a guarda `pushing` saiu. No lugar, cada envio carimba
+  `configuracoes.updatedBy = DEVICE_ID` e o listener descarta **apenas o eco do
+  próprio dispositivo** (mesmo `updatedAt` + mesmo `DEVICE_ID`, com TTL de 5min).
+  Alteração vinda de outro PC durante um save local passa a ser aplicada.
+- `js/data.js` — novo relógio de referência: `now()` = `Date.now()` + desvio do
+  servidor, alimentado por `FirebaseSync` via `.info/serverTimeOffset` (nó local
+  do SDK, não depende de regra de leitura). Todos os 25 carimbos de versão de
+  data.js, mais `contador.js` e `scale-rules.js`, passaram a usar `AppData.now()`.
+  Sem Firebase o desvio é 0 e o comportamento é o de antes. Desvio acima de 60s
+  gera aviso no console.
+
+Testes: `scripts/verify-sync-chaves.mjs` (nova, 45 asserções, no
+`npm run validate`) — escape e não-colisão de chaves; exclusão definitiva de
+feriado e de vínculo com `.`, `/` e `[ ]` no nome gerando payload aceito e
+continuando a valer; migração das chaves legadas preservando o `deletedAt` e a
+exclusão; vínculo legado sem `employeeId`; rede de segurança do payload sem
+apagar nó; `save()` que não lança e não deixa o PC surdo; alteração de outro PC
+durante o save; eco do próprio envio; relógio do servidor revertendo o cenário
+do item 5; e regressão do fluxo normal. `npm test` 47/47, `npm run validate`
+21/21 suítes, `npm run test:offline` 15/15. Prova ponta a ponta com o **SDK real
+do Firebase 10.12.2**: o payload do cenário que antes lançava agora é
+**ACEITO** (nenhuma exceção).
+
+Pendência: validação em produção pelo usuário (abrir no computador afetado e
+conferir o selo "Sincronizado"). Deploy ainda não executado.
+
 ## 2026-09-07 — Escala impressa: folha inteira e layout igual nas duas empresas
 
 Problema:

@@ -40,6 +40,7 @@ const SUITES = [
   { name: "Vínculo — tombstone de exclusão", script: "scripts/verify-vinculo-tombstone.mjs" },
   { name: "Tombstones em todos os módulos", script: "scripts/verify-tombstones-sync.mjs" },
   { name: "Sincronização newer-wins", script: "scripts/verify-sync-newer-wins.mjs" },
+  { name: "Sincronização — chaves, payload e relógio", script: "scripts/verify-sync-chaves.mjs" },
   { name: "Exclusão de funcionário em 24h", script: "scripts/verify-exclusao-24h.mjs" },
   { name: "Funcionário inativo na escala", script: "scripts/verify-inativo-escala.mjs" },
   { name: "Inativos — visibilidade e data de desligamento", script: "scripts/verify-inativos-visibilidade.mjs" },

@@ -444,3 +444,31 @@ Firebase e localStorage devem fazer merge seguro.
 Nunca sobrescrever dados recentes com dados antigos.
 
 Nunca recriar dados incorretos já corrigidos.
+
+## Chaves do Firebase (REGRA FIXA)
+
+O Realtime Database **recusa** chave que contenha `.` `#` `$` `/` `[` `]` ou
+caractere de controle — e a recusa é **síncrona** (`ref.update()` lança). Uma
+única chave inválida derruba a sincronização inteira daquele computador.
+
+Portanto:
+
+1. **Toda chave montada com texto do usuário** (nome de feriado, nome de pessoa,
+   nome de empresa, qualquer campo digitável) passa obrigatoriamente por
+   `ImportUtils.escapeRtdbKey`. `normalizeSearchText` **não serve** para isso:
+   ele só tira acento e caixa.
+2. Ao introduzir o escape numa chave que já existe em produção, incluir sempre:
+   **migração não-destrutiva** da chave antiga (preservando o valor / o
+   `deletedAt` maior) e **leitura tolerante** (aceitar a chave nova e a legada).
+   Nunca descartar registro por mudança de grafia de chave.
+3. Valor `undefined`, `NaN` e `Infinity` também são recusados. Campo opcional vai
+   com fallback (`|| ""`), nunca cru.
+4. `js/firebase-sync.js` mantém a rede de segurança (`sanitizeForRtdb`) que
+   escapa/omite o que escapou das regras acima e **registra erro no console** —
+   ela é a última linha de defesa, não a primeira. Console limpo é o esperado.
+5. Nenhum envio pode mandar `null` num nó por não ter o dado: `null` **apaga** o
+   nó no servidor. Nó ausente simplesmente não é enviado.
+
+Cobertura: `scripts/verify-sync-chaves.mjs` (inclui uma guarda que monta um
+estado completo com texto perigoso em todos os campos digitáveis e exige payload
+limpo **antes** da rede de segurança).

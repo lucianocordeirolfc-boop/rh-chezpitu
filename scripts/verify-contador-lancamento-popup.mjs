@@ -107,7 +107,10 @@ const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
     isEmployeeActive: (e) => String((e && e.status) || "").trim().toLowerCase() === "ativo",
     getPrimaryPageCompany: () => "Chez Pitu",
     getActiveCompany: () => "Chez Pitu",
-    monthKey: () => "2026-08"
+    monthKey: () => "2026-08",
+    // Relógio de referência da sincronização (AppData.now = Date.now + offset do
+    // servidor). O carimbo updatedAt do lançamento passa por aqui.
+    now: () => Date.now()
   };
   window.__toasts = [];
   window.App = {
