@@ -104,9 +104,21 @@ Use este checklist antes de qualquer commit ou deploy.
 - [ ] Trocar empresa.
 - [ ] Confirmar dados preservados.
 
+## Sincronização entre computadores (somente leitura)
+
+- [ ] Selo do topo chega a **"Sincronizado"** (não fica preso em "Sincronizando…").
+- [ ] Console sem `update failed: ... invalid key` e sem `contains undefined`.
+- [ ] Console sem `[FirebaseSync] ... ocorrência(s) saneada(s)` — a rede de
+      segurança é a última linha de defesa, não o caminho normal.
+- [ ] Se o selo mostrar `⚠ relógio ... atrasado/adiantado`, acertar a data/hora
+      do Windows (a sincronização continua correta, usa a hora do servidor).
+- [ ] Alteração feita em um computador aparece no outro com o sistema aberto.
+- [ ] Exclusão definitiva de feriado/vínculo feita em um PC não volta no outro.
+
 ## Testes técnicos
 
 - [ ] npm test
 - [ ] npm run validate
+- [ ] npm run test:offline
 - [ ] verificar console do navegador
 - [ ] verificar git status

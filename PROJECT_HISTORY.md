@@ -7,6 +7,42 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-09-16 (3) — Documentação e manual do usuário alinhados à correção de sincronização
+
+Sem mudança de comportamento do sistema: alinha a documentação (e o manual que o
+usuário lê dentro do sistema) ao que foi publicado em `20260916.01`.
+
+- `MANUAL_USUARIO.md` e `js/manual.js` — tabela com os cinco estados do selo de
+  sincronização: *Sincronizado*, *Sincronizando…*, *Offline — cache local*,
+  *Erro de sincronização* e o novo *⚠ relógio … atrasado/adiantado*, este último
+  explicando que os dados continuam corretos (o sistema usa a hora do servidor) e
+  que vale acertar a data/hora do Windows. O manual embutido se declara espelho
+  do `MANUAL_USUARIO.md`, então os dois mudam juntos; usa a classe `.manual-table`
+  que já existia.
+- `ARCHITECTURE.md` — papel real de `js/firebase-sync.js` (envio incremental por
+  caminho, nunca envia `null`, nunca lança, descarta só o eco do próprio
+  dispositivo, alinha o relógio por `.info/serverTimeOffset`); `js/import-utils.js`
+  entrou no mapa como dono do `escapeRtdbKey`; `js/data.js` ganhou a nota do
+  `AppData.now()`.
+- `BUGS_CONHECIDOS.md` — novo bug registrado ("chave inválida derruba a
+  sincronização do computador"), com o sintoma para reconhecer no console
+  (`update failed: ... invalid key`, selo preso em "Sincronizando…"), a regra
+  correta e onde verificar; novo risco "relógio do computador fora de hora".
+- `TEST_CHECKLIST.md` — nova seção "Sincronização entre computadores", com seis
+  itens **somente leitura** (selo chega a Sincronizado, console limpo, aviso de
+  relógio, alteração de um PC aparecendo no outro, exclusão definitiva que não
+  volta); `npm run test:offline` somado aos testes técnicos.
+- `.claude/session-recovery.md` — sincronização na arquitetura de referência e a
+  regra do carimbo por `AppData.now()`.
+
+**Testes:** `npm test` 47/47, `npm run validate` 21/21 suítes,
+`verify-sync-chaves.mjs` 73/73, `node --check js/manual.js` e carga do módulo em
+sandbox (`window.UserManual` exposto, template string íntegra).
+
+**Por que houve bump de versão:** `js/manual.js` é código de produção servido com
+`max-age=3600`; sem o bump do `?v=`, o usuário continuaria vendo o manual antigo
+por até uma hora.
+
 ## 2026-09-16 (2) — Sincronização: envio incremental, aviso de relógio e escape em toda chave
 
 Continuação direta da entrada anterior (mesma frente, ainda não publicada). Três

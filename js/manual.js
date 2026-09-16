@@ -14,6 +14,19 @@
     <p class="manual-note">Tudo o que você vê e edita pertence à <strong>empresa selecionada na aba</strong>.
        Confirme a aba correta antes de lançar qualquer informação.</p>
 
+    <p><strong>O selo de sincronização</strong> (ao lado da versão) mostra se os seus dados já
+       estão na nuvem:</p>
+    <table class="manual-table">
+      <thead><tr><th>O que aparece</th><th>O que significa</th></tr></thead>
+      <tbody>
+        <tr><td>Sincronizado</td><td>Tudo salvo na nuvem e visível nos outros computadores.</td></tr>
+        <tr><td>Sincronizando…</td><td>Enviando agora. Some em segundos.</td></tr>
+        <tr><td>Offline — cache local</td><td>Sem internet. Pode continuar trabalhando: o sistema guarda no computador e envia sozinho quando a conexão voltar.</td></tr>
+        <tr><td>Erro de sincronização</td><td>O envio falhou. Passe o mouse no selo para ver o motivo. Se não resolver sozinho, avise o suporte.</td></tr>
+        <tr><td>⚠ relógio … atrasado/adiantado</td><td>A data/hora <strong>deste computador</strong> está errada em relação ao servidor. Seus dados continuam corretos (o sistema usa a hora do servidor), mas vale acertar a data/hora do Windows.</td></tr>
+      </tbody>
+    </table>
+
     <h3>2. Trocar de empresa</h3>
     <p>Clique na aba <strong>Chez Pitu</strong> ou <strong>Pengold</strong> no topo. Todo o sistema passa a
        mostrar os dados daquela empresa. Nada é apagado ao trocar de aba.</p>

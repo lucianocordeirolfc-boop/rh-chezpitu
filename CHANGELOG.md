@@ -1,3 +1,13 @@
+2026-09-16 (3) - Documentacao e manual do usuario alinhados a correcao de sincronizacao
+- [NOVO] MANUAL_USUARIO.md e js/manual.js: tabela com os cinco estados do selo de sincronizacao (Sincronizado, Sincronizando..., Offline - cache local, Erro de sincronizacao e o novo aviso de relogio atrasado/adiantado), explicando que os dados continuam corretos porque o sistema usa a hora do servidor e que vale acertar a data/hora do Windows
+- [DOC] ARCHITECTURE.md: papel real de js/firebase-sync.js (envio incremental por caminho, nunca envia null, nunca lanca, descarta so o eco do proprio dispositivo, alinha o relogio por .info/serverTimeOffset); js/import-utils.js como dono do escapeRtdbKey; nota do AppData.now() em js/data.js
+- [DOC] BUGS_CONHECIDOS.md: novo bug "chave invalida derruba a sincronizacao do computador" com o sintoma para reconhecer no console, a regra correta e onde verificar; novo risco "relogio do computador fora de hora"
+- [DOC] TEST_CHECKLIST.md: secao "Sincronizacao entre computadores" com seis itens somente leitura; npm run test:offline nos testes tecnicos
+- [DOC] .claude/session-recovery.md: sincronizacao na arquitetura de referencia e a regra do carimbo por AppData.now()
+- [NOTA] O bump de versao foi necessario porque js/manual.js e codigo de producao servido com max-age=3600: sem trocar o ?v=, o usuario veria o manual antigo por ate uma hora
+- Arquivos: MANUAL_USUARIO.md, js/manual.js, ARCHITECTURE.md, BUGS_CONHECIDOS.md, TEST_CHECKLIST.md, .claude/session-recovery.md
+- npm test 47/47; npm run validate 21/21 suites
+
 2026-09-16 (2) - Sincronizacao: envio incremental, aviso de relogio no selo e escape em toda chave
 - [MELHORIA] save() reescrevia a arvore inteira (19 nos de topo) a cada saveState(): toda a base trafegava a cada gravacao e o no sistemaRH/funcionarios era reescrito por completo mesmo quando so uma empresa mudava - um PC sobrepunha o bloco da outra empresa gravado por outro PC. buildUpdatePaths passou a desdobrar os nos indexados por empresa em caminhos proprios (sistemaRH/funcionarios/Chez Pitu) e buildChangedUpdates envia so os caminhos que diferem do ultimo envio confirmado da sessao. Medido na suite: 30 caminhos no 1o envio da sessao, 3 numa edicao de funcionario
 - [MELHORIA] Gravacao sem mudanca nenhuma nao grava - evita trafego inutil e evita acordar os outros computadores com um snapshot identico ao que ja tem

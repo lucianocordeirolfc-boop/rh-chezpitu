@@ -15,6 +15,16 @@ Acesso: **https://chez-pitu-rh.web.app**
    - **Status de sincronização:** "Sincronizado" (dados salvos na nuvem).
    - **Versão:** ex. `v2026.06.10.02 | PRODUÇÃO` (clique para ver detalhes).
 
+### O selo de sincronização
+
+| O que aparece | O que significa |
+|---|---|
+| **Sincronizado** | Tudo salvo na nuvem e visível nos outros computadores. |
+| **Sincronizando…** | Enviando agora. Some em segundos. |
+| **Offline — cache local** | Sem internet. Pode continuar trabalhando: o sistema guarda no computador e envia sozinho quando a conexão voltar. |
+| **Erro de sincronização** | O envio falhou. Passe o mouse no selo para ver o motivo. Se não resolver sozinho, avise o suporte. |
+| **⚠ relógio ... atrasado/adiantado** | A data/hora **deste computador** está errada em relação ao servidor. Seus dados continuam corretos (o sistema usa a hora do servidor), mas vale acertar a data/hora do Windows. |
+
 > **Importante:** tudo o que você vê e edita pertence à **empresa selecionada na aba**. Antes de lançar qualquer informação, confirme se a aba correta está ativa.
 
 ---

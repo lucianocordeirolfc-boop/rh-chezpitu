@@ -23,6 +23,12 @@ Recibo de Vale-transporte · Controle de Feriados · Informações Contador.
 - **Dados:** `js/data.js` (`window.AppData`) — fonte de verdade; `employeeId` é o
   vínculo principal (nome só fallback de migração). `getCompanyData(company)`.
 - **Regras de escala:** `js/scale-rules.js` (`window.ScaleRules`).
+- **Sincronização:** `js/firebase-sync.js` (`window.FirebaseSync`) — envio
+  incremental por caminho (`sistemaRH/funcionarios/<empresa>`), nunca envia
+  `null`, nunca lança, descarta só o eco do próprio dispositivo e alinha o
+  relógio por `.info/serverTimeOffset` (→ `AppData.now()`). Toda chave montada
+  com texto do usuário passa por `ImportUtils.escapeRtdbKey`
+  (PROJECT_RULES.md → "Chaves do Firebase").
 - **Versão:** `js/version.js` (constante única `APP_VERSION`); `scripts/bump-cache.js`
   carimba build e reescreve `?v=` no `index.html`.
 - **Estilos:** `css/style.css` (geral) · `css/print.css` (impressão geral) ·
@@ -38,6 +44,8 @@ Recibo de Vale-transporte · Controle de Feriados · Informações Contador.
   vínculo manual confirmado deve aparecer no Histórico e no modal CO.
 - Cores: padrão **navy + pêssego** (não reverter para verde-mar/dourado).
 - Padroeira de Búzios: data correta **26/07** (nunca 21/05).
+- Carimbo de versão sempre por `AppData.now()` (hora do servidor), nunca
+  `Date.now()` direto — senão um PC com a hora errada reverte a edição do outro.
 - Regras completas: `PROJECT_RULES.md`.
 
 ## Links internos importantes
