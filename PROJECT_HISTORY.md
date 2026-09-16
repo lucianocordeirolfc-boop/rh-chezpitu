@@ -7,6 +7,41 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-09-16 (4) — Hosting publicava `.git/` e demais pastas ocultas (CRÍTICO)
+
+Problema (CRÍTICO, anterior a esta frente): o deploy do Firebase Hosting estava
+publicando **83 arquivos internos** junto com o site — `.git/` inteiro (incluindo
+`.git/config` e os *packfiles* com todo o histórico do repositório), `.claude/`,
+`.netlify/` e `.cursor/`. Qualquer pessoa com o endereço do site podia baixá-los.
+
+Causa raiz: em `firebase.json`, o padrão de ignore `"**/.*"` casa com a **entrada**
+que começa com ponto, mas **não com o conteúdo dela** — `.git` é ignorado,
+`.git/objects/pack/xxx.pack` não é. O `firebase-tools` lista os arquivos com
+`glob.sync("**/*", { dot: true, ignore })` (`node_modules/firebase-tools/lib/listFiles.js`),
+então todo arquivo dentro de uma pasta oculta escapava do filtro.
+
+Detectado ao conferir por que o deploy anunciava "found 109 files" para um site de
+26 arquivos. O deploy de 07/09/2026 já subia 95 arquivos pelo mesmo motivo.
+
+Correção: acrescentado `"**/.*/**"` à lista de ignore de `firebase.json`.
+Verificado com o **mesmo motor de glob** que o `firebase-tools` usa, sobre o
+projeto real:
+
+```
+ignore ATUAL   -> 109 arquivos publicados
+ignore NOVO    ->  26 arquivos publicados (index.html + js/ + css/)
+removidos      ->  83
+```
+
+Só corrigir o ignore não bastava: os arquivos já enviados seguem servidos até sair
+uma **nova release sem eles** — por isso a correção veio acompanhada de redeploy.
+
+Sem bump de versão: nenhum arquivo servido ao usuário mudou (só deixaram de
+subir arquivos que nunca deveriam ter subido).
+
+**Pendência menor:** `Comando padrão cursor.txt` continua sendo publicado —
+inofensivo, mas sem função no site.
+
 ## 2026-09-16 (3) — Documentação e manual do usuário alinhados à correção de sincronização
 
 Sem mudança de comportamento do sistema: alinha a documentação (e o manual que o

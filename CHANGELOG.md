@@ -1,3 +1,12 @@
+2026-09-16 (4) - Hosting publicava .git/ e demais pastas ocultas (CRITICO)
+- [CORRECAO] CRITICO: o deploy do Firebase Hosting publicava 83 arquivos internos junto com o site - .git/ inteiro (incluindo .git/config e os packfiles com todo o historico do repositorio), .claude/, .netlify/ e .cursor/. Qualquer pessoa com o endereco do site podia baixa-los
+- [CAUSA] Em firebase.json, o padrao de ignore "**/.*" casa com a ENTRADA que comeca com ponto, mas nao com o conteudo dela: .git era ignorado, .git/objects/pack/xxx.pack nao. O firebase-tools lista os arquivos com glob.sync("**/*", { dot: true, ignore })
+- [CORRECAO] Acrescentado "**/.*/**" ao ignore. Verificado com o mesmo motor de glob do firebase-tools sobre o projeto real: de 109 para 26 arquivos publicados (index.html + js/ + css/), 83 removidos
+- [NOTA] Corrigir o ignore nao bastava: os arquivos ja enviados seguem servidos ate sair uma nova release sem eles - por isso a correcao veio acompanhada de redeploy. Sem bump de versao: nenhum arquivo servido ao usuario mudou
+- [PENDENCIA] "Comando padrao cursor.txt" continua sendo publicado - inofensivo, mas sem funcao no site
+- Arquivos: firebase.json
+- npm test 47/47; npm run validate 21/21 suites
+
 2026-09-16 (3) - Documentacao e manual do usuario alinhados a correcao de sincronizacao
 - [NOVO] MANUAL_USUARIO.md e js/manual.js: tabela com os cinco estados do selo de sincronizacao (Sincronizado, Sincronizando..., Offline - cache local, Erro de sincronizacao e o novo aviso de relogio atrasado/adiantado), explicando que os dados continuam corretos porque o sistema usa a hora do servidor e que vale acertar a data/hora do Windows
 - [DOC] ARCHITECTURE.md: papel real de js/firebase-sync.js (envio incremental por caminho, nunca envia null, nunca lanca, descarta so o eco do proprio dispositivo, alinha o relogio por .info/serverTimeOffset); js/import-utils.js como dono do escapeRtdbKey; nota do AppData.now() em js/data.js
