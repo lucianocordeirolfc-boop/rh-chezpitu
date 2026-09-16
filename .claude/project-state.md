@@ -8,13 +8,15 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260916.01` (exibida como `v2026.09.16.01`) — fonte: `js/version.js`
-- **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito)
-- **Último commit:** `0f69614` — chore: carimbo de build 20260916.01 (deploy da correcao de sincronizacao)
-- **Status geral:** 🟢 EM PRODUÇÃO — correção CRÍTICA da sincronização entre
-  computadores (`20260916.01`) commitada (`5de11b4` + `0f69614`), **deployada**
-  em `chez-pitu-rh.web.app` e **pushada** para `origin/main`. Aguarda validação
-  do usuário no computador que estava com o erro de sincronização.
+- **Versão atual:** `20260916.02` (exibida como `v2026.09.16.02`) — fonte: `js/version.js`
+- **Branch atual:** `main` — **4 commits à frente de `origin/main`** (push pendente de autorização)
+- **Último commit:** `efb0412` — fix(hosting): deploy publicava .git/ e demais pastas ocultas
+- **Status geral:** 🟢 EM PRODUÇÃO — três entregas publicadas hoje: correção
+  CRÍTICA da sincronização entre computadores (`20260916.01`), manual do usuário
+  atualizado (`20260916.02`) e correção CRÍTICA do hosting, que publicava `.git/`
+  e demais pastas ocultas (redeploy sem bump, 109 → 26 arquivos). Pendente:
+  `git push` (4 commits) e validação do usuário no computador que estava com o
+  erro de sincronização.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 

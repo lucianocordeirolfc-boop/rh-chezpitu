@@ -9,12 +9,34 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260916.01 (sincronização entre computadores: envio recusado pelo
-Firebase deixava o PC surdo)
+**Versão:** 20260916.02 (manual do usuário atualizado; sobre a correção de
+sincronização de 20260916.01)
 **Data:** 2026-09-16
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
+
+Data: 16/09/2026
+Versão: 20260916.02 (Firebase Hosting — chez-pitu-rh)
+Commits: `268d5ec` (docs/manual) + `3375b08` (carimbo de build) + `efb0412`
+(fix de hosting, redeploy sem bump)
+
+**Manual do usuário.** Tabela com os cinco estados do selo de sincronização,
+incluindo o novo aviso de relógio fora de hora — em `MANUAL_USUARIO.md` e no
+manual embutido (`js/manual.js`). Bump necessário porque `js/manual.js` é servido
+com `max-age=3600`.
+
+**Hosting publicava pastas ocultas (CRÍTICO, anterior a esta frente).** O deploy
+subia 83 arquivos internos junto com o site — `.git/` inteiro (com os packfiles
+de todo o histórico), `.claude/`, `.netlify/` e `.cursor/`. Causa: o padrão
+`"**/.*"` do `firebase.json` ignora a entrada que começa com ponto, mas não o
+conteúdo dela. Corrigido com `"**/.*/**"`; conferido com o mesmo motor de glob do
+`firebase-tools` e no deploy real: **de 109 para 26 arquivos publicados**, nenhum
+oculto. Detalhes em `PROJECT_HISTORY.md` → 2026-09-16 (4).
+
+**Cache-busting:** todos os `?v=` do index.html em `20260916.02`.
+
+## Deploy 20260916.01
 
 Data: 16/09/2026
 Versão: 20260916.01 (Firebase Hosting — chez-pitu-rh)
