@@ -8,9 +8,9 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261008.01` (exibida como `v2026.10.08.01`) — fonte: `js/version.js`
+- **Versão atual:** `20261008.02` (exibida como `v2026.10.08.02`) — fonte: `js/version.js`
 - **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito e conferido)
-- **Último commit:** `e05f8f0` — chore: carimbo de build 20261008.01 (feat em `2ad1959`)
+- **Último commit:** carimbo 20261008.02 (fix do botão em `a4c6930`)
 - **Status geral:** 🟢 EM PRODUÇÃO — três entregas publicadas hoje: correção
   CRÍTICA da sincronização entre computadores (`20260916.01`), manual do usuário
   atualizado (`20260916.02`) e correção CRÍTICA do hosting, que publicava `.git/`
@@ -359,6 +359,9 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 - ✅ **2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF"** —
   **em produção** (`20261008.01`, commits `2ad1959` + `e05f8f0`, pushado).
+  **`20261008.02`** (commit `a4c6930`): botão movido da toolbar do topo para o
+  cabeçalho do card "Histórico de feriados" — o usuário não o encontrava ao
+  rolar até a tabela.
   Botão na toolbar → relatório dos filtros atuais com feriados trabalhados +
   projeção dos próximos feriados lida da escala. Novo `js/feriados-report.js`
   (iframe isolado, somente leitura) + `scripts/verify-feriados-pdf.mjs`
@@ -442,6 +445,9 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
+
+- ✅ **Botão do PDF junto dos filtros (`20261008.02`) — commitado, pushado e
+  deployado** (27 arquivos, nenhum oculto).
 
 - ✅ **Relatório PDF de feriados (`20261008.01`) — commitado, pushado e
   deployado** em `chez-pitu-rh.web.app`. Commits `2ad1959` (feat) + `e05f8f0`
