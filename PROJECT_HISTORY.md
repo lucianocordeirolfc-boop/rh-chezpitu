@@ -7,6 +7,14 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-08 (5) — Encerramento: relatório PDF de feriados aprovado
+
+Usuário validou em produção a versão `20261008.03` ("ok tudo aprovado").
+Frente encerrada sem pendências; melhorias opcionais (CSV para o contador,
+salvar vários PDFs de uma vez) registradas em `.claude/project-state.md` →
+Próximas tarefas. Commits da frente: `2ad1959`, `e05f8f0`, `4e75540`,
+`a4c6930`, `76319a3`, `88838cf`, `0d9d9b3`.
+
 ## 2026-10-08 (4) — PDF do relatório de feriados: layout e leitura corrigidos
 
 Relato do usuário com o PDF real (Cristiane, `20261008.02`, 3 páginas):

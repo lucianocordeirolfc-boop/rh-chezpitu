@@ -1,3 +1,27 @@
+2026-10-08 (4) - Relatorio PDF de feriados: layout e leitura corrigidos a partir do PDF real (20261008.03)
+- [CORRECAO] CRITICO: 1a pagina do PDF saia so com o cabecalho - break-inside: avoid-page no bloco do funcionario (maior que a pagina) o empurrava inteiro para a folha seguinte. Agora o bloco quebra; titulo, resumo e subtitulos ficam presos ao conteudo e o cabecalho da tabela repete por pagina
+- [CORRECAO] Resumo dizia "0 previsto(s) a trabalhar" com 20 feriados futuros ja lancados: feriado futuro lancado passa a contar; quadro com trabalhados, futuros lancados, previstos pela escala e saldo a compensar (passados + futuros)
+- [MELHORIA] Compensacao tirada antes do feriado marcada como "antecipada"; situacao "Lancado - compensado antecipado / compensacao agendada / a compensar"
+- [MELHORIA] CNPJ com mascara, dia da semana na mesma linha da data, separador por ano na projecao, rodape com empresa, emissao e Pagina X de Y
+- [NOTA] Caso da Cristiane: 3 paginas (1a em branco) -> 1 pagina. Somente apresentacao; dados e escopo inalterados
+- Arquivos: js/feriados-report.js, js/manual.js, MANUAL_USUARIO.md, scripts/verify-feriados-pdf.mjs
+- verify-feriados-pdf 70/70; npm test 47/47; npm run validate 22/22 suites
+
+2026-10-08 (3) - Botao Imprimir / PDF junto dos filtros (20261008.02)
+- [CORRECAO] O botao ficava na toolbar do topo e sumia de vista ao rolar ate a tabela ("nao aparece nenhuma opcao para gerar pdf"). Movido para o cabecalho do card "Historico de feriados", acima dos filtros, em destaque
+- Arquivos: js/feriados.js, js/manual.js, MANUAL_USUARIO.md, scripts/verify-feriados-pdf.mjs
+
+2026-10-08 (2) - Relatorio PDF de feriados: conteudo e formato
+- [NOVO] Janela de opcoes: Conteudo (ambos / somente feriados trabalhados / somente projecao) e Formato (arquivo unico / uma pagina por funcionario / um PDF por funcionario, com lista "Gerar PDF" + "Gerar proximo")
+- [CORRECAO] Foco devolvido a pagina apos imprimir (Esc ficava preso no iframe) e blocos da janela escondidos corretamente
+- Arquivos: js/feriados-report.js, js/feriados.js, scripts/verify-feriados-pdf.mjs, MANUAL_USUARIO.md, js/manual.js
+
+2026-10-08 (1) - Controle de Feriados: relatorio Imprimir / PDF (20261008.01)
+- [NOVO] Botao Imprimir / PDF gera relatorio com as mesmas linhas filtradas da tabela: feriados trabalhados (prazo, dias restantes, compensacao, status) e projecao dos proximos feriados lida da escala, respeitando admissao e desligamento
+- [ARQUITETURA] Novo js/feriados-report.js: montagem pura (buildReport/buildReportHTML) e impressao em iframe isolado - nao toca o print.css global. Somente leitura: nao grava estado, nao recomputa escala, nao persiste logo
+- [TESTE] scripts/verify-feriados-pdf.mjs (fixture em memoria) incluido no npm run validate
+- Arquivos: js/feriados-report.js (novo), js/feriados.js, index.html, scripts/verify-feriados-pdf.mjs (novo), scripts/run-validate.mjs, MANUAL_USUARIO.md, js/manual.js
+
 2026-09-16 (4) - Hosting publicava .git/ e demais pastas ocultas (CRITICO)
 - [CORRECAO] CRITICO: o deploy do Firebase Hosting publicava 83 arquivos internos junto com o site - .git/ inteiro (incluindo .git/config e os packfiles com todo o historico do repositorio), .claude/, .netlify/ e .cursor/. Qualquer pessoa com o endereco do site podia baixa-los
 - [CAUSA] Em firebase.json, o padrao de ignore "**/.*" casa com a ENTRADA que comeca com ponto, mas nao com o conteudo dela: .git era ignorado, .git/objects/pack/xxx.pack nao. O firebase-tools lista os arquivos com glob.sync("**/*", { dot: true, ignore })

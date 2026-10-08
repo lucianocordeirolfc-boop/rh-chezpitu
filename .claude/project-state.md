@@ -10,13 +10,12 @@
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
 - **Versão atual:** `20261008.03` (exibida como `v2026.10.08.03`) — fonte: `js/version.js`
 - **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito e conferido)
-- **Último commit:** carimbo 20261008.03 (fix do PDF em `88838cf`)
-- **Status geral:** 🟢 EM PRODUÇÃO — três entregas publicadas hoje: correção
-  CRÍTICA da sincronização entre computadores (`20260916.01`), manual do usuário
-  atualizado (`20260916.02`) e correção CRÍTICA do hosting, que publicava `.git/`
-  e demais pastas ocultas (redeploy sem bump, 109 → 26 arquivos). Tudo commitado,
-  deployado e pushado. Pendente: validação do usuário no computador que estava
-  com o erro de sincronização.
+- **Último commit:** `0d9d9b3` — chore: carimbo de build 20261008.03 (PDF do relatório de feriados corrigido)
+- **Status geral:** 🟢 EM PRODUÇÃO — relatório **Imprimir / PDF** do Controle de
+  Feriados entregue em três publicações no dia 2026-10-08 (`20261008.01` →
+  `.02` → `.03`) e **aprovado pelo usuário em produção** ("ok tudo aprovado").
+  Tudo commitado, deployado e pushado. Pendente (frente anterior): validação do
+  usuário no computador que estava com o erro de sincronização.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -30,6 +29,33 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF" (em produção, APROVADO)
+
+- ✅ **Relatório PDF pelos filtros da tela** (`20261008.01`, commit `2ad1959`) —
+  usa as MESMAS linhas filtradas da tabela; por funcionário: feriados
+  trabalhados (até hoje) + projeção dos próximos feriados lida da escala
+  (`getScaleCode` + `monthHasScaleData`): Lançado · Trabalha (pela escala) ·
+  Provável trabalho · Não trabalha. Respeita admissão/desligamento.
+- ✅ **Janela de opções** — Conteúdo (Ambos / Somente feriados trabalhados /
+  Somente projeção) e Formato (Arquivo único / uma página por funcionário /
+  **um PDF por funcionário**, com lista "Gerar PDF" + "Gerar próximo" e ✓).
+- ✅ **Botão junto dos filtros** (`20261008.02`, commit `a4c6930`) — estava na
+  toolbar do topo e o usuário não o via ao rolar até a tabela; agora fica no
+  cabeçalho do card "Histórico de feriados".
+- ✅ **PDF corrigido a partir do PDF real do usuário** (`20261008.03`, commit
+  `88838cf`) — 1ª página em branco (`break-inside: avoid-page` no bloco),
+  resumo "0 previsto(s) a trabalhar" com 20 lançados (agora quadro com saldo
+  a compensar passados + futuros), compensação **antecipada** identificada,
+  CNPJ com máscara, separador por ano, rodapé "Página X de Y". Caso da
+  Cristiane: 3 → 1 página.
+- ✅ **Arquitetura** — `js/feriados-report.js` (novo; carregado antes de
+  `feriados.js`): montagem pura (`buildReport`/`buildReportHTML`/`sliceReport`)
+  + impressão em `<iframe>` isolado (não toca o `print.css` global). **Somente
+  leitura**: não grava estado, não recomputa escala, não persiste logo.
+- ✅ **Homologação** — `scripts/verify-feriados-pdf.mjs` (novo, **70 asserções**,
+  no `npm run validate`: 22/22 suítes) + testes no Chrome headless (janela,
+  tela real do módulo com fixture, PDFs gerados, storage idêntico).
 
 ### Frente 2026-09-16 — Sincronização entre computadores (em produção)
 
@@ -357,23 +383,7 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Funcionalidades em andamento
 
-- ✅ **2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF"** —
-  **em produção** (`20261008.01`, commits `2ad1959` + `e05f8f0`, pushado).
-  **`20261008.02`** (commit `a4c6930`): botão movido da toolbar do topo para o
-  cabeçalho do card "Histórico de feriados" — o usuário não o encontrava ao
-  rolar até a tabela.
-  **`20261008.03`** (commit `88838cf`): PDF corrigido a partir do PDF real do
-  usuário — 1ª página em branco (`break-inside: avoid-page`), saldo a compensar
-  futuro, compensação antecipada, CNPJ, rodapé com páginas. Caso da Cristiane:
-  3 → 1 página.
-  Botão na toolbar → relatório dos filtros atuais com feriados trabalhados +
-  projeção dos próximos feriados lida da escala. Novo `js/feriados-report.js`
-  (iframe isolado, somente leitura) + `scripts/verify-feriados-pdf.mjs`
-  (53 asserções, no `npm run validate`). **Melhoria (2)** no mesmo dia: janela
-  de opções com Conteúdo (ambos / só trabalhados / só projeção) e Formato
-  (arquivo único / uma página por funcionário / um PDF por funcionário). Detalhes em
-  `PROJECT_HISTORY.md` (2026-10-08). Pendente: validação do usuário em
-  produção (Ctrl+F5), somente leitura.
+- (nenhuma — relatório PDF de feriados concluído e aprovado em 2026-10-08)
 - Aguardando validação do usuário no computador que estava com o erro de
   sincronização.
 
@@ -385,6 +395,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Próximas tarefas
 
+- Relatório de feriados (opcional, sem pedido em aberto): exportar o mesmo
+  relatório em CSV para o contador; "um PDF por funcionário" gera um diálogo
+  de impressão por pessoa — salvar todos de uma vez exigiria biblioteca de PDF
+  (jsPDF/html2pdf), hoje evitada de propósito.
 - Guarda no `npm run deploy`: abortar se o `firebase deploy` listar arquivo
   oculto (evita a repetição exata do problema de 2026-09-16; esperado: 26
   arquivos).
@@ -417,6 +431,8 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de validação
 
+- ✅ **Validado pelo usuário em produção (2026-10-08):** relatório Imprimir /
+  PDF do Controle de Feriados (`20261008.03`) — "ok tudo aprovado".
 - ⏳ **Validação em produção pelo usuário** (Ctrl+F5 para `?v=20260916.02`),
   **somente leitura**, no computador que estava com erro: o selo do topo deve
   chegar a **"Sincronizado"** (antes ficava preso em "Sincronizando…") e o
@@ -509,13 +525,11 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo após o commit docs do estado vivo)
+(working tree limpo em 0d9d9b3 — só os arquivos de documentação do encerramento)
 ```
-> Todo o **código** e a documentação da sessão estão commitados, pushados e em
-> produção (`20260916.02`); o working tree estava limpo em `d903d91`. A única
-> alteração pendente é este arquivo de estado, gravado pelo checkpoint de
-> encerramento — a skill `/atualizar-estado` não commita. `*.md` está no
-> `ignore` do `firebase.json` — não exige deploy.
+> Código e deploy da sessão 2026-10-08 commitados, pushados e em produção
+> (`20261008.03`). O encerramento atualiza apenas documentação (`*.md`, fora do
+> deploy pelo `ignore` do `firebase.json`).
 
 ---
 
@@ -890,3 +904,27 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 - **Próximo passo:** Usuário validar em produção no computador que estava com o
   erro (Ctrl+F5, selo "Sincronizado"). Depois, avaliar a guarda de arquivos
   ocultos no `npm run deploy` e a limpeza das versões antigas de hosting.
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-10-08 17:08
+- **Versão:** 20261008.03 (em produção, aprovada pelo usuário)
+- **Branch:** main (sincronizado com `origin/main` em `0d9d9b3`)
+- **Commits:** `2ad1959` (feat relatório PDF) + `e05f8f0` (carimbo .01) +
+  `4e75540` (estado vivo) + `a4c6930` (fix botão) + `76319a3` (carimbo .02) +
+  `88838cf` (fix layout do PDF) + `0d9d9b3` (carimbo .03)
+- **Arquivos alterados:** `js/feriados-report.js` (novo), `js/feriados.js`,
+  `index.html`, `js/version.js`, `js/manual.js`, `scripts/verify-feriados-pdf.mjs`
+  (novo), `scripts/run-validate.mjs`, `MANUAL_USUARIO.md`, `PROJECT_HISTORY.md`,
+  `PROJECT_STATUS.md`, `CHANGELOG.md`, `.claude/project-state.md`
+- **Resumo:** Criado o relatório Imprimir / PDF do Controle de Feriados pelos
+  filtros da tela (histórico trabalhado + projeção pela escala), com janela de
+  Conteúdo (ambos / só histórico / só projeção) e Formato (arquivo único /
+  página por funcionário / um PDF por funcionário). Dois ajustes a partir do
+  uso real: botão movido para junto dos filtros e PDF corrigido (1ª página em
+  branco, saldo a compensar futuro, compensação antecipada, rodapé com páginas;
+  caso da Cristiane 3 → 1 página). Somente leitura; nenhum dado de produção
+  lido/alterado nos testes. `verify-feriados-pdf.mjs` 70/70, `npm test` 47/47,
+  `npm run validate` 22/22. Aprovado pelo usuário em produção.
+- **Próximo passo:** Nenhuma pendência desta frente. Seguem abertas a
+  validação da sincronização no outro computador (frente 2026-09-16) e as
+  melhorias opcionais listadas em "Próximas tarefas".

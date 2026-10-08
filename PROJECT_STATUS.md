@@ -9,12 +9,30 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20260916.02 (manual do usuário atualizado; sobre a correção de
-sincronização de 20260916.01)
-**Data:** 2026-09-16
+**Versão:** 20261008.03 (relatório Imprimir / PDF do Controle de Feriados)
+**Data:** 2026-10-08
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
+
+Data: 08/10/2026
+Versão: 20261008.03 (Firebase Hosting — chez-pitu-rh) — **aprovada pelo usuário**
+Commits: `2ad1959` (feat) + `e05f8f0` (carimbo .01) + `a4c6930` (fix botão) +
+`76319a3` (carimbo .02) + `88838cf` (fix layout do PDF) + `0d9d9b3` (carimbo .03)
+
+**Controle de Feriados — Imprimir / PDF.** Relatório pelos filtros da tela, por
+funcionário: feriados trabalhados (prazo, compensação, status) e projeção dos
+próximos feriados lida da escala (Lançado · Trabalha · Provável trabalho · Não
+trabalha). Janela de opções: Conteúdo (ambos / só trabalhados / só projeção) e
+Formato (arquivo único / uma página por funcionário / um PDF por funcionário).
+Resumo com **saldo a compensar** (passados + futuros), compensação antecipada
+identificada, rodapé com "Página X de Y". Novo `js/feriados-report.js`
+(somente leitura, impressão em iframe isolado). Release: 27 arquivos, nenhum
+oculto. Detalhes em `PROJECT_HISTORY.md` → 2026-10-08.
+
+**Cache-busting:** todos os `?v=` do index.html em `20261008.03`.
+
+## Deploy 20260916.02
 
 Data: 16/09/2026
 Versão: 20260916.02 (Firebase Hosting — chez-pitu-rh)
