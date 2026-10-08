@@ -99,7 +99,7 @@
        <strong>Um PDF por funcionário</strong> — neste, clique em Gerar PDF em cada nome ou em Gerar próximo). Na janela de
        impressão escolha <strong>Salvar como PDF</strong>. O relatório traz os <strong>feriados trabalhados</strong> (prazo,
        compensação e status) e/ou a <strong>projeção dos próximos feriados</strong> lida da escala (Trabalha, Provável
-       trabalho, Não trabalha ou Já lançado).</p>
+       trabalho, Não trabalha ou Lançado), com o <strong>saldo a compensar</strong>; folga tirada antes do feriado aparece como <strong>antecipada</strong>.</p>
     <p class="manual-note">Status, prazo e compensação filtram só os feriados trabalhados; a projeção segue os filtros de
        funcionário, setor, feriado e busca por nome. Gerar o relatório não altera nenhum dado.</p>
 

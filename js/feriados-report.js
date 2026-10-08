@@ -111,12 +111,23 @@
     const linked = findLinkedEntry(data, employee.id, holiday.date);
     if (linked) {
       const status = AppData.resolveWorkedHolidayStatus(linked.item, holiday.date, today);
+      const compensationDate = linked.item.compensationDate || linked.item.scheduledCoDate || "";
+      // Folga compensatória tirada ANTES do feriado (prática comum na escala).
+      const anticipated = Boolean(compensationDate) && compensationDate < holiday.date;
+      const label =
+        status.key === "compensado"
+          ? `Lançado · compensado${anticipated ? " antecipado" : ""}`
+          : status.key === "agendado"
+            ? "Lançado · compensação agendada"
+            : "Lançado · a compensar";
       return {
         key: "vinculado",
-        label: `Já lançado — ${status.label}`,
+        statusKey: status.key,
+        label,
+        anticipated,
         code: "",
         dueDate: AppData.getHolidayCompensationDueDate(holiday.date),
-        compensationDate: linked.item.compensationDate || linked.item.scheduledCoDate || ""
+        compensationDate
       };
     }
 
@@ -233,7 +244,7 @@
         group.projection.sort((a, b) => a.holidayDate.localeCompare(b.holidayDate));
         group.summary = summarizeHistory(group.history);
         group.projectionSummary = summarizeProjection(group.projection);
-        group.projectedWork = group.projectionSummary.previsto + group.projectionSummary.provavel;
+        group.projectedWork = group.projectionSummary.aTrabalhar;
         return group;
       })
       .filter((group) => group.history.length || group.projection.length)
@@ -254,7 +265,7 @@
   function computeTotals(employees) {
     const totals = summarizeHistory(employees.flatMap((group) => group.history));
     totals.projection = summarizeProjection(employees.flatMap((group) => group.projection));
-    totals.projectedWork = totals.projection.previsto + totals.projection.provavel;
+    totals.projectedWork = totals.projection.aTrabalhar;
     return totals;
   }
 
@@ -327,14 +338,42 @@
     agendado: "info",
     pendente: "warn",
     vencido: "bad",
-    vinculado: "info",
     folga: "muted",
     previsto: "warn",
     provavel: "soft"
   };
 
-  function pill(key, label) {
-    return `<span class="pill ${STATUS_CLASS[key] || "muted"}">${escHTML(label)}</span>`;
+  /** Classe do selo: vínculo futuro herda a cor do status do vínculo. */
+  function pillClass(row) {
+    if (row.key === "vinculado") return STATUS_CLASS[row.statusKey] || "warn";
+    return STATUS_CLASS[row.key] || "muted";
+  }
+
+  function pill(className, label) {
+    return `<span class="pill ${className}">${escHTML(label)}</span>`;
+  }
+
+  const WEEKDAY_SHORT = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+  /** "12/10/2026 seg" — dia da semana na mesma linha, para a tabela ficar compacta. */
+  function dateWithWeekday(iso) {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-").map(Number);
+    const dow = WEEKDAY_SHORT[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+    return `${fmt(iso)} <span class="dow">${dow}</span>`;
+  }
+
+  /** Data de compensação, marcada quando a folga foi tirada antes do feriado. */
+  function compensationCell(compensationDate, holidayDate) {
+    if (!compensationDate) return "—";
+    const anticipated = holidayDate && compensationDate < holidayDate;
+    return `${fmt(compensationDate)}${anticipated ? ` <span class="tag">antecipada</span>` : ""}`;
+  }
+
+  function formatCnpj(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (digits.length !== 14) return String(value || "");
+    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
   }
 
   function deadlineText(row) {
@@ -349,8 +388,9 @@
     }
     return `
       <table>
+        <colgroup><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:16%"><col style="width:14%"></colgroup>
         <thead><tr>
-          <th>Feriado</th><th>Data trabalhada</th><th>Prazo de compensação</th>
+          <th>Feriado</th><th>Data trabalhada</th><th>Prazo p/ compensar</th>
           <th>Restam</th><th>Compensação</th><th>Status</th>
         </tr></thead>
         <tbody>
@@ -358,11 +398,11 @@
             .map(
               (row) => `<tr>
               <td>${escHTML(row.holidayName)}${row.origin ? `<small>${escHTML(row.origin)}</small>` : ""}</td>
-              <td>${fmt(row.holidayDate)}</td>
+              <td>${dateWithWeekday(row.holidayDate)}</td>
               <td>${fmt(row.dueDate)}</td>
               <td>${escHTML(deadlineText(row))}</td>
-              <td>${fmt(row.compensationDate)}</td>
-              <td>${pill(row.statusKey, row.statusLabel)}</td>
+              <td>${compensationCell(row.compensationDate, row.holidayDate)}</td>
+              <td>${pill(STATUS_CLASS[row.statusKey] || "muted", row.statusLabel)}</td>
             </tr>`
             )
             .join("")}
@@ -372,88 +412,135 @@
 
   function projectionTable(group) {
     if (!group.projection.length) return `<p class="empty">Nenhum feriado futuro cadastrado no período.</p>`;
+    // Separador por ano quando a projeção atravessa a virada (2026 → 2027 → 2028).
+    const multiYear = new Set(group.projection.map((row) => row.holidayDate.slice(0, 4))).size > 1;
+    let currentYear = "";
+    const body = group.projection
+      .map((row) => {
+        const year = row.holidayDate.slice(0, 4);
+        const separator = multiYear && year !== currentYear ? `<tr class="year"><td colspan="5">${year}</td></tr>` : "";
+        currentYear = year;
+        return `${separator}<tr>
+              <td>${escHTML(row.holidayName)}</td>
+              <td>${dateWithWeekday(row.holidayDate)}</td>
+              <td>${pill(pillClass(row), row.label)}</td>
+              <td>${fmt(row.dueDate)}</td>
+              <td>${compensationCell(row.compensationDate, row.holidayDate)}</td>
+            </tr>`;
+      })
+      .join("");
     return `
       <table>
+        <colgroup><col style="width:31%"><col style="width:14%"><col style="width:25%"><col style="width:12%"><col style="width:18%"></colgroup>
         <thead><tr>
-          <th>Feriado</th><th>Data</th><th>Previsão</th><th>Prazo de compensação</th><th>Compensação</th>
+          <th>Feriado</th><th>Data</th><th>Situação</th><th>Prazo p/ compensar</th><th>Compensação</th>
         </tr></thead>
-        <tbody>
-          ${group.projection
-            .map(
-              (row) => `<tr>
-              <td>${escHTML(row.holidayName)}</td>
-              <td>${fmt(row.holidayDate)} <small>${escHTML(AppData.weekdayName?.(row.holidayDate) || "")}</small></td>
-              <td>${pill(row.key, row.label)}</td>
-              <td>${fmt(row.dueDate)}</td>
-              <td>${fmt(row.compensationDate)}</td>
-            </tr>`
-            )
-            .join("")}
-        </tbody>
+        <tbody>${body}</tbody>
       </table>`;
   }
 
   function summarizeProjection(rows) {
-    const summary = { previsto: 0, provavel: 0, folga: 0, vinculado: 0 };
+    const summary = {
+      previsto: 0, provavel: 0, folga: 0, vinculado: 0,
+      vincCompensado: 0, vincAntecipado: 0, vincACompensar: 0
+    };
     rows.forEach((row) => {
       if (summary[row.key] !== undefined) summary[row.key] += 1;
+      if (row.key !== "vinculado") return;
+      if (row.statusKey === "compensado") {
+        summary.vincCompensado += 1;
+        if (row.anticipated) summary.vincAntecipado += 1;
+      } else {
+        summary.vincACompensar += 1; // pendente, agendado ou vencido: folga ainda não tirada
+      }
     });
+    // Feriados futuros em que o funcionário deve trabalhar (lançados + previstos pela escala).
+    summary.aTrabalhar = summary.vinculado + summary.previsto + summary.provavel;
+    // Folgas compensatórias que ainda vão nascer/ficar devidas por esses feriados.
+    summary.aCompensarFuturo = summary.vincACompensar + summary.previsto + summary.provavel;
     return summary;
   }
 
-  /** Resumo do bloco conforme o conteúdo escolhido. */
-  function summaryLine(summary, projection, content) {
-    const parts = [];
+  function kpi(label, value, detail, highlight) {
+    return `<div class="kpi${highlight ? " hl" : ""}"><span class="kpi-label">${label}</span><b>${value}</b>${detail ? `<small>${detail}</small>` : ""}</div>`;
+  }
+
+  /** Quadro de resumo conforme o conteúdo escolhido. */
+  function summaryBox(summary, projection, content) {
+    const cards = [];
     if (content !== "projecao") {
-      parts.push(
-        `<span><b>${summary.total}</b> trabalhado(s)</span>`,
-        `<span><b>${summary.compensado}</b> compensado(s)</span>`,
-        `<span><b>${summary.agendado}</b> agendado(s)</span>`,
-        `<span><b>${summary.pendente}</b> pendente(s)</span>`,
-        `<span><b>${summary.vencido}</b> vencido(s)</span>`,
-        `<span class="hl"><b>${summary.aCompensar}</b> a compensar</span>`
+      cards.push(
+        kpi("Trabalhados até hoje", summary.total, `${summary.compensado} compensado(s) · ${summary.aCompensar} a compensar`),
+        kpi("Pendentes / vencidos", summary.pendente + summary.vencido, `${summary.agendado} agendado(s)`)
       );
     }
-    if (content === "projecao") {
-      parts.push(
-        `<span class="hl"><b>${projection.previsto}</b> trabalha (escala)</span>`,
-        `<span class="hl"><b>${projection.provavel}</b> provável trabalho</span>`,
-        `<span><b>${projection.folga}</b> não trabalha</span>`,
-        `<span><b>${projection.vinculado}</b> já lançado(s)</span>`
+    if (content !== "historico") {
+      cards.push(
+        kpi("Futuros já lançados", projection.vinculado,
+          `${projection.vincCompensado} compensado(s)${projection.vincAntecipado ? ` (${projection.vincAntecipado} antecipado)` : ""} · ${projection.vincACompensar} a compensar`),
+        kpi("Previstos pela escala", projection.previsto + projection.provavel,
+          `${projection.previsto} trabalha · ${projection.provavel} provável · ${projection.folga} não trabalha`)
       );
-    } else if (content === "ambos") {
-      parts.push(`<span class="hl"><b>${projection.previsto + projection.provavel}</b> previsto(s) a trabalhar</span>`);
     }
-    return `<div class="summary">${parts.join("")}</div>`;
+    if (content === "ambos") {
+      cards.push(kpi("Saldo a compensar", summary.aCompensar + projection.aCompensarFuturo,
+        `${summary.aCompensar} de feriados passados · ${projection.aCompensarFuturo} de futuros`, true));
+    } else if (content === "historico") {
+      cards.push(kpi("A compensar", summary.aCompensar, "folgas ainda não tiradas", true));
+    } else {
+      cards.push(kpi("A compensar (futuro)", projection.aCompensarFuturo, `${projection.aTrabalhar} feriado(s) a trabalhar`, true));
+    }
+    return `<div class="kpis">${cards.join("")}</div>`;
+  }
+
+  /** Texto seguro para `content:` do CSS (rodapé das páginas). */
+  function cssString(value) {
+    return `"${String(value).replace(/[\\"]/g, "\\$&").replace(/[\r\n<>]/g, " ")}"`;
   }
 
   const REPORT_CSS = `
-    @page { size: A4 portrait; margin: 12mm 10mm; }
+    @page { size: A4 portrait; margin: 9mm 10mm 12mm;
+      @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8px "Segoe UI", Arial, sans-serif; color: #8a817a; } }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5px; color: #2c2a26; background: #fff;
+    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; font-size: 10px; color: #2c2a26; background: #fff;
       -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     header.report { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
-      border-bottom: 3px solid #133169; padding-bottom: 8px; margin-bottom: 10px; }
-    header.report h1 { margin: 0 0 2px; font-size: 17px; color: #133169; }
+      border-bottom: 3px solid #133169; padding-bottom: 7px; margin-bottom: 8px; }
+    header.report h1 { margin: 0 0 2px; font-size: 16px; color: #133169; }
     header.report p { margin: 1px 0; }
-    header.report .logo { max-height: 52px; max-width: 160px; object-fit: contain; }
+    header.report .logo { max-height: 48px; max-width: 150px; object-fit: contain; }
     .meta { color: #6b625a; }
-    .filters { background: #eef2f8; border-left: 4px solid #FFBC7D; padding: 6px 8px; margin-bottom: 10px; }
+    .filters { background: #eef2f8; border-left: 4px solid #FFBC7D; padding: 4px 8px; margin-bottom: 8px; }
     .totals { margin-bottom: 12px; }
-    section.employee { margin-bottom: 14px; break-inside: avoid-page; }
+    /* Sem "avoid" no bloco inteiro: ele é maior que uma página e deixava a 1ª em branco.
+       Só o título, o resumo e os subtítulos ficam presos ao que vem depois. */
+    section.employee { margin-bottom: 14px; }
     body.page-per-employee section.employee + section.employee { break-before: page; }
-    section.employee h2 { margin: 0; padding: 5px 8px; font-size: 12.5px; color: #fff; background: #133169; border-radius: 3px 3px 0 0; }
+    section.employee h2, .kpis, h3 { break-after: avoid; }
+    section.employee h2 { margin: 0; padding: 5px 8px; font-size: 12px; color: #fff; background: #133169; border-radius: 3px 3px 0 0; }
     section.employee h2 small { font-weight: 400; color: #FFBC7D; margin-left: 6px; }
-    h3 { font-size: 11px; color: #133169; margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #d9d2c5; padding: 3px 5px; text-align: left; vertical-align: top; }
-    th { background: #eef2f8; color: #133169; font-weight: 600; }
+    h3 { font-size: 10.5px; color: #133169; margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-auto-flow: column; gap: 0;
+      border: 1px solid #e6ddcd; border-top: 0; background: #f7f4ee; }
+    .totals .kpis { border-top: 1px solid #e6ddcd; }
+    .kpi { padding: 5px 8px; border-left: 1px solid #e6ddcd; display: flex; flex-direction: column; }
+    .kpi:first-child { border-left: 0; }
+    .kpi-label { font-size: 8.5px; text-transform: uppercase; letter-spacing: .03em; color: #6b625a; }
+    .kpi b { font-size: 15px; color: #2c2a26; line-height: 1.2; }
+    .kpi small { font-size: 8.5px; color: #6b625a; }
+    .kpi.hl { background: #fff1e3; }
+    .kpi.hl b { color: #133169; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    thead { display: table-header-group; }
+    th, td { border: 1px solid #d9d2c5; padding: 2px 5px; text-align: left; vertical-align: middle; }
+    th { background: #eef2f8; color: #133169; font-weight: 600; font-size: 9.5px; }
     tr { break-inside: avoid; }
-    td small { display: block; color: #8a817a; font-size: 9px; }
-    .summary { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 5px 8px; background: #f7f4ee; border: 1px solid #e6ddcd; border-top: 0; }
-    .totals .summary { border-top: 1px solid #e6ddcd; }
-    .summary .hl b { color: #133169; }
-    .pill { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 9.5px; font-weight: 600; white-space: nowrap; }
+    td small { display: block; color: #8a817a; font-size: 8.5px; }
+    tr.year td { background: #133169; color: #FFBC7D; font-weight: 700; padding: 2px 6px; font-size: 9.5px; letter-spacing: .05em; }
+    .dow { color: #8a817a; font-size: 8.5px; margin-left: 3px; }
+    td:has(.tag) { white-space: nowrap; }
+    .tag { display: inline-block; font-size: 8px; color: #1f5e45; background: #dcefe6; border-radius: 6px; padding: 0 4px; margin-left: 2px; }
+    .pill { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 600; white-space: nowrap; }
     .pill.ok { background: #dcefe6; color: #1f5e45; }
     .pill.info { background: #dce8f7; color: #1d3f73; }
     .pill.warn { background: #ffe8d2; color: #8a4b12; }
@@ -461,7 +548,7 @@
     .pill.soft { background: #fff4e6; color: #8a6a3a; border: 1px dashed #d9b98a; }
     .pill.muted { background: #ece9e4; color: #5d5750; }
     .empty { margin: 4px 0; color: #8a817a; font-style: italic; }
-    .legend { margin-top: 10px; color: #6b625a; font-size: 9.5px; }
+    .legend { margin-top: 10px; color: #6b625a; font-size: 8.5px; border-top: 1px solid #e6ddcd; padding-top: 5px; break-inside: avoid; }
     .legend p { margin: 2px 0; }
   `;
 
@@ -472,10 +559,11 @@
   function buildReportHTML(report, options = {}) {
     const info = report.companyInfo || {};
     const legalName = info.legalName || report.company;
-    const cnpj = AppData.resolveCompanyCnpj ? AppData.resolveCompanyCnpj(info) : info.cnpj;
+    const cnpj = formatCnpj(AppData.resolveCompanyCnpj ? AppData.resolveCompanyCnpj(info) : info.cnpj);
     const logo = info.logoDataUrl ? `<img class="logo" src="${escHTML(info.logoDataUrl)}" alt="Logo">` : "";
     const content = report.content || "ambos";
     const title = reportTitle(report).heading;
+    const footer = `${legalName} · ${title} · emitido em ${fmt(report.today)}`;
 
     const sections = report.employees.length
       ? report.employees
@@ -483,8 +571,8 @@
             (group) => `
         <section class="employee">
           <h2>${escHTML(group.name)}<small>${escHTML(group.department || "Sem setor")}${group.inactive ? " · Inativo" : ""}</small></h2>
-          ${summaryLine(group.summary, group.projectionSummary, content)}
-          ${content !== "projecao" ? `<h3>Feriados trabalhados</h3>${historyTable(group)}` : ""}
+          ${summaryBox(group.summary, group.projectionSummary, content)}
+          ${content !== "projecao" ? `<h3>Feriados trabalhados (até ${fmt(report.today)})</h3>${historyTable(group)}` : ""}
           ${content !== "historico" ? `<h3>Projeção — próximos feriados</h3>${projectionTable(group)}` : ""}
         </section>`
           )
@@ -494,16 +582,17 @@
     const legend = [];
     if (content !== "historico") {
       legend.push(
-        `<p><b>Projeção:</b> feriados cadastrados de ${fmt(report.today)} em diante (${report.futureHolidayCount}), lidos da escala atual.${content === "ambos" ? " Filtros de status, prazo e compensação valem só para o histórico." : ""}</p>`,
-        `<p><b>Trabalha (pela escala)</b>: mês com escala lançada e dia sem folga · <b>Provável trabalho</b>: escala do mês ainda não lançada; considera só folga fixa, férias e ausências · <b>Não trabalha</b>: folga, férias ou ausência no dia · <b>Já lançado</b>: vínculo já registrado no Controle de Feriados.</p>`,
-        `<p>A projeção é uma previsão e muda se a escala for alterada.</p>`
+        `<p><b>Projeção:</b> feriados cadastrados de ${fmt(report.today)} em diante (${report.futureHolidayCount}), lidos da escala atual.${content === "ambos" ? " Filtros de status, prazo e compensação valem só para os feriados trabalhados." : ""} A projeção é uma previsão e muda se a escala for alterada.</p>`,
+        `<p><b>Lançado</b>: feriado futuro já registrado no Controle de Feriados (compensado, agendado ou a compensar) · <b>Trabalha (pela escala)</b>: mês com escala lançada e dia sem folga · <b>Provável trabalho</b>: escala do mês ainda não lançada (considera folga fixa, férias e ausências) · <b>Não trabalha</b>: folga, férias ou ausência no dia · <b>antecipada</b>: folga compensatória tirada antes do feriado.</p>`
       );
     } else {
-      legend.push(`<p>Feriados trabalhados até ${fmt(report.today)}. Prazo de compensação: ${AppData.HOLIDAY_COMPENSATION_DAYS} dias após o feriado.</p>`);
+      legend.push(`<p>Feriados trabalhados até ${fmt(report.today)}. Prazo de compensação: ${AppData.HOLIDAY_COMPENSATION_DAYS} dias após o feriado · <b>antecipada</b>: folga compensatória tirada antes do feriado.</p>`);
     }
 
     return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><title>${escHTML(title)}</title><style>${REPORT_CSS}</style></head>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>${escHTML(title)}</title>
+<style>${REPORT_CSS}</style>
+<style>@page { @bottom-left { content: ${cssString(footer)}; font: 8px "Segoe UI", Arial, sans-serif; color: #8a817a; } }</style></head>
 <body class="${options.pagePerEmployee ? "page-per-employee" : ""}">
   <header class="report">
     <div>
@@ -514,7 +603,7 @@
     ${logo}
   </header>
   <div class="filters"><b>Filtros aplicados:</b> ${escHTML(report.filtersText)}</div>
-  ${report.employees.length > 1 ? `<div class="totals"><h3>Totais do relatório (${report.employees.length} funcionários)</h3>${summaryLine(report.totals, report.totals.projection, content)}</div>` : ""}
+  ${report.employees.length > 1 ? `<div class="totals"><h3>Totais do relatório (${report.employees.length} funcionários)</h3>${summaryBox(report.totals, report.totals.projection, content)}</div>` : ""}
   ${sections}
   <div class="legend">${legend.join("")}</div>
 </body></html>`;

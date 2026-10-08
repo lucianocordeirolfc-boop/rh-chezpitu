@@ -96,6 +96,10 @@ function buildState() {
           ] },
           { id: "h-natal", name: "Natal", date: "2026-12-25", workedEmployees: [
             { employeeId: "e-xss", compensationDate: "2027-01-10", status: "Agendado", origin: "Manual" }
+          ] },
+          // Folga compensatória tirada ANTES do feriado (caso real da escala).
+          { id: "h-fin", name: "Finados", date: "2026-11-02", workedEmployees: [
+            { employeeId: "e-xss", compensationDate: "2026-08-20", status: "Compensado", origin: "Automático pela escala" }
           ] }
         ]
       },
@@ -170,9 +174,16 @@ assert(cris.projectedWork === 2, `2 previstos a trabalhar (${cris.projectedWork}
 console.log("[3] Feriado futuro já lançado aparece como 'Já lançado'");
 r = run({ employeeId: "e-xss" }, buildLines().filter((l) => l.employeeId === "e-xss"));
 const xssNatal = r.employees[0].projection.find((p) => p.holidayDate === "2026-12-25");
-assert(xssNatal?.key === "vinculado" && /Agendado/.test(xssNatal.label), `Natal já vinculado (${xssNatal?.label})`);
+assert(xssNatal?.key === "vinculado" && xssNatal.statusKey === "agendado" && /compensação agendada/.test(xssNatal.label), `Natal já vinculado (${xssNatal?.label})`);
+const xssFin = r.employees[0].projection.find((p) => p.holidayDate === "2026-11-02");
+assert(xssFin?.statusKey === "compensado" && xssFin.anticipated === true && xssFin.label === "Lançado · compensado antecipado", `folga tirada antes do feriado = compensado antecipado (${xssFin?.label})`);
+const xps = r.employees[0].projectionSummary;
+assert(xps.vinculado === 2 && xps.vincCompensado === 1 && xps.vincAntecipado === 1 && xps.vincACompensar === 1, `resumo dos lançados futuros (${JSON.stringify(xps)})`);
+assert(xps.aCompensarFuturo === xps.vincACompensar + xps.previsto + xps.provavel, "a compensar no futuro = lançados não compensados + previstos");
 assert(xssNatal.compensationDate === "2027-01-10", "traz a compensação agendada");
-assert(r.employees[0].projectedWork === r.employees[0].projection.length - 1, "vínculo já lançado não conta como 'previsto a trabalhar'");
+// Feriado futuro já lançado = funcionário escalado para trabalhar nele (antes o
+// resumo mostrava "0 previsto(s) a trabalhar" com 20 lançados — relato do usuário).
+assert(r.employees[0].projectedWork === r.employees[0].projection.filter((p) => p.key !== "folga").length, "feriado futuro lançado conta como 'a trabalhar'");
 assert(!r.employees[0].history.some((h) => h.holidayDate === "2026-12-25"), "Natal futuro não se repete no histórico");
 
 // ── 4. Sem filtros ──
@@ -191,7 +202,7 @@ assert(ina && ina.history.length === 1 && ina.projection.length === 0, "inativo 
 console.log("[5] Filtros de situação e de feriado");
 const compensados = buildLines().filter((l) => resolveStatus(l).key === "compensado");
 r = run({ quickView: "compensados", status: "compensado" }, compensados);
-assert(r.employees.length === 1 && r.employees[0].employeeId === "e-cris", "Compensados: só quem tem compensado no histórico");
+assert(JSON.stringify(r.employees.map((g) => g.employeeId).sort()) === JSON.stringify(["e-cris", "e-xss"]), "Compensados: só quem tem vínculo compensado (Cristiane + Finados antecipado)");
 r = run({ holidayId: "h-natal" }, buildLines().filter((l) => l.holiday.id === "h-natal"));
 assert(r.employees.every((g) => g.projection.every((p) => p.holidayDate === "2026-12-25")), "filtro Feriado=Natal: projeção só do Natal");
 r = run({ department: "Cozinha" }, buildLines().filter((l) => l.department === "Cozinha"));
@@ -228,7 +239,7 @@ assert(html.includes("<h1>Projeção de feriados — Cristiane") && !html.includ
 r = runContent("historico");
 assert(!r.employees.some((g) => g.employeeId === "e-renan"), "Somente histórico: quem não trabalhou feriado fica de fora");
 r = runContent("projecao", { quickView: "compensados", status: "compensado" }, compensados);
-assert(r.employees.length === 1 && r.employees[0].employeeId === "e-cris", "Somente projeção respeita o escopo do filtro de situação");
+assert(JSON.stringify(r.employees.map((g) => g.employeeId).sort()) === JSON.stringify(["e-cris", "e-xss"]), "Somente projeção respeita o escopo do filtro de situação");
 r = runContent("xyz", { employeeId: "e-cris" }, crisLines);
 assert(r.content === "ambos", "conteúdo inválido cai em Ambos");
 
@@ -247,6 +258,32 @@ assert(t.file === "Relatório de feriados - Cristiane da S. Azevedo - 2026-10-08
 assert(Report.reportTitle({ ...slice, content: "projecao" }).file.startsWith("Projeção de feriados - Cristiane"), "nome do arquivo reflete o conteúdo");
 html = Report.buildReportHTML(slice);
 assert(!html.includes("Totais do relatório") && html.includes("Cristiane da S. Azevedo") && !html.includes("Renan"), "PDF individual só com o funcionário");
+
+// ── 6d. Correções de layout do PDF (relato do usuário, 2026-10-08) ──
+console.log("[6d] Layout do PDF");
+html = Report.buildReportHTML(run({ employeeId: "e-cris" }, crisLines));
+assert(!/section\.employee\s*\{[^}]*break-inside:\s*avoid/.test(html), "bloco do funcionário pode quebrar (1ª página não fica em branco)");
+assert(/section\.employee h2, \.kpis, h3 \{ break-after: avoid; \}/.test(html), "título, resumo e subtítulos presos ao conteúdo seguinte");
+assert(/thead \{ display: table-header-group; \}/.test(html), "cabeçalho da tabela repete em cada página");
+assert(/counter\(page\)[^;]*counter\(pages\)/.test(html), "rodapé com Página X de Y");
+assert(html.includes('class="kpis"') && html.includes("Saldo a compensar"), "resumo em quadros com saldo a compensar");
+assert(/<span class="dow">seg<\/span>/.test(html), "dia da semana abreviado na mesma linha da data (12/10/2026 seg)");
+const xssHtml = Report.buildReportHTML(run({ employeeId: "e-xss" }, buildLines().filter((l) => l.employeeId === "e-xss")));
+assert(/20\/08\/2026 <span class="tag">antecipada<\/span>/.test(xssHtml), "compensação antes do feriado marcada como antecipada");
+assert(xssHtml.includes("Lançado · compensado antecipado"), "situação do feriado futuro já compensado");
+// Separador de ano quando a projeção atravessa a virada.
+const multi = Report.buildReport({
+  company: CO, data, lines: [], resolveStatus, today: TODAY, content: "projecao",
+  filters: { ...baseFilters, employeeId: "e-cris" }
+});
+multi.employees[0].projection.push({ holidayName: "Ano Novo", holidayDate: "2027-01-01", key: "provavel", label: "Provável trabalho", dueDate: "", compensationDate: "" });
+const multiHtml = Report.buildReportHTML(multi);
+assert(/<tr class="year"><td colspan="5">2026<\/td><\/tr>/.test(multiHtml) && /<tr class="year"><td colspan="5">2027<\/td><\/tr>/.test(multiHtml), "separador por ano na projeção (2026 / 2027)");
+assert(!/<tr class="year">/.test(Report.buildReportHTML(run({ employeeId: "e-cris" }, crisLines))), "sem separador quando a projeção é de um ano só");
+// CNPJ com máscara.
+const cnpjHtml = Report.buildReportHTML({ ...run({ employeeId: "e-cris" }, crisLines), companyInfo: { legalName: "Chez Pitu", cnpj: "10263290000110" } });
+assert(cnpjHtml.includes("CNPJ 10.263.290/0001-10"), "CNPJ formatado 00.000.000/0000-00");
+assert(/@bottom-left \{ content: "Chez Pitu · Relatório de feriados — Cristiane da S. Azevedo · emitido em 08\/10\/2026"/.test(cnpjHtml), "rodapé com empresa, título e data de emissão");
 
 // ── 7. Somente leitura ──
 console.log("[7] Somente leitura");

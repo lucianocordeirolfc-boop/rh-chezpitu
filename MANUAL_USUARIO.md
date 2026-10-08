@@ -149,8 +149,9 @@ No formato **Um PDF por funcionário** aparece a lista dos funcionários: clique
 O relatório traz, para cada funcionário filtrado:
 - **Feriados trabalhados** — os que já passaram, com prazo, dias restantes, data de compensação e status;
 - **Projeção — próximos feriados** — os feriados cadastrados de hoje em diante e a previsão lida da escala:
-  *Trabalha (pela escala)*, *Provável trabalho (escala não lançada)*, *Não trabalha (folga/férias/ausência)* ou *Já lançado*;
-- resumo com quantos estão **a compensar** e quantos estão **previstos a trabalhar**.
+  *Trabalha (pela escala)*, *Provável trabalho (escala não lançada)*, *Não trabalha (folga/férias/ausência)* ou *Lançado* (feriado futuro já registrado: compensado, compensação agendada ou a compensar). Folga tirada **antes** do feriado aparece como **antecipada**;
+- quadro de resumo: trabalhados até hoje, futuros já lançados, previstos pela escala e o **saldo a compensar** (passados + futuros);
+- rodapé com empresa, data de emissão e **Página X de Y**.
 
 > Os filtros de status, prazo e compensação valem para os feriados trabalhados; a projeção respeita os filtros de funcionário, setor, feriado e busca por nome. Gerar o relatório **não altera nenhum dado**.
 

@@ -7,6 +7,36 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-08 (4) — PDF do relatório de feriados: layout e leitura corrigidos
+
+Relato do usuário com o PDF real (Cristiane, `20261008.02`, 3 páginas):
+- **CRÍTICO (layout):** página 1 só com o cabeçalho, conteúdo todo na 2. Causa:
+  `section.employee { break-inside: avoid-page }` — o bloco do funcionário é
+  maior que o espaço restante, então o Chrome o empurrava inteiro para a folha
+  seguinte. Correção: bloco pode quebrar; só título, resumo e subtítulos ficam
+  presos ao conteúdo seguinte (`break-after: avoid`); `thead` repete por página.
+- **ALTO (leitura):** resumo dizia "0 previsto(s) a trabalhar" com 20 feriados
+  futuros já lançados (14 a compensar); não havia saldo futuro. Correção:
+  feriado futuro lançado conta como "a trabalhar"; quadro de resumo com
+  Trabalhados até hoje · Pendentes/vencidos · Futuros já lançados (compensados,
+  antecipados, a compensar) · Previstos pela escala · **Saldo a compensar**
+  (passados + futuros).
+- **MÉDIO:** "Já lançado — Compensado" em feriado futuro com compensação ANTES
+  do feriado (folga antecipada, prática da escala) não era explicado. Agora:
+  "Lançado · compensado antecipado / compensação agendada / a compensar", e a
+  data de compensação leva a etiqueta **antecipada** (histórico e projeção).
+- **BAIXO:** CNPJ com máscara; dia da semana abreviado na mesma linha da data;
+  separador por ano na projeção; rodapé com empresa, título, emissão e
+  "Página X de Y" (`@page` margin boxes); colunas e espaçamentos compactados.
+
+Resultado no caso equivalente ao do usuário (6 trabalhados + 23 futuros de
+2026 a 2028): **1 página** (antes 3, a 1ª em branco). Os dados não mudam — só
+a apresentação; lógica de leitura e escopo preservados.
+
+Homologação: `verify-feriados-pdf.mjs` com **70 asserções** (nova seção [6d] de
+layout + compensação antecipada na fixture). PDF regenerado no Chrome headless
+a partir de fixture que reproduz o caso; janela de opções e tela re-testadas.
+
 ## 2026-10-08 (3) — Botão "Imprimir / PDF" movido para junto dos filtros
 
 Problema (relato do usuário com print, versão `20261008.01` em produção): "não
