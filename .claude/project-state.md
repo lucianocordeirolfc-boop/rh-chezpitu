@@ -8,9 +8,9 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20260916.02` (exibida como `v2026.09.16.02`) — fonte: `js/version.js`
+- **Versão atual:** `20261008.01` (exibida como `v2026.10.08.01`) — fonte: `js/version.js`
 - **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito e conferido)
-- **Último commit:** `efb0412` — fix(hosting): deploy publicava .git/ e demais pastas ocultas
+- **Último commit:** `e05f8f0` — chore: carimbo de build 20261008.01 (feat em `2ad1959`)
 - **Status geral:** 🟢 EM PRODUÇÃO — três entregas publicadas hoje: correção
   CRÍTICA da sincronização entre computadores (`20260916.01`), manual do usuário
   atualizado (`20260916.02`) e correção CRÍTICA do hosting, que publicava `.git/`
@@ -357,16 +357,16 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Funcionalidades em andamento
 
-- 🟡 **2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF"** —
-  implementado e homologado **localmente, NÃO commitado nem deployado**.
+- ✅ **2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF"** —
+  **em produção** (`20261008.01`, commits `2ad1959` + `e05f8f0`, pushado).
   Botão na toolbar → relatório dos filtros atuais com feriados trabalhados +
   projeção dos próximos feriados lida da escala. Novo `js/feriados-report.js`
   (iframe isolado, somente leitura) + `scripts/verify-feriados-pdf.mjs`
   (53 asserções, no `npm run validate`). **Melhoria (2)** no mesmo dia: janela
   de opções com Conteúdo (ambos / só trabalhados / só projeção) e Formato
   (arquivo único / uma página por funcionário / um PDF por funcionário). Detalhes em
-  `PROJECT_HISTORY.md` (2026-10-08). Próximo passo: usuário aprovar →
-  commit → bump de `APP_VERSION` → `npm run deploy`.
+  `PROJECT_HISTORY.md` (2026-10-08). Pendente: validação do usuário em
+  produção (Ctrl+F5), somente leitura.
 - Aguardando validação do usuário no computador que estava com o erro de
   sincronização.
 
@@ -443,6 +443,11 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de deploy
 
+- ✅ **Relatório PDF de feriados (`20261008.01`) — commitado, pushado e
+  deployado** em `chez-pitu-rh.web.app`. Commits `2ad1959` (feat) + `e05f8f0`
+  (carimbo). Release com **27 arquivos, nenhum oculto** (26 + `js/feriados-report.js`),
+  conferido em `.firebase/hosting..cache`.
+
 - ✅ **Sincronização (`20260916.01`) — commitada, pushada e deployada** em
   `chez-pitu-rh.web.app`. Commits `5de11b4` (fix) + `0f69614` (carimbo).
 - ✅ **Manual do usuário (`20260916.02`) — commitada, pushada e deployada**.
@@ -491,18 +496,8 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Arquivos modificados não commitados (snapshot)
 
 ```
- M .claude/project-state.md
- M PROJECT_HISTORY.md
- M MANUAL_USUARIO.md
- M index.html
- M js/feriados.js
- M js/manual.js
- M scripts/run-validate.mjs
-?? js/feriados-report.js
-?? scripts/verify-feriados-pdf.mjs
+(working tree limpo após o commit docs do estado vivo)
 ```
-> 2026-10-08: relatório PDF do Controle de Feriados aguardando aprovação
-> do usuário para commit/deploy.
 > Todo o **código** e a documentação da sessão estão commitados, pushados e em
 > produção (`20260916.02`); o working tree estava limpo em `d903d91`. A única
 > alteração pendente é este arquivo de estado, gravado pelo checkpoint de
