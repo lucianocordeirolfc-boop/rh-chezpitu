@@ -48,7 +48,8 @@ const SUITES = [
   { name: "Contador — sincronização", script: "scripts/verify-contador-sync.mjs" },
   { name: "Contador — pop-up + Lançamento", script: "scripts/verify-contador-lancamento-popup.mjs" },
   { name: "Auditoria de status", script: "scripts/verify-auditoria-status.mjs" },
-  { name: "Impressão da escala", script: "scripts/verify-print-escala.mjs" }
+  { name: "Impressão da escala", script: "scripts/verify-print-escala.mjs" },
+  { name: "Feriados — relatório Imprimir / PDF", script: "scripts/verify-feriados-pdf.mjs" }
 ];
 
 /**

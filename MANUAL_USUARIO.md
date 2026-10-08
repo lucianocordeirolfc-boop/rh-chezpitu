@@ -137,6 +137,23 @@ A tabela "Histórico de feriados" mostra cada vínculo com:
 
 Use os filtros e as abas (Pendentes, Vencidos, Alertas) para localizar rapidamente.
 
+### Imprimir / gerar PDF do relatório de feriados
+1. Aplique os filtros desejados (ex.: **Funcionário = Cristiane**).
+2. Clique em **Imprimir / PDF** (topo da tela) e escolha:
+   - **Conteúdo:** *Ambos*, *Somente feriados trabalhados* ou *Somente projeção*;
+   - **Formato** (aparece quando há mais de um funcionário): *Arquivo único*, *Arquivo único — uma página por funcionário* ou *Um PDF por funcionário*.
+3. Clique em **Gerar PDF** e, na janela de impressão, escolha **Salvar como PDF** (o nome do arquivo já vem sugerido).
+
+No formato **Um PDF por funcionário** aparece a lista dos funcionários: clique em **Gerar PDF** em cada um (ou em **Gerar próximo**). Cada clique abre uma janela de impressão com o nome do funcionário no arquivo; os já gerados ficam marcados com ✓. O sistema lembra a última escolha enquanto a página estiver aberta.
+
+O relatório traz, para cada funcionário filtrado:
+- **Feriados trabalhados** — os que já passaram, com prazo, dias restantes, data de compensação e status;
+- **Projeção — próximos feriados** — os feriados cadastrados de hoje em diante e a previsão lida da escala:
+  *Trabalha (pela escala)*, *Provável trabalho (escala não lançada)*, *Não trabalha (folga/férias/ausência)* ou *Já lançado*;
+- resumo com quantos estão **a compensar** e quantos estão **previstos a trabalhar**.
+
+> Os filtros de status, prazo e compensação valem para os feriados trabalhados; a projeção respeita os filtros de funcionário, setor, feriado e busca por nome. Gerar o relatório **não altera nenhum dado**.
+
 ---
 
 ## 8. Recibo de Vale Transporte

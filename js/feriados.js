@@ -561,6 +561,27 @@
     bindTableActions(container);
   }
 
+  /**
+   * "Imprimir / PDF": abre a janela de opções (conteúdo e formato) sobre
+   * exatamente as linhas que a tabela mostra (mesmos filtros). Somente
+   * leitura — a montagem vive em js/feriados-report.js.
+   */
+  function printHolidayReport() {
+    if (!window.FeriadosReport) {
+      alert("Módulo de relatório não carregado. Recarregue a página.");
+      return;
+    }
+    const company = AppData.getPrimaryPageCompany("feriados");
+    const data = AppData.getCompanyData(company);
+    window.FeriadosReport.openPrintOptions({
+      company,
+      data,
+      lines: applyFilters(buildVisibleLines(data, company)),
+      filters: { ...filterState, visibleInactiveIds: new Set(filterState.visibleInactiveIds) },
+      resolveStatus: resolveLineStatus
+    });
+  }
+
   function setCompensationDate(holidayId, employeeId, compensationDate) {
     const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
     const holiday = data.holidays.find((item) => item.id === holidayId);
@@ -1593,6 +1614,10 @@
       openInactiveEmployeesPicker();
     });
 
+    container.querySelector("#printHolidayReport")?.addEventListener("click", () => {
+      printHolidayReport();
+    });
+
     ImportUtils.bindImportModal(container, "holidayImportModal", {
       buttonId: "importOldHolidays",
       run: () => runHolidayImport(container)
@@ -1950,6 +1975,7 @@
         </div>
         <div class="feriados-toolbar-actions">
           ${renderInactiveToggle(rawLines, data)}
+          <button type="button" class="secondary" id="printHolidayReport" title="Gera o relatório dos filtros atuais: feriados trabalhados e projeção dos próximos feriados">Imprimir / PDF</button>
           <button type="button" class="primary" id="openLinkEmployeeHoliday">+ Vincular funcionário a feriado</button>
           <button type="button" class="primary" id="openHolidayRegister">+ Cadastrar feriado</button>
         </div>

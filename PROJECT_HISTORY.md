@@ -7,6 +7,77 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-08 (2) — Relatório de feriados: conteúdo e formato (melhoria)
+
+Pedido: no "Imprimir / PDF", escolher **somente histórico / somente projeção /
+ambos** e poder **gerar um PDF por funcionário**.
+
+Entrega (`js/feriados-report.js`; `js/feriados.js` passa a abrir
+`openPrintOptions` em vez de imprimir direto):
+- Janela de opções com **Conteúdo** (Ambos / Somente feriados trabalhados /
+  Somente projeção) e **Formato** (Arquivo único / Arquivo único — uma página
+  por funcionário / Um PDF por funcionário). Formato só aparece com mais de um
+  funcionário. Contagem de funcionários atualiza conforme o conteúdo. Última
+  escolha lembrada na sessão (variável em memória — nada gravado).
+- `buildReport({ content })`: com "historico" não calcula projeção; com
+  "projecao" não monta histórico (o escopo continua respeitando os filtros de
+  situação). Título e nome do arquivo refletem o conteúdo ("Feriados
+  trabalhados", "Projeção de feriados", "Relatório de feriados"). Resumo da
+  projeção por funcionário: trabalha / provável / não trabalha / já lançado.
+- **Uma página por funcionário**: `break-before: page` entre os blocos.
+- **Um PDF por funcionário**: lista com "Gerar PDF" por nome + "Gerar próximo"
+  e marca ✓; cada clique imprime `sliceReport(report, id)` com o nome do
+  funcionário no arquivo. Um diálogo de impressão por arquivo — o navegador
+  não permite salvar vários PDFs sem interação, e evitamos biblioteca externa.
+- Correções vistas no teste em navegador: foco devolvido à página após
+  `print()` (Esc ficava preso no iframe) e regra `[hidden]` local (o
+  `display:flex` inline anulava o `hidden` dos blocos da janela).
+
+Homologação: `verify-feriados-pdf.mjs` agora com **53 asserções** (conteúdos,
+quebra de página, recorte por funcionário, nomes de arquivo). Janela testada no
+Chrome headless: troca de conteúdo, página por funcionário (PDF de 3
+funcionários = 3 páginas), um PDF por funcionário (títulos individuais), Esc e
+storage idêntico antes/depois.
+
+## 2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF" (melhoria)
+
+Pedido: gerar PDF de acordo com os filtros da tela — ex.: filtro Cristiane →
+todos os feriados já trabalhados + projeção dos próximos.
+
+Entrega:
+- Botão **Imprimir / PDF** na toolbar do Controle de Feriados (`js/feriados.js`,
+  `printHolidayReport`). Usa **as mesmas linhas filtradas da tabela**
+  (`applyFilters(buildVisibleLines(...))`) — inclusive a regra de inativos.
+- Novo módulo `js/feriados-report.js` (carregado antes de `feriados.js`):
+  - **Feriados trabalhados**: vínculos com data até hoje; prazo, dias restantes,
+    compensação, status e origem;
+  - **Projeção**: feriados cadastrados (`listRegisteredHolidays`) de hoje em
+    diante × funcionários do escopo, lida de `getScaleCode` +
+    `ScaleRules.monthHasScaleData`: *Trabalha (pela escala)*, *Provável trabalho
+    (escala não lançada)*, *Não trabalha (código)* ou *Já lançado — status*.
+    Vínculo de feriado futuro aparece uma vez só (na projeção). Respeita
+    admissão e desligamento;
+  - escopo da projeção: filtro Funcionário → só ele; senão ativos (+ inativos
+    exibidos) do Setor, estreitados pela Busca por nome; com filtro de
+    situação (status/prazo/compensação), só quem aparece no histórico filtrado;
+  - resumo por funcionário e totais (a compensar / previstos a trabalhar).
+- Impressão em `<iframe>` isolado com CSS próprio (A4 retrato, navy +
+  pêssego): **não toca o `print.css` global** (Escala, Contador, VT). Nome do
+  PDF sugerido: `Feriados - <funcionário> - <data>`.
+- **Somente leitura**: não grava estado, não recomputa escala, não busca nem
+  persiste logo (usa `companyInfo.logoDataUrl` se já existir).
+
+Homologação: `scripts/verify-feriados-pdf.mjs` (36 asserções, fixture em
+memória, incluída no `npm run validate`) — cobre filtros, projeção (folga,
+férias, mês com/sem escala, já lançado), admissão, inativos, escape de HTML e
+prova de que nenhum dado/armazenamento muda. Fluxo de impressão conferido no
+Chrome headless (print chamado uma vez no iframe, título sugerido, título da
+aba restaurado) e PDF de amostra renderizado.
+
+Arquivos: `js/feriados-report.js` (novo), `js/feriados.js`, `index.html`,
+`scripts/verify-feriados-pdf.mjs` (novo), `scripts/run-validate.mjs`,
+`MANUAL_USUARIO.md`, `js/manual.js`.
+
 ## 2026-09-16 (4) — Hosting publicava `.git/` e demais pastas ocultas (CRÍTICO)
 
 Problema (CRÍTICO, anterior a esta frente): o deploy do Firebase Hosting estava

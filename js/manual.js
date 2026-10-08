@@ -92,6 +92,15 @@
        Ano Novo, Quarta-feira de Cinzas, Semana Santa, Tiradentes e São Jorge de 2026 já vêm pré-cadastrados.</p>
     <p>A tabela "Histórico de feriados" mostra status (Pendente, Agendado, Compensado, Vencido), a barra de
        prazo (120 dias para compensar) e a data prevista. Use os filtros e as abas para localizar rapidamente.</p>
+    <p><strong>Imprimir / PDF:</strong> aplique os filtros (ex.: Funcionário = Cristiane) e clique em
+       <strong>Imprimir / PDF</strong>. Escolha o <strong>Conteúdo</strong> (Ambos, Somente feriados trabalhados ou Somente
+       projeção) e, com mais de um funcionário, o <strong>Formato</strong> (Arquivo único, uma página por funcionário ou
+       <strong>Um PDF por funcionário</strong> — neste, clique em Gerar PDF em cada nome ou em Gerar próximo). Na janela de
+       impressão escolha <strong>Salvar como PDF</strong>. O relatório traz os <strong>feriados trabalhados</strong> (prazo,
+       compensação e status) e/ou a <strong>projeção dos próximos feriados</strong> lida da escala (Trabalha, Provável
+       trabalho, Não trabalha ou Já lançado).</p>
+    <p class="manual-note">Status, prazo e compensação filtram só os feriados trabalhados; a projeção segue os filtros de
+       funcionário, setor, feriado e busca por nome. Gerar o relatório não altera nenhum dado.</p>
 
     <h3>8. Recibo de Vale Transporte</h3>
     <ol>

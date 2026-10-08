@@ -31,6 +31,50 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
 
+### Frente 2026-09-16 — Sincronização entre computadores (em produção)
+
+- ✅ **Chave inválida no Realtime Database** (`20260916.01`, commit `5de11b4`) —
+  os tombstones de exclusão definitiva montavam a chave com o nome do feriado
+  digitado pelo usuário (`data|nome`), e `normalizeSearchText` não remove
+  `.` `#` `$` `/` `[` `]`. Excluir um feriado como *"Sto. Antônio"* ou
+  *"Carnaval 16/02"* tornava o payload inválido para sempre naquele PC.
+  Corrigido com `ImportUtils.escapeRtdbKey` (escape injetivo), **migração
+  não-destrutiva** das chaves já gravadas e leitura tolerante — o computador
+  travado se cura sozinho no primeiro carregamento.
+- ✅ **`employeeId: undefined` no índice `holidaysWorked`** — vínculo legado
+  gravado só por nome derrubava o envio inteiro. Fallback `|| ""` + rede de
+  segurança `sanitizeForRtdb` no payload.
+- ✅ **`save()` nunca mais lança** — a validação do SDK é **síncrona**; sem
+  `try/catch`, o `.finally()` não rodava, `pushing` ficava `true` para sempre e o
+  listener deixava o PC **surdo**. Agora o erro vira status "Erro de
+  sincronização" e nunca interrompe a ação do usuário.
+- ✅ **Fim da guarda `pushing`** — o listener descarta apenas o **eco do próprio
+  dispositivo** (`configuracoes.updatedBy = DEVICE_ID` + carimbo). Antes,
+  alteração de outro PC que chegasse durante um save local era perdida para
+  sempre.
+- ✅ **Relógio de referência do servidor** — `AppData.now()` = hora local +
+  `.info/serverTimeOffset`, aplicado a todos os carimbos de versão. PC com a hora
+  errada não reverte mais a edição recém-feita.
+- ✅ **Envio incremental** — nós indexados por empresa viram caminhos próprios
+  (`sistemaRH/funcionarios/Chez Pitu`) e só o que mudou é enviado: **30 caminhos
+  no 1º envio da sessão contra 3 numa edição de funcionário**; gravação sem
+  mudança nenhuma não grava.
+- ✅ **Aviso de relógio no selo** — acima de 60s de desvio o selo mostra
+  `Sincronizado ⚠ relógio 2h 15min atrasado`, com dica e um único toast.
+- ✅ **Escape estendido** a `coveragePrincipalBindings` e regra fixa em
+  `PROJECT_RULES.md` → "Chaves do Firebase", com guarda anti-regressão na suíte.
+- ✅ **Manual do usuário** (`20260916.02`, commits `268d5ec` + `3375b08`) —
+  tabela com os cinco estados do selo em `MANUAL_USUARIO.md` e no manual
+  embutido (`js/manual.js`).
+- ✅ **Hosting publicava pastas ocultas** (commit `efb0412`, redeploy sem bump) —
+  o deploy subia 83 arquivos internos (`.git/` completo com os packfiles,
+  `.claude/`, `.netlify/`, `.cursor/`). Causa: `"**/.*"` ignora a entrada que
+  começa com ponto, mas não o conteúdo dela. Corrigido com `"**/.*/**"`:
+  **de 109 para 26 arquivos publicados**, nenhum oculto.
+- ✅ **Homologação:** `scripts/verify-sync-chaves.mjs` (nova, **73 asserções**,
+  no `npm run validate`) + prova ponta a ponta com o **SDK real do Firebase
+  10.12.2**, que passou a aceitar o payload do cenário que antes lançava.
+
 ### Frente 2026-09-07 — Escala impressa: folha inteira e layout igual nas duas empresas (em produção)
 
 - ✅ **Auto-fit passou a medir o layout impresso** (`20260907.01`, commit
@@ -313,13 +357,37 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Funcionalidades em andamento
 
-- (nenhuma pendência técnica aberta nesta frente — aguardando validação do usuário)
+- 🟡 **2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF"** —
+  implementado e homologado **localmente, NÃO commitado nem deployado**.
+  Botão na toolbar → relatório dos filtros atuais com feriados trabalhados +
+  projeção dos próximos feriados lida da escala. Novo `js/feriados-report.js`
+  (iframe isolado, somente leitura) + `scripts/verify-feriados-pdf.mjs`
+  (53 asserções, no `npm run validate`). **Melhoria (2)** no mesmo dia: janela
+  de opções com Conteúdo (ambos / só trabalhados / só projeção) e Formato
+  (arquivo único / uma página por funcionário / um PDF por funcionário). Detalhes em
+  `PROJECT_HISTORY.md` (2026-10-08). Próximo passo: usuário aprovar →
+  commit → bump de `APP_VERSION` → `npm run deploy`.
+- Aguardando validação do usuário no computador que estava com o erro de
+  sincronização.
 
 ## Bugs conhecidos
 
-- Ver `BUGS_CONHECIDOS.md` (nenhum bug aberto desta frente de impressão).
+- Ver `BUGS_CONHECIDOS.md` — nenhum bug aberto. Dois registros novos em
+  2026-09-16 (ambos corrigidos, mantidos para monitorar): "chave inválida derruba
+  a sincronização do computador" e "relógio do computador fora de hora".
 
 ## Próximas tarefas
+
+- Guarda no `npm run deploy`: abortar se o `firebase deploy` listar arquivo
+  oculto (evita a repetição exata do problema de 2026-09-16; esperado: 26
+  arquivos).
+- Decisão do usuário: apagar as versões antigas de hosting no Console do Firebase
+  — não são servidas, mas ainda guardam o `.git/` para rollback.
+- Sincronização (opcional): enviar `auditLog` por blocos se o volume crescer;
+  retry com backoff no envio que falha (hoje o reenvio só ocorre na próxima
+  gravação); "última sincronização às HH:MM" na dica do selo.
+- `Comando padrão cursor.txt` continua sendo publicado no site — inofensivo, sem
+  função; tirar do ar se o usuário quiser.
 
 - Escala impressa — **decisão em aberto do usuário**: na vertical a folha
   continua alinhada ao topo (Pengold com 15 funcionários usa ~176mm dos 210mm).
@@ -341,6 +409,13 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   mas não no calendário), para o usuário decidir o que consolidar.
 
 ## Pendências de validação
+
+- ⏳ **Validação em produção pelo usuário** (Ctrl+F5 para `?v=20260916.02`),
+  **somente leitura**, no computador que estava com erro: o selo do topo deve
+  chegar a **"Sincronizado"** (antes ficava preso em "Sincronizando…") e o
+  console não deve trazer `update failed: ... invalid key`. Se o selo mostrar
+  `⚠ relógio ... atrasado/adiantado`, acertar a data/hora do Windows — os dados
+  continuam corretos, pois o sistema usa a hora do servidor.
 
 - ⏳ **Validação visual em produção pelo usuário** (Ctrl+F5 para
   `?v=20260907.01`), **somente leitura**: gerar a Escala de Folga de
@@ -367,6 +442,19 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
+
+- ✅ **Sincronização (`20260916.01`) — commitada, pushada e deployada** em
+  `chez-pitu-rh.web.app`. Commits `5de11b4` (fix) + `0f69614` (carimbo).
+- ✅ **Manual do usuário (`20260916.02`) — commitada, pushada e deployada**.
+  Commits `268d5ec` (docs/manual) + `3375b08` (carimbo). Bump necessário porque
+  `js/manual.js` é servido com `max-age=3600`.
+- ✅ **Correção do hosting (commit `efb0412`) — deployada sem bump** (nenhum
+  arquivo servido ao usuário mudou). Release conferida em
+  `.firebase/hosting..cache`: **26 arquivos, nenhum oculto**.
+- ⚠️ **Lição de 2026-09-16:** a verificação por `curl` dos arquivos publicados foi
+  bloqueada pelo classificador de ações de produção do agente. A conferência do
+  deploy foi feita pelo retorno do CLI e pelo `.firebase/hosting..cache`; a
+  validação por HTTP fica a cargo do usuário.
 
 - ✅ **Escala impressa (`20260907.01`) — commitada, pushada e deployada** em
   `chez-pitu-rh.web.app`. Commits `ed21969` (fix) + `4ea49f5` (carimbo); `main` e
@@ -403,11 +491,23 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo)
+ M .claude/project-state.md
+ M PROJECT_HISTORY.md
+ M MANUAL_USUARIO.md
+ M index.html
+ M js/feriados.js
+ M js/manual.js
+ M scripts/run-validate.mjs
+?? js/feriados-report.js
+?? scripts/verify-feriados-pdf.mjs
 ```
-> Todo o código e a documentação da sessão estão commitados, pushados e em
-> produção (`20260907.01`). `*.md` está no `ignore` do `firebase.json` — não
-> exige deploy.
+> 2026-10-08: relatório PDF do Controle de Feriados aguardando aprovação
+> do usuário para commit/deploy.
+> Todo o **código** e a documentação da sessão estão commitados, pushados e em
+> produção (`20260916.02`); o working tree estava limpo em `d903d91`. A única
+> alteração pendente é este arquivo de estado, gravado pelo checkpoint de
+> encerramento — a skill `/atualizar-estado` não commita. `*.md` está no
+> `ignore` do `firebase.json` — não exige deploy.
 
 ---
 
@@ -748,3 +848,37 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   Commit, push (`main`) e deploy em produção (`chez-pitu-rh.web.app`) concluídos.
 - **Próximo passo:** Nenhuma pendência aberta. Garantir que a regra de leitura
   do Storage (`logos/{cnpj}/...`) permaneça publicada no Console.
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-09-16 19:06
+- **Versão:** 20260916.02 (em produção)
+- **Branch:** main (sincronizado com `origin/main` em `d903d91`)
+- **Commits:** `5de11b4` (fix sync) + `0f69614` (carimbo 20260916.01) +
+  `61f7ae3` (docs) + `268d5ec` (manual/docs) + `3375b08` (carimbo 20260916.02) +
+  `efb0412` (fix hosting) + `77757d2` (docs) + `d903d91` (estado vivo)
+- **Arquivos alterados:** `js/import-utils.js`, `js/data.js`,
+  `js/firebase-sync.js`, `js/contador.js`, `js/scale-rules.js`, `js/manual.js`,
+  `css/style.css`, `firebase.json`, `scripts/verify-sync-chaves.mjs` (novo),
+  `scripts/run-validate.mjs`, `scripts/verify-contador-lancamento-popup.mjs`,
+  `PROJECT_RULES.md`, `PROJECT_HISTORY.md`, `PROJECT_STATUS.md`, `CHANGELOG.md`,
+  `ARCHITECTURE.md`, `BUGS_CONHECIDOS.md`, `TEST_CHECKLIST.md`,
+  `MANUAL_USUARIO.md`, `.claude/session-recovery.md`, `.claude/project-state.md`
+- **Resumo:** Diagnosticada e corrigida a pane de sincronização em outros
+  computadores: chave de tombstone montada com o nome do feriado continha
+  caractere proibido no RTDB, `ref.update()` lançava de forma **síncrona**, o
+  `.finally()` nunca rodava e o PC ficava **surdo** (nada entrava, nada saía).
+  Somaram-se `employeeId: undefined` no índice `holidaysWorked` e a guarda
+  `pushing`, que descartava alterações dos outros PCs. Corrigido com escape
+  injetivo de chave + migração não-destrutiva (o PC travado se cura sozinho),
+  `save()` à prova de exceção, eco por dispositivo e relógio do servidor. Três
+  melhorias na sequência: envio incremental por empresa (30 → 3 caminhos),
+  aviso de relógio no selo e escape estendido a toda chave montada com texto do
+  usuário (virou regra fixa). Manual do usuário atualizado (`20260916.02`). Ao
+  conferir o deploy, descoberto que o Hosting publicava `.git/`, `.claude/`,
+  `.netlify/` e `.cursor/` (83 arquivos) — corrigido e redeployado (109 → 26).
+  Testes: `verify-sync-chaves.mjs` 73/73 (nova), `npm test` 47/47,
+  `npm run validate` 21/21, `npm run test:offline` 15/15, mais prova ponta a
+  ponta com o SDK real do Firebase 10.12.2.
+- **Próximo passo:** Usuário validar em produção no computador que estava com o
+  erro (Ctrl+F5, selo "Sincronizado"). Depois, avaliar a guarda de arquivos
+  ocultos no `npm run deploy` e a limpeza das versões antigas de hosting.
