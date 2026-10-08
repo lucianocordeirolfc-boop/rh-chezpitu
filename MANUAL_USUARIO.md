@@ -139,7 +139,7 @@ Use os filtros e as abas (Pendentes, Vencidos, Alertas) para localizar rapidamen
 
 ### Imprimir / gerar PDF do relatório de feriados
 1. Aplique os filtros desejados (ex.: **Funcionário = Cristiane**).
-2. Clique em **Imprimir / PDF** (topo da tela) e escolha:
+2. Clique em **Imprimir / PDF** (botão azul à direita do título **Histórico de feriados**, logo acima dos filtros) e escolha:
    - **Conteúdo:** *Ambos*, *Somente feriados trabalhados* ou *Somente projeção*;
    - **Formato** (aparece quando há mais de um funcionário): *Arquivo único*, *Arquivo único — uma página por funcionário* ou *Um PDF por funcionário*.
 3. Clique em **Gerar PDF** e, na janela de impressão, escolha **Salvar como PDF** (o nome do arquivo já vem sugerido).

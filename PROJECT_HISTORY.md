@@ -7,6 +7,22 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-08 (3) — Botão "Imprimir / PDF" movido para junto dos filtros
+
+Problema (relato do usuário com print, versão `20261008.01` em produção): "não
+aparece nenhuma opção para gerar pdf". O botão existia, mas ficava na toolbar
+do topo da página (ao lado de "+ Vincular funcionário a feriado"), acima dos
+indicadores — quem filtra e rola até a tabela não o vê.
+
+Correção: o botão passou para o **cabeçalho do card "Histórico de feriados"**
+(à direita do título, logo acima dos filtros), em destaque (`primary`), e saiu
+da toolbar (um único botão). Manual atualizado com a nova posição.
+
+Validação: tela real do Controle de Feriados renderizada no Chrome headless
+com fixture — botão único, visível, no cabeçalho do histórico e acima dos
+filtros; filtro Funcionário = Cristiane → clique → janela com "Funcionário:
+Cristiane" e 1 funcionário. Guarda de fonte nova em `verify-feriados-pdf.mjs`.
+
 ## 2026-10-08 (2) — Relatório de feriados: conteúdo e formato (melhoria)
 
 Pedido: no "Imprimir / PDF", escolher **somente histórico / somente projeção /

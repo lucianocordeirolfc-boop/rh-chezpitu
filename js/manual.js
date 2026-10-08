@@ -92,7 +92,8 @@
        Ano Novo, Quarta-feira de Cinzas, Semana Santa, Tiradentes e São Jorge de 2026 já vêm pré-cadastrados.</p>
     <p>A tabela "Histórico de feriados" mostra status (Pendente, Agendado, Compensado, Vencido), a barra de
        prazo (120 dias para compensar) e a data prevista. Use os filtros e as abas para localizar rapidamente.</p>
-    <p><strong>Imprimir / PDF:</strong> aplique os filtros (ex.: Funcionário = Cristiane) e clique em
+    <p><strong>Imprimir / PDF:</strong> aplique os filtros (ex.: Funcionário = Cristiane) e clique no botão azul, à direita do título
+       "Histórico de feriados",
        <strong>Imprimir / PDF</strong>. Escolha o <strong>Conteúdo</strong> (Ambos, Somente feriados trabalhados ou Somente
        projeção) e, com mais de um funcionário, o <strong>Formato</strong> (Arquivo único, uma página por funcionário ou
        <strong>Um PDF por funcionário</strong> — neste, clique em Gerar PDF em cada nome ou em Gerar próximo). Na janela de

@@ -1975,7 +1975,6 @@
         </div>
         <div class="feriados-toolbar-actions">
           ${renderInactiveToggle(rawLines, data)}
-          <button type="button" class="secondary" id="printHolidayReport" title="Gera o relatório dos filtros atuais: feriados trabalhados e projeção dos próximos feriados">Imprimir / PDF</button>
           <button type="button" class="primary" id="openLinkEmployeeHoliday">+ Vincular funcionário a feriado</button>
           <button type="button" class="primary" id="openHolidayRegister">+ Cadastrar feriado</button>
         </div>
@@ -1987,6 +1986,7 @@
             <p class="eyebrow">Controle</p>
             <h2>Histórico de feriados</h2>
           </div>
+          <button type="button" class="primary" id="printHolidayReport" title="Gera o PDF dos filtros atuais: feriados trabalhados e/ou projeção dos próximos feriados">Imprimir / PDF</button>
         </div>
         ${renderFilters(data)}
         <div class="table-wrap table-compact">

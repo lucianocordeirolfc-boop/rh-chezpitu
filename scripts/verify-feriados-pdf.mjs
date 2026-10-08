@@ -259,7 +259,14 @@ assert(!/\b(saveState|runScaleIntegrations|recomputeScaleIntegrations|updateComp
 console.log("[8] Amarras de fonte");
 const feriadosSrc = fs.readFileSync(path.join(root, "js/feriados.js"), "utf8");
 const indexSrc = fs.readFileSync(path.join(root, "index.html"), "utf8");
-assert(/id="printHolidayReport"/.test(feriadosSrc), "botão Imprimir / PDF na toolbar");
+assert(/id="printHolidayReport"/.test(feriadosSrc), "botão Imprimir / PDF presente");
+// O botão vive no cabeçalho do card "Histórico de feriados", junto dos filtros
+// (na toolbar do topo ele sumia de vista ao rolar até a tabela).
+assert(
+  /<h2>Histórico de feriados<\/h2>\s*<\/div>\s*<button[^>]*id="printHolidayReport"/.test(feriadosSrc),
+  "botão no cabeçalho do Histórico de feriados, acima dos filtros"
+);
+assert((feriadosSrc.match(/id="printHolidayReport"/g) || []).length === 1, "um único botão (sem duplicata na toolbar)");
 assert(/FeriadosReport\.openPrintOptions\(/.test(feriadosSrc) && /lines: applyFilters\(buildVisibleLines/.test(feriadosSrc), "usa as mesmas linhas filtradas da tabela");
 const iReport = indexSrc.indexOf("js/feriados-report.js");
 const iFeriados = indexSrc.indexOf("js/feriados.js");
