@@ -1,14 +1,24 @@
 (function () {
+  // label: rótulo completo (pop-up de lançamento e dica do cabeçalho).
+  // short: rótulo abreviado das colunas (grade de Lançamentos, Resumo e PDF).
   const LANCAMENTO_FIELDS = [
-    { key: "falta",          label: "Falta (dias)",           type: "number" },
-    { key: "horaExtra",      label: "Hora Extra",             type: "time" },
-    { key: "gratificacao",   label: "Gratificação (R$)",      type: "number" },
-    { key: "comissoes",      label: "Comissões (R$)",         type: "number" },
-    { key: "consumoInterno", label: "Consumo Interno (R$)",   type: "number" },
-    { key: "domingoMulher",  label: "Domingo da Mulher (R$)", type: "number" },
-    { key: "adNoturno",      label: "Ad. Noturno",            type: "time" },
-    { key: "vales",          label: "Vales (R$)",             type: "number" }
+    { key: "falta",            label: "Falta (dias)",           short: "Falta",              type: "number" },
+    { key: "horaExtra",        label: "Hora Extra",             short: "H. Extra",           type: "time" },
+    { key: "horaExtraNoturna", label: "Hora Extra Noturna",     short: "Hora Extra Noturna", type: "time", wide: true },
+    { key: "gratificacao",     label: "Gratificação (R$)",      short: "Gratif.",            type: "number" },
+    { key: "comissoes",        label: "Comissões (R$)",         short: "Comiss.",            type: "number" },
+    { key: "consumoInterno",   label: "Consumo Interno (R$)",   short: "Cons. Int.",         type: "number" },
+    { key: "domingoMulher",    label: "Domingo da Mulher (R$)", short: "Dom. Mulher",        type: "number" },
+    { key: "adNoturno",        label: "Ad. Noturno",            short: "Ad. Not.",           type: "time" },
+    { key: "vales",            label: "Vales (R$)",             short: "Vales",              type: "number" }
   ];
+
+  // Cabeçalho de coluna: rótulo curto, com o nome completo como dica (title).
+  function columnHeader(f, className) {
+    var cls = (className || "") + (f.wide ? " col-wide" : "");
+    return '<th' + (cls.trim() ? ' class="' + cls.trim() + '"' : '') +
+      ' title="' + App.escapeHTML(f.label) + '">' + f.short + '</th>';
+  }
 
   // Normaliza um campo de horas no formato HH:MM aceitando de 00:00 até 200:00.
   // Aceita entradas como "8", "8:30", "120:00", "200:00". Retorna a string
@@ -224,7 +234,7 @@
 
     var headerCells = '<th>Funcionário</th>';
     LANCAMENTO_FIELDS.forEach(function (f) {
-      headerCells += '<th>' + f.label.split(" (")[0] + '</th>';
+      headerCells += columnHeader(f);
     });
 
     var rows = lancamentos.map(function (l) {
@@ -430,13 +440,9 @@
       '<div class="empty-state"><strong>Nenhum funcionário ativo em ' + App.escapeHTML(company) + '.</strong></div>';
     }
 
-    var shortLabels = LANCAMENTO_FIELDS.map(function (f) {
-      return f.label.split(" (")[0];
-    });
-
     var headerCells = '<th class="resumo-name-col">Funcionário</th>';
-    shortLabels.forEach(function (label) {
-      headerCells += '<th class="resumo-data-col">' + label + '</th>';
+    LANCAMENTO_FIELDS.forEach(function (f) {
+      headerCells += columnHeader(f, "resumo-data-col");
     });
 
     var rows = employees.map(function (emp) {
@@ -482,11 +488,9 @@
     var lancMap = {};
     lancamentos.forEach(function (l) { lancMap[l.employeeId] = l; });
 
-    var shortLabels = LANCAMENTO_FIELDS.map(function (f) { return f.label.split(" (")[0]; });
-
     var headerCells = '<th class="resumo-print-name">Funcionário</th>';
-    shortLabels.forEach(function (label) {
-      headerCells += '<th>' + label + '</th>';
+    LANCAMENTO_FIELDS.forEach(function (f) {
+      headerCells += columnHeader(f);
     });
 
     var rows = employees.map(function (emp) {
@@ -640,8 +644,10 @@
     });
   }
 
+  // Re-render vindo do App (troca de módulo ou sincronização em tempo real)
+  // preserva o mês já escolhido na tela; só a 1ª abertura usa o mês atual.
   function render(container) {
-    var ym = currentYearMonth();
+    var ym = container._contadorYearMonth || currentYearMonth();
     renderContent(container, ym);
   }
 

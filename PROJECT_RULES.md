@@ -379,7 +379,7 @@ PDF e impressão devem usar os mesmos filtros exibidos na tela.
 
 ### Lançamentos do Contador
 
-Campos de horas (Hora Extra e Ad. Noturno) usam digitação livre no formato
+Campos de horas (Hora Extra, Hora Extra Noturna e Ad. Noturno) usam digitação livre no formato
 `HH:MM`, aceitando de `00:00` até `200:00`. Não usar mais lista suspensa
 (`input type="time"`), que limitava a 23:59.
 

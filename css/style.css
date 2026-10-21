@@ -3252,7 +3252,17 @@ td.code-dom { background: #fff7e6; color: #b45309; }
 
 .resumo-data-col {
   text-align: center;
-  min-width: 100px;
+  min-width: 84px;
+}
+
+/* Coluna de rótulo longo (Hora Extra Noturna): quebra em 2 linhas para
+   manter a largura em harmonia com as colunas abreviadas. */
+.resumo-table thead th.col-wide,
+.contador-table th.col-wide {
+  white-space: normal;
+  min-width: 96px;
+  max-width: 110px;
+  line-height: 1.2;
 }
 
 .resumo-data-cell {

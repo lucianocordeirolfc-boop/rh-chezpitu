@@ -341,7 +341,9 @@
       // ScaleRules já existe. É idempotente: meses passados convergem na 1ª exec.
       AppData.runScaleIntegrations(["2026-04"]);
       updateCompanyTabsUI();
-      render("dashboard");
+      // Mantém o módulo que o usuário já abriu enquanto o Firebase carregava
+      // (antes era render("dashboard") fixo, que o puxava de volta ao Dashboard).
+      render(activeModuleId());
       initSync();
       importCompanyLogos();
     };

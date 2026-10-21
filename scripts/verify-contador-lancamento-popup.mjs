@@ -165,8 +165,8 @@ try {
     };
   });
   assert(!tabela.heads.includes("Ações"), `coluna "Ações" saiu do cabeçalho (${tabela.heads.join(" | ")})`);
-  assert(tabela.colunas === 9, `cabeçalho com Funcionário + 8 campos (${tabela.colunas})`);
-  assert(tabela.celulasPorLinha.every((n) => n === 9), `todas as linhas com 9 células (${tabela.celulasPorLinha.join(",")})`);
+  assert(tabela.colunas === 10, `cabeçalho com Funcionário + 9 campos (${tabela.colunas})`);
+  assert(tabela.celulasPorLinha.every((n) => n === 10), `todas as linhas com 10 células (${tabela.celulasPorLinha.join(",")})`);
   assert(tabela.editar === 0 && tabela.excluir === 0, "nenhum botão de editar/excluir na tela principal");
   assert(tabela.acoes === 0, "nenhuma célula de ações na tabela");
 

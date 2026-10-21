@@ -1004,11 +1004,32 @@
     // Excluir feriado permanente vive apenas no modal "Gerenciar feriados"
     // (bindCompanyHolidayManager / data-popup-remove-holiday).
 
+    // Data de compensação: grava só ao SAIR do campo (blur) ou com Enter.
+    // O "change" do <input type="date"> dispara a cada dígito que forma uma
+    // data válida (ao digitar o 1º dígito do ano, o valor já é "0002-10-20");
+    // gravar ali redesenhava a tabela e interrompia a digitação pela metade.
     container.querySelectorAll("[data-compensation-date]").forEach((input) => {
-      input.addEventListener("change", () => {
+      if (input.dataset.compBound) return; // refreshView pode religar a mesma linha
+      input.dataset.compBound = "1";
+      const commit = () => {
+        const value = input.value;
+        if (value === input.defaultValue) return;
+        const year = Number(String(value).slice(0, 4));
+        if (value && (year < 2000 || year > 2100)) {
+          window.App?.toast?.("Data de compensação inválida: confira o ano (4 dígitos).", "warning", 5000);
+          input.value = input.defaultValue;
+          return;
+        }
         const [holidayId, employeeId] = input.dataset.compensationDate.split("|");
-        setCompensationDate(holidayId, employeeId, input.value);
+        setCompensationDate(holidayId, employeeId, value);
         refreshTable(container);
+      };
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          input.blur();
+        }
       });
     });
   }
@@ -1106,6 +1127,11 @@
 
   function refreshView(container) {
     if (!container) return;
+    // Sincronização em tempo real chegando enquanto o usuário digita uma data
+    // de compensação: não redesenhar agora (destruiria o campo no meio da
+    // digitação). A gravação no blur já chama refreshTable com o dado atual.
+    const focused = document.activeElement;
+    if (focused && container.contains(focused) && focused.matches("[data-compensation-date]")) return;
     refreshTable(container);
     bindTableActions(container);
   }

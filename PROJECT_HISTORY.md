@@ -7,6 +7,51 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-21 (2) — Feriados: data de compensação cortada / Contador volta ao início
+
+Relato do usuário: (1) ao digitar 20-10-2026 na data de compensação do
+Controle de Feriados, ficou salvo 20-10-0002; (2) ao clicar em Informações do
+Contador o sistema volta para a tela principal.
+
+- **ALTO — data cortada** (`js/feriados.js`): o `<input type="date">` dispara
+  `change` a cada dígito que forma data válida (1º dígito do ano = "0002"); o
+  handler gravava e redesenhava a tabela ali mesmo, destruindo o campo no meio
+  da digitação. Reproduzido com a versão em produção (gravou `0002-10-20`).
+  Correção: grava só no blur/Enter; ano fora de 2000–2100 é recusado com aviso
+  (valor anterior restaurado); `refreshView` (sincronização em tempo real) não
+  redesenha a tabela enquanto um campo de compensação está em foco; guarda
+  contra ligação dupla do listener (refreshView religava a mesma linha).
+- **MÉDIO — Contador volta ao início** (`js/app.js`, `js/contador.js`): o boot
+  pós-carga do Firebase (até 5 s) chamava `render("dashboard")` fixo, puxando o
+  usuário de volta se ele já tivesse aberto outro módulo; agora re-renderiza o
+  módulo ativo. E toda sincronização re-renderizava o Contador no mês atual;
+  agora preserva o mês/aba escolhidos.
+- Dados: nenhum lançamento existente alterado (datas já gravadas erradas, como
+  0002-10-20, continuam como estão — corrigir pela tela).
+- Testes: reprodução antes/depois no app real isolado (Firebase bloqueado,
+  perfil temporário); `npm test` 47/47; `npm run validate` 22/22.
+
+## 2026-10-21 — Contador: nova coluna "Hora Extra Noturna"
+
+Pedido do usuário: coluna **Hora Extra Noturna** na sub-aba Resumo, demais
+colunas abreviadas para harmonia, e campo de lançamento no pop-up seguindo o
+padrão dos demais.
+
+- `js/contador.js`: novo campo `horaExtraNoturna` (tipo horas, mesma máscara
+  `HHH:MM` até 200:00, mesma validação e total em HH:MM) logo após Hora Extra.
+  Cada campo ganhou rótulo curto (`short`), usado na grade de Lançamentos, no
+  Resumo e no PDF: Falta · H. Extra · Hora Extra Noturna · Gratif. · Comiss. ·
+  Cons. Int. · Dom. Mulher · Ad. Not. · Vales. O nome completo fica como dica
+  (`title`) no cabeçalho; o pop-up continua com os rótulos completos.
+- `css/style.css`: colunas do Resumo mais estreitas (min 84px); o rótulo longo
+  quebra em 2 linhas (`.col-wide`).
+- Dados: nenhum lançamento existente alterado. Registros antigos sem o campo
+  exibem "—" e somam 0; o campo só é gravado quando o usuário salva o
+  funcionário pelo pop-up.
+- Testes: `verify-contador-lancamento-popup.mjs` atualizado para 10 colunas;
+  `npm test` 47/47, `npm run validate` 22/22; checagem visual com fixture
+  (Resumo, grade e pop-up).
+
 ## 2026-10-08 (5) — Encerramento: relatório PDF de feriados aprovado
 
 Usuário validou em produção a versão `20261008.03` ("ok tudo aprovado").
