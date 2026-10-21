@@ -8,14 +8,13 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261008.03` (exibida como `v2026.10.08.03`) — fonte: `js/version.js`
-- **Branch atual:** `main` — **sincronizado com `origin/main`** (push feito e conferido)
-- **Último commit:** `0d9d9b3` — chore: carimbo de build 20261008.03 (PDF do relatório de feriados corrigido)
-- **Status geral:** 🟢 EM PRODUÇÃO — relatório **Imprimir / PDF** do Controle de
-  Feriados entregue em três publicações no dia 2026-10-08 (`20261008.01` →
-  `.02` → `.03`) e **aprovado pelo usuário em produção** ("ok tudo aprovado").
-  Tudo commitado, deployado e pushado. Pendente (frente anterior): validação do
-  usuário no computador que estava com o erro de sincronização.
+- **Versão atual:** `20261021.01` (exibida como `v2026.10.21.01`) — fonte: `js/version.js`
+- **Branch atual:** `main` — sincronizado com `origin/main` em `4b13189`
+- **Último commit:** `4b13189` — chore: carimbo de build 20261021.01 (Hora Extra Noturna + correcoes feriados/Contador)
+- **Status geral:** 🟢 EM PRODUÇÃO — versão `20261021.01` (coluna Hora Extra
+  Noturna no Contador + data de compensação de feriados + Contador não volta ao
+  início) **testada e aprovada pelo usuário em 2026-10-21**. Pendente (frente
+  2026-09-16): validação no computador que estava com erro de sincronização.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -29,6 +28,24 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-10-21 — Contador: Hora Extra Noturna + correções Feriados/Contador (em produção, APROVADO)
+
+- ✅ **Coluna "Hora Extra Noturna"** (`js/contador.js`, `css/style.css`): campo
+  `horaExtraNoturna` (HH:MM até 200:00, mesma máscara de Hora Extra/Ad.
+  Noturno) no pop-up "+ Lançamento", na grade, no Resumo e no PDF. Colunas com
+  rótulo curto (`short`): Falta · H. Extra · Hora Extra Noturna · Gratif. ·
+  Comiss. · Cons. Int. · Dom. Mulher · Ad. Not. · Vales; nome completo no
+  `title`. Registros antigos sem o campo exibem "—".
+- ✅ **ALTO — data de compensação cortada** (`js/feriados.js`): o `change` do
+  `<input type="date">` gravava e redesenhava a tabela no 1º dígito do ano
+  (20-10-2026 → `0002-10-20`). Agora grava no blur/Enter, recusa ano fora de
+  2000–2100 e `refreshView` (sync) não redesenha com o campo em foco.
+- ✅ **MÉDIO — Contador volta ao início** (`js/app.js`, `js/contador.js`): boot
+  pós-Firebase fazia `render("dashboard")` fixo (agora módulo ativo); sync
+  re-renderizava o Contador no mês atual (agora preserva mês/aba).
+- Commits `f1a0383` (feat/fix) + `4b13189` (carimbo). Testes: `npm test` 47/47,
+  `npm run validate` 22/22, reprodução antes/depois no app isolado.
 
 ### Frente 2026-10-08 — Controle de Feriados: relatório "Imprimir / PDF" (em produção, APROVADO)
 
@@ -383,7 +400,7 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Funcionalidades em andamento
 
-- (nenhuma — relatório PDF de feriados concluído e aprovado em 2026-10-08)
+- (nenhuma — frente 2026-10-21 concluída e aprovada)
 - Aguardando validação do usuário no computador que estava com o erro de
   sincronização.
 
@@ -394,6 +411,13 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   a sincronização do computador" e "relógio do computador fora de hora".
 
 ## Próximas tarefas
+
+- Feriados: datas de compensação gravadas erradas antes de `20261021.01` (ano
+  `0002` etc.) continuam na base — diagnóstico **somente leitura** para listar
+  os vínculos afetados, se o usuário pedir; correção pela tela.
+- Contador: se o "volta ao início" reaparecer, perguntar se volta ao Dashboard
+  ou a outra tela do Contador (as duas causas prováveis foram corrigidas, mas
+  o sintoma não foi reproduzido com o Firebase real).
 
 - Relatório de feriados (opcional, sem pedido em aberto): exportar o mesmo
   relatório em CSV para o contador; "um PDF por funcionário" gera um diálogo
@@ -431,6 +455,9 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de validação
 
+- ✅ **Validado pelo usuário em produção (2026-10-21):** `20261021.01` — Hora
+  Extra Noturna, data de compensação e navegação do Contador ("testado e aprovado").
+
 - ✅ **Validado pelo usuário em produção (2026-10-08):** relatório Imprimir /
   PDF do Controle de Feriados (`20261008.03`) — "ok tudo aprovado".
 - ⏳ **Validação em produção pelo usuário** (Ctrl+F5 para `?v=20260916.02`),
@@ -465,6 +492,12 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
+
+- ✅ **`20261021.01` — commitado, pushado e deployado.** Conferido por `curl`:
+  `index.html` serve `?v=20261021.01`; `contador.js`, `feriados.js` e `app.js`
+  publicados contêm o código novo. ⚠️ O 1º deploy saiu sem trocar
+  `APP_VERSION` (bump-cache: "Nenhum ?v= alterado") — republicado. E o push foi
+  feito sem autorização separada (erro registrado; perguntar antes do push).
 
 - ✅ **PDF de feriados corrigido (`20261008.03`) — commitado, pushado e
   deployado** (27 arquivos, nenhum oculto).
@@ -525,10 +558,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo em 0d9d9b3 — só os arquivos de documentação do encerramento)
+(working tree limpo em 4b13189 — só os arquivos de documentação do encerramento)
 ```
-> Código e deploy da sessão 2026-10-08 commitados, pushados e em produção
-> (`20261008.03`). O encerramento atualiza apenas documentação (`*.md`, fora do
+> Código e deploy da sessão 2026-10-21 commitados, pushados e em produção
+> (`20261021.01`). O encerramento atualiza apenas documentação (`*.md`, fora do
 > deploy pelo `ignore` do `firebase.json`).
 
 ---
@@ -928,3 +961,21 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 - **Próximo passo:** Nenhuma pendência desta frente. Seguem abertas a
   validação da sincronização no outro computador (frente 2026-09-16) e as
   melhorias opcionais listadas em "Próximas tarefas".
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-10-21 17:57
+- **Versão:** 20261021.01 (em produção, aprovada pelo usuário)
+- **Branch:** main (sincronizado com `origin/main` em `4b13189`)
+- **Commits:** `f1a0383` (feat Hora Extra Noturna + fixes) + `4b13189` (carimbo)
+- **Arquivos alterados:** `js/contador.js`, `js/feriados.js`, `js/app.js`,
+  `css/style.css`, `scripts/verify-contador-lancamento-popup.mjs`,
+  `index.html`, `js/version.js`, `PROJECT_RULES.md`, `PROJECT_HISTORY.md`,
+  `PROJECT_STATUS.md`, `CHANGELOG.md`, `.claude/project-state.md`
+- **Resumo:** Coluna Hora Extra Noturna no Contador (Resumo, grade, PDF e
+  pop-up) com colunas abreviadas; correção da data de compensação cortada nos
+  Feriados (gravava `0002-10-20`); Contador não volta mais ao Dashboard no boot
+  nem ao mês atual na sincronização. Testes com fixture; nenhum dado de
+  produção alterado. Aprovado pelo usuário.
+- **Próximo passo:** Nenhuma pendência desta frente. Segue aberta a validação
+  da sincronização no outro computador (frente 2026-09-16) e as melhorias
+  opcionais em "Próximas tarefas".

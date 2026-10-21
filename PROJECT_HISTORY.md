@@ -7,6 +7,11 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-21 (4) — Encerramento: versão 20261021.01 aprovada
+
+Usuário testou e aprovou em produção a versão `20261021.01` ("ok testado e
+aprovado"). Frente encerrada sem pendências. Commits: `f1a0383`, `4b13189`.
+
 ## 2026-10-21 (3) — Publicação 20261021.01
 
 Commit `f1a0383` (coluna Hora Extra Noturna + correções de feriados/Contador)

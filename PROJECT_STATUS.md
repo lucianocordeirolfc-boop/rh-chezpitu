@@ -9,11 +9,26 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261008.03 (relatório Imprimir / PDF do Controle de Feriados)
-**Data:** 2026-10-08
+**Versão:** 20261021.01 (Contador: Hora Extra Noturna + correções Feriados/Contador)
+**Data:** 2026-10-21
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
+
+Data: 21/10/2026
+Versão: 20261021.01 (Firebase Hosting — chez-pitu-rh) — **aprovada pelo usuário**
+Commits: `f1a0383` (feat/fix) + `4b13189` (carimbo)
+
+**Contador — Hora Extra Noturna.** Nova coluna/campo (HH:MM até 200:00) no
+pop-up, grade, Resumo e PDF; demais colunas abreviadas. **Feriados:** data de
+compensação não é mais gravada no meio da digitação (gravava ano 0002).
+**Navegação:** o fim da carga do Firebase não força mais o Dashboard; o
+Contador mantém mês/aba na sincronização. Detalhes em `PROJECT_HISTORY.md` →
+2026-10-21.
+
+**Cache-busting:** todos os `?v=` do index.html em `20261021.01`.
+
+## Deploy 20261008.03
 
 Data: 08/10/2026
 Versão: 20261008.03 (Firebase Hosting — chez-pitu-rh) — **aprovada pelo usuário**
@@ -30,7 +45,6 @@ identificada, rodapé com "Página X de Y". Novo `js/feriados-report.js`
 (somente leitura, impressão em iframe isolado). Release: 27 arquivos, nenhum
 oculto. Detalhes em `PROJECT_HISTORY.md` → 2026-10-08.
 
-**Cache-busting:** todos os `?v=` do index.html em `20261008.03`.
 
 ## Deploy 20260916.02
 

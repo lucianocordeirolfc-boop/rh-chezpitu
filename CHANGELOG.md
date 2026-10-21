@@ -1,3 +1,11 @@
+2026-10-21 - Contador: Hora Extra Noturna; Feriados: data de compensacao; Contador volta ao inicio (20261021.01)
+- [NOVO] Contador: coluna/campo "Hora Extra Noturna" (HH:MM ate 200:00) no pop-up, grade, Resumo e PDF; demais colunas abreviadas (H. Extra, Gratif., Comiss., Cons. Int., Dom. Mulher, Ad. Not.)
+- [CORRECAO] ALTO: data de compensacao dos feriados era gravada no meio da digitacao (20-10-2026 -> 0002-10-20). Agora grava ao sair do campo/Enter; ano fora de 2000-2100 recusado; sincronizacao nao redesenha a tabela com o campo em foco
+- [CORRECAO] MEDIO: ao abrir o sistema, o fim da carga do Firebase forcava o Dashboard; agora mantem o modulo aberto. Contador preserva mes/aba na sincronizacao
+- [NOTA] Datas ja gravadas erradas nao foram alteradas (corrigir pela tela)
+- Arquivos: js/contador.js, js/feriados.js, js/app.js, css/style.css, scripts/verify-contador-lancamento-popup.mjs
+- npm test 47/47; npm run validate 22/22. Aprovado pelo usuario em producao
+
 2026-10-08 (4) - Relatorio PDF de feriados: layout e leitura corrigidos a partir do PDF real (20261008.03)
 - [CORRECAO] CRITICO: 1a pagina do PDF saia so com o cabecalho - break-inside: avoid-page no bloco do funcionario (maior que a pagina) o empurrava inteiro para a folha seguinte. Agora o bloco quebra; titulo, resumo e subtitulos ficam presos ao conteudo e o cabecalho da tabela repete por pagina
 - [CORRECAO] Resumo dizia "0 previsto(s) a trabalhar" com 20 feriados futuros ja lancados: feriado futuro lancado passa a contar; quadro com trabalhados, futuros lancados, previstos pela escala e saldo a compensar (passados + futuros)
