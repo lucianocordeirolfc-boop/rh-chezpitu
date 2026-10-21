@@ -7,6 +7,12 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-21 (3) — Publicação 20261021.01
+
+Commit `f1a0383` (coluna Hora Extra Noturna + correções de feriados/Contador)
+publicado em chez-pitu-rh.web.app com carimbo `?v=20261021.01`. Conferido no
+site: index.html, contador.js, feriados.js e app.js servindo a versão nova.
+
 ## 2026-10-21 (2) — Feriados: data de compensação cortada / Contador volta ao início
 
 Relato do usuário: (1) ao digitar 20-10-2026 na data de compensação do
