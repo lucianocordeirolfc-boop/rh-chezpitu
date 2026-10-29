@@ -337,7 +337,7 @@
     return { receipts, validation };
   }
 
-  function persistDeductionField(input) {
+  function persistDeductionField(input, options = {}) {
     if (!input?.dataset?.employeeId || !input.dataset.yearMonth) return;
     const company = AppData.getPrimaryPageCompany("vale-transporte");
     if (input.dataset.field === "discount") {
@@ -345,7 +345,10 @@
         save: true,
         company
       });
-      input.value = parsed === null ? "" : AppData.formatDiscountDisplay(parsed);
+      // Durante a digitação não reformata: "16," viraria "16,00" e o próximo dígito quebraria o valor.
+      if (options.format !== false) {
+        input.value = parsed === null ? "" : AppData.formatDiscountDisplay(parsed);
+      }
       return;
     }
     AppData.setVtDeduction(input.dataset.employeeId, input.dataset.yearMonth, input.value, { save: true, company });
@@ -380,7 +383,7 @@
       input.addEventListener("input", () => {
         markEditing();
         const ym = input.dataset.yearMonth;
-        persistDeductionField(input);
+        persistDeductionField(input, { format: false });
         debounce(`refresh-${fieldKey}`, () => {
           refreshVtCalculations(container, ym);
         }, 120);

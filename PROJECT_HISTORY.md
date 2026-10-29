@@ -7,6 +7,21 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-29 — VT: campo "Desconto (R$)" não aceitava 16,70
+
+Relato do usuário: no card "Vale-transporte a descontar" não era possível
+digitar 16,70 no campo de valor em R$.
+
+- **ALTO — valor corrompido na digitação** (`js/vale-transporte.js`): o evento
+  `input` gravava e **reformatava** o campo a cada tecla ("16," → "16,00" com o
+  cursor no fim; o "7" seguinte virava "16,007" → "16,01"...). Correção:
+  `persistDeductionField(input, { format: false })` durante a digitação (valor
+  continua sendo salvo a cada tecla); a formatação "0,00" ocorre só no
+  blur/change. Simulação: antes resultava em "7,00"; agora salva 16.70 e exibe
+  "16,70".
+- Dados: nenhum valor existente alterado. `npm test` (47/47) e
+  `npm run validate` (22/22) aprovados.
+
 ## 2026-10-21 (4) — Encerramento: versão 20261021.01 aprovada
 
 Usuário testou e aprovou em produção a versão `20261021.01` ("ok testado e
