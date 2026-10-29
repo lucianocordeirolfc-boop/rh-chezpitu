@@ -7,6 +7,18 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-29 (3) — Encerramento: versão 20261029.01 aprovada
+
+Usuário testou e aprovou em produção a versão `20261029.01` ("ok testado e
+aprovado"). Frente encerrada sem pendências. Commits: `0d9b367`, `d12b5fd`.
+
+## 2026-10-29 (2) — Publicação 20261029.01
+
+Commit `0d9b367` publicado em chez-pitu-rh.web.app. O 1º `npm run deploy` não
+trocou o `?v=` (APP_VERSION ainda 20261021.01); APP_VERSION elevado para
+`20261029.01` e republicado. Conferido no site: index.html servindo
+`vale-transporte.js?v=20261029.01` com a correção. Carimbo: `d12b5fd`.
+
 ## 2026-10-29 — VT: campo "Desconto (R$)" não aceitava 16,70
 
 Relato do usuário: no card "Vale-transporte a descontar" não era possível
