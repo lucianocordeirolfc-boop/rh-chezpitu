@@ -118,6 +118,7 @@ A partir daí, o feriado fica disponível para compensação (código CO) na Esc
 ### Feriado cadastrado não se exclui
 - Feriado já cadastrado **não pode ser excluído**. Para corrigir nome ou data, use **Editar**.
 - Para tirar um funcionário de um feriado, use **Excluir vínculo** na linha dele. A confirmação mostra funcionário, feriado e situação (e avisa se já houver compensação).
+- **Escala indica folga:** mudar a folga na escala **não** remove o vínculo (o automático só cria). Quando a escala do dia do feriado marca folga (FOLGA, DOM, FÉRIAS, atestado...), a linha mostra a etiqueta vermelha **Escala: …** e entra no indicador **Escala indica folga**. Se o funcionário trocou a folga e não trabalhou, ajuste a escala e use **Excluir vínculo**; se trabalhou, corrija a escala. O sistema só avisa, nunca exclui sozinho.
 - Todo vínculo excluído vai para a **Lixeira** (botão **Lixeira (N)** no topo da tela) e pode ser **restaurado** com status e compensação. A Lixeira também existe no Cadastro de Funcionários e em Férias/Ausências.
 
 ### Incluir um feriado anterior ao Corpus Christi (retroativo)

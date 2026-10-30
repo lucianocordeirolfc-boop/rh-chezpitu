@@ -105,6 +105,23 @@
     return data.employees.find((employee) => employee.id === employeeId);
   }
 
+  /**
+   * Alerta "Escala indica folga": o funcionário está vinculado como tendo
+   * trabalhado no feriado, mas a escala daquele dia diz que não trabalhou
+   * (FOLGA, DOM, FÉRIAS, atestado...). Acontece quando a folga foi trocada
+   * depois do vínculo automático — que só CRIA vínculo, nunca remove. Só
+   * avisa: quem decide é o usuário, pelo "Excluir vínculo". Meses sem escala
+   * preenchida não alertam (o padrão do cadastro ali não é confiável).
+   * Retorna o código da escala ("" quando não há conflito).
+   */
+  function scaleOffCodeOnHoliday(employee, date, data) {
+    if (!employee || !date || !window.ScaleRules) return "";
+    if (!ScaleRules.monthHasScaleData(String(date).slice(0, 7), data)) return "";
+    const code = AppData.getScaleCode(employee, date, data);
+    if (ScaleRules.isScaleCodeWorked(code, AppData.state)) return "";
+    return String(code || "").trim() || "não trabalhado";
+  }
+
   function buildLines(data, companyKey) {
     const companyLabel = companyKey || AppData.getPrimaryPageCompany("feriados");
     // Fase 3A — Filtrar feriados deletados (soft delete)
@@ -147,6 +164,7 @@
             // visível — é dado a corrigir, não alguém desligado.
             employeeInactive: Boolean(employee) && !AppData.isEmployeeActive(employee),
             employeeId: item.employeeId,
+            scaleOffCode: scaleOffCodeOnHoliday(employee, holiday.date, data),
             employeeName: employee?.name || "Funcionário não encontrado",
             department: employee?.department || "",
             compensationDate: item.compensationDate || "",
@@ -243,6 +261,7 @@
     if (filterState.quickView === "alertas") {
       return (key === "pendente" || key === "agendado") && line.daysLeft <= 20;
     }
+    if (filterState.quickView === "escalaFolga") return Boolean(line.scaleOffCode);
     return true;
   }
 
@@ -380,9 +399,12 @@
         // Inativo só chega aqui quando o usuário pediu para exibi-lo; a marca
         // deixa claro que aquela linha é de alguém desligado.
         const inactiveNote = line.employeeInactive ? `<span class="pill muted">Inativo</span>` : "";
+        const scaleOffNote = line.scaleOffCode
+          ? `<span class="pill danger scale-off-pill" title="A escala deste dia marca &quot;${esc(line.scaleOffCode)}&quot;: o funcionário não aparece como tendo trabalhado. Se ele folgou no feriado (troca de folga), use Excluir vínculo; se trabalhou, corrija a escala.">Escala: ${esc(line.scaleOffCode)}</span>`
+          : "";
         return `
-        <tr>
-          <td>${esc(line.employeeName)}${inactiveNote}${originNote}</td>
+        <tr${line.scaleOffCode ? ' class="is-scale-off"' : ""}>
+          <td>${esc(line.employeeName)}${inactiveNote}${scaleOffNote}${originNote}</td>
           <td>${esc(line.holiday.name)}</td>
           <td>${esc(line.department || "-")} / ${esc(line.company)}</td>
           <td>${formatDateBR(line.holiday.date)}</td>
@@ -493,9 +515,10 @@
   }
 
   function computeStatsFromLines(allLines) {
-    const stats = { pending: 0, agendado: 0, compensado: 0, vencido: 0, deadlineAlerts: 0 };
+    const stats = { pending: 0, agendado: 0, compensado: 0, vencido: 0, deadlineAlerts: 0, scaleOff: 0 };
     allLines.forEach(function (line) {
       if (!line.workedItem) return;
+      if (line.scaleOffCode) stats.scaleOff += 1;
       var key = statusKey(line);
       if (key === "pendente") stats.pending += 1;
       if (key === "agendado") stats.agendado += 1;
@@ -516,7 +539,14 @@
       { id: "agendados", label: "Agendados", count: lineStats.agendado, chipClass: "chip-info" },
       { id: "compensados", label: "Compensados", count: lineStats.compensado, chipClass: "" },
       { id: "vencidos", label: "Vencidos", count: lineStats.vencido, chipClass: "chip-danger" },
-      { id: "alertas", label: "Alertas prazo", count: lineStats.deadlineAlerts, chipClass: "" }
+      { id: "alertas", label: "Alertas prazo", count: lineStats.deadlineAlerts, chipClass: "" },
+      {
+        id: "escalaFolga",
+        label: "Escala indica folga",
+        count: lineStats.scaleOff,
+        chipClass: lineStats.scaleOff ? "chip-danger" : "",
+        title: "Vinculados como tendo trabalhado, mas a escala do dia marca folga — verificar e, se for o caso, Excluir vínculo"
+      }
     ];
     return items
       .map(
@@ -524,7 +554,7 @@
       <button
         type="button"
         class="stat-chip feriados-nav-chip ${item.chipClass} ${q === item.id ? "is-active" : ""}"
-        data-feriados-view="${item.id}"
+        data-feriados-view="${item.id}"${item.title ? ` title="${esc(item.title)}"` : ""}
       >
         <span>${item.label}</span>
         <strong>${item.count}</strong>
@@ -2031,6 +2061,7 @@
     progressBarHint,
     statusKey,
     statusLabel,
-    statusClass
+    statusClass,
+    scaleOffCodeOnHoliday
   };
 })();

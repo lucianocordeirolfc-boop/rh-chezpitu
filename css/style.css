@@ -842,6 +842,17 @@ tbody tr:hover {
   background: #e3eef5;
 }
 
+/* Controle de Feriados — "Escala indica folga" (js/feriados.js scaleOffCodeOnHoliday) */
+.pill.scale-off-pill {
+  margin-left: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+tr.is-scale-off > td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
 /* ═══════════════════ STAT CHIPS ═══════════════════ */
 
 .stat-row,

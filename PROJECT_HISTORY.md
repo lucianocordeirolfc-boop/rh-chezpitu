@@ -7,6 +7,43 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-30 (6) — Carlos Andrey 29/07 removido + alerta "Escala indica folga"
+
+- **Correção autorizada em produção:** vínculo do Carlos Andrey em 29/07
+  Comércio Hoteleiro (escala FOLGA; vínculo com compensação 28/09 vindo de cache
+  local) removido como o "Excluir vínculo" faz — item fora (outros 13
+  preservados), tombstone novo e cópia na Lixeira. Ensaio em memória antes,
+  conferência depois.
+- **Melhoria (pedido do usuário):** `js/feriados.js` — `scaleOffCodeOnHoliday`
+  marca a linha do Histórico quando a escala do dia do feriado diz "não
+  trabalhado" (FOLGA, DOM, FÉRIAS, atestado, CO...): etiqueta vermelha
+  "Escala: <código>" com orientação, faixa na linha e indicador "Escala indica
+  folga (N)" que filtra só esses casos. Só avisa — não exclui vínculo (regra:
+  rotina automática não apaga dado). Meses sem escala preenchida não alertam.
+  `css/style.css`, manual (`js/manual.js`, `MANUAL_USUARIO.md`).
+- Testes: `scripts/verify-feriados-escala-folga.mjs` (novo, 11 asserções,
+  cadastrado no validate); `npm test` 47/47; `npm run validate` 24/24.
+- Leitura da base real (somente leitura): 32 vínculos receberão o alerta
+  (12 Chez Pitu, 20 Pengold) — para conferência do usuário; nada alterado.
+
+## 2026-10-30 (5) — Correção: Carlos Andrey não trabalhou 26/07 (escala DOM)
+
+Relato do usuário: na escala de julho o Carlos Andrey folgou em 26/07, mas o
+Controle de Feriados o mostrava como tendo trabalhado a Padroeira de Búzios.
+
+- **Causa:** erro da restauração (4). O vínculo tinha sido excluído DE PROPÓSITO
+  em 28/09 (a escala dele em 26/07 é "DOM", folga de domingo) e a restauração o
+  trouxe de volta. Lição: tombstone de "Excluir vínculo" pode ser correção do
+  usuário — conferir a escala antes de restaurar vínculo sem compensação.
+- **Correção autorizada (só 26/07):** patch em produção equivalente ao "Excluir
+  vínculo": item removido (os outros 15 vínculos do feriado preservados),
+  tombstone novo (vence o `restoredAt`) e cópia na Lixeira. Ensaio em memória
+  antes (inclusive PC com cache antigo: não ressuscita) e conferência depois.
+- **Em aberto (aguarda o usuário):** 29/07 Comércio Hoteleiro — escala "FOLGA",
+  mas o vínculo voltou de um cache local com compensação em 28/09/2026.
+- **Comportamento confirmado:** o auto-vínculo da escala só CRIA vínculo; mudar
+  o dia para folga depois NÃO remove o vínculo (regra: rotina não apaga dado).
+
 ## 2026-10-30 (4) — Publicação 20261030.02 + restauração AUTORIZADA de dados
 
 Publicado `ca92b97` (+ carimbo `6933f31`) em chez-pitu-rh.web.app e no GitHub;

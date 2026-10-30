@@ -88,6 +88,11 @@
        Para tirar um funcionário de um feriado, use <strong>Excluir vínculo</strong> na linha dele: a confirmação mostra
        o funcionário, o feriado e a situação. O vínculo excluído vai para a <strong>Lixeira</strong> (botão
        <strong>Lixeira (N)</strong>, no topo da tela), de onde pode ser <strong>restaurado</strong> com status e compensação.</p>
+    <p><strong>Escala indica folga:</strong> o vínculo automático só é criado quando a escala marca o dia do feriado
+       como trabalhado — mudar a escala depois <strong>não</strong> remove o vínculo. Quando a escala do dia marca folga
+       (FOLGA, DOM, FÉRIAS, atestado...), a linha ganha a etiqueta vermelha <strong>Escala: …</strong> e entra no indicador
+       <strong>Escala indica folga</strong>. Se o funcionário trocou a folga e não trabalhou no feriado, ajuste a escala e use
+       <strong>Excluir vínculo</strong>; se ele trabalhou, corrija a escala. O sistema só avisa — nunca exclui sozinho.</p>
     <p><strong>Incluir um feriado anterior ao Corpus Christi (retroativo):</strong> para datas do início do ano
        (Ano Novo, Carnaval, Quarta-feira de Cinzas, Tiradentes, São Jorge), use <strong>+ Cadastrar feriado</strong>
        informando a data (ex.: <code>01/01</code>, <code>18/02</code>) e depois <strong>+ Vincular funcionário a feriado</strong>.</p>
