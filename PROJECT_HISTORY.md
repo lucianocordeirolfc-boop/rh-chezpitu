@@ -7,6 +7,32 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-30 (4) — Publicação 20261030.02 + restauração AUTORIZADA de dados
+
+Publicado `ca92b97` (+ carimbo `6933f31`) em chez-pitu-rh.web.app e no GitHub;
+site conferido servindo `?v=20261030.02` e `holidayDeleteBlocked` em data.js.
+
+**Correção de dado em produção — autorizada pelo usuário ("restaurar 2 e 3").**
+Executada DEPOIS da publicação (o código novo faz `restoredAt` vencer os
+tombstones nos outros PCs). Patch de 18 caminhos em `/sistemaRH`, montado por
+script a partir de snapshot lido imediatamente antes, ensaiado em memória no
+código do app (vínculos carregados 654 → 672, nenhum a menos) e conferido após
+a gravação:
+- **Carlos Andrey** — 5 vínculos removidos por "Excluir vínculo" voltam como
+  Pendente: Padroeira de Búzios 26/07, Comércio Hoteleiro 29/07, Independência
+  07/09, Padroeira do Brasil 12/10, Finados 02/11 (marcas de exclusão limpas).
+- **4 feriados da Chez Pitu recriados com o id original** (os CO órfãos da
+  escala voltam a encontrá-los) e os vínculos COMPENSADOS comprovados pelo CO:
+  Tiradentes 21/04 (Carlos Roberto, Catherina); São Jorge 23/04 (Carlos Andrey
+  18/06, Catherina, Renan); Trabalhador 01/05 (Catherina, Renan); Corpus Christi
+  04/06 (Catherina, Claudiana, Edna, Maria de Lourdes, Raquel, Rosana).
+- Não restaurado (sem evidência): quem trabalhou esses 4 feriados e ainda não
+  havia compensado; CO órfão `feriado-mph9gd8l-nlr75` (Cristiane 06/04,
+  Fernando 23/08 — feriado não identificado); marcas de 2027 com nome digitado
+  errado ("mario", "ninados"), limpas em agosto de propósito.
+- Cópia do patch aplicado: scratchpad da sessão
+  (`restore-patch-APLICADO-20261030.json`).
+
 ## 2026-10-30 (3) — REGRA FIXA: feriado cadastrado não se exclui (só o vínculo)
 
 Pedido do usuário: "nunca um usuário poder excluir um feriado já criado, deve
