@@ -7,6 +7,13 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-30 — Publicação 20261030.01 (1º deploy com versão automática)
+
+Commit `d2fa97a` publicado. `npm run deploy` gerou sozinho `20261029.01 →
+20261030.01` e trocou os `?v=`. Conferido no site: index.html servindo
+`?v=20261030.01`; `/js/**` e `/css/**` com `Cache-Control: no-cache`; `/` com
+`no-cache, no-store, must-revalidate`.
+
 ## 2026-10-29 (4) — Deploy: versão automática para os navegadores sempre carregarem a nova
 
 Pedido do usuário: toda melhoria publicada deve ser carregada nos demais

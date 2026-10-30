@@ -17,12 +17,12 @@
  */
 (function () {
   // >>> ÚNICO PONTO A EDITAR MANUALMENTE <<<
-  var APP_VERSION = "20261029.01";
+  var APP_VERSION = "20261030.01";
 
   // Preenchidos automaticamente por scripts/bump-cache.js (não editar à mão).
   var BUILD_BRANCH = "main";
-  var BUILD_COMMIT = "0d9b367";
-  var BUILD_DATE = "2026-10-29";
+  var BUILD_COMMIT = "d2fa97a";
+  var BUILD_DATE = "2026-10-30";
 
   var info = {
     APP_VERSION: APP_VERSION,
