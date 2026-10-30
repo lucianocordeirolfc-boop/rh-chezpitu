@@ -327,6 +327,30 @@ novos nós de topo sob `sistemaRH`: o deploy (`--only hosting`) NÃO publica as
 regras do Database, então um nó não previsto nas regras de produção pode ter a
 escrita negada (`permission_denied`).
 
+## Vínculo automático anulado pela escala (REGRA FIXA)
+
+Vigente desde 2026-10-30, a pedido do usuário ("se na escala marca folga, não
+deve aparecer na relação de feriados").
+
+O auto-vínculo só CRIA vínculo quando a escala marca o dia do feriado como
+trabalhado — e nunca o apaga depois. Se a folga é trocada e a escala do dia
+passa a marcar não trabalhado (FOLGA, DOM, FÉRIAS, atestado, licença...), o
+vínculo **automático e sem nenhuma compensação** deixa de aparecer em toda a
+relação de feriados — Histórico, cards do Dashboard, modal CO, contador "Auto
+escala" e relatório PDF —, antes e depois da data do feriado.
+
+- Função única: `isAutoLinkVoidedByScale` (js/data.js), aplicada dentro de
+  `isWorkedEntryVisibleInHistory`. Não criar filtro paralelo em outra tela.
+- **Nada é apagado:** o registro continua na base; se a escala voltar a marcar
+  trabalho, o vínculo reaparece sozinho.
+- **Não se aplica** a vínculo manual, com `historyOverride`, ou com qualquer
+  compensação (`compensationDate`, `scheduledCoDate`, `scaleCoDate`, CO ligado):
+  esses continuam visíveis com o alerta "Escala indica folga" — há decisão do
+  usuário a tomar (ex.: CO já gozado para um feriado em que ele folgará).
+- Mês sem escala lançada (`monthHasScaleData`, agora em js/data.js) não anula.
+
+Cobertura: `scripts/verify-feriados-escala-folga.mjs`.
+
 ## Auto-vínculo da escala (guarda anti-regressão)
 
 `syncAutoHolidaysWorkedForMonth` cria vínculos automáticos de feriado para

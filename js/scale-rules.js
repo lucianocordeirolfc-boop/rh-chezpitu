@@ -311,28 +311,9 @@
    * com auto-vínculo normal. Feriado trabalhado de dia vazio nesses meses
    * continua sendo auto-vinculado, pois o mês como um todo tem escala.
    */
+  // Fonte única em AppData (também usada pela regra do vínculo anulado pela escala).
   function monthHasScaleData(yearMonth, data) {
-    const ym = String(yearMonth || "");
-    if (!ym) return false;
-
-    const manual = data.manualScale || {};
-    for (const key of Object.keys(manual)) {
-      const datePart = String(key).split("|")[1] || "";
-      if (!datePart.startsWith(`${ym}-`)) continue;
-      const entry = manual[key];
-      const code = entry && typeof entry === "object" ? entry.code : entry;
-      if (String(code || "").trim()) return true;
-    }
-
-    const touchesMonth = (start, end) => {
-      const s = String(start || "").slice(0, 7);
-      const e = String(end || start || "").slice(0, 7);
-      return (s && s <= ym && ym <= (e || s)) || s === ym || e === ym;
-    };
-    if ((data.vacations || []).some((v) => touchesMonth(v.startDate, v.endDate))) return true;
-    if ((data.absences || []).some((a) => touchesMonth(a.startDate, a.endDate))) return true;
-
-    return false;
+    return AppData.monthHasScaleData(yearMonth, data);
   }
 
   function syncAutoHolidaysWorkedForMonth(yearMonth, state, options = {}) {
@@ -476,7 +457,10 @@
       return (
         total +
         (holiday.workedEmployees || []).filter(
-          (item) => item.autoCreated && !item.compensationDate
+          (item) =>
+            item.autoCreated &&
+            !item.compensationDate &&
+            !AppData.isAutoLinkVoidedByScale(holiday, item, data)
         ).length
       );
     }, 0);

@@ -7,6 +7,38 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-30 (8) — Vínculo automático com folga na escala some da relação
+
+Relato do usuário: Fernando 15/11, Edna 15/11 e Claudiana 02/11 apareciam no
+Controle de Feriados embora a escala marque folga; "se na escala futura marca
+folga, não deve aparecer na relação de feriados".
+
+- **Análise (leitura da base):** Fernando (DOM, 3º domingo) e Claudiana (FOLGA)
+  — vínculos automáticos Pendentes sem compensação, criados quando a escala
+  dizia trabalhado. Como o auto-vínculo nunca remove, ficariam para sempre (e
+  virariam Vencidos). Edna (DOM) — automático, mas **Compensado com CO em
+  26/09** ligado ao feriado: decisão do usuário.
+- **Correção:** `js/data.js` — `isAutoLinkVoidedByScale` (automático + sem
+  compensação/CO + mês com escala + escala do dia "não trabalhado") aplicada em
+  `isWorkedEntryVisibleInHistory`: some do Histórico, Dashboard, modal CO e
+  relatório, antes e depois da data; reaparece se a escala voltar a marcar
+  trabalho. Nada apagado. `monthHasScaleData` movida para data.js (fonte única;
+  `ScaleRules` delega). `js/scale-rules.js`: contador "Auto escala" ignora os
+  anulados. `js/feriados-report.js`: projeção mostra "Não trabalha (código)".
+- Regra fixa em `PROJECT_RULES.md`; manual atualizado.
+- Testes: `verify-feriados-escala-folga.mjs` 23 asserções (casos reais
+  reproduzidos); `npm test` 47/47; `npm run validate` 24/24.
+- Base real (leitura): 8 vínculos saem da relação (Chez Pitu: Fernando 15/11,
+  Claudiana 02/11, Tatiane 26/07, Jefferson 26/07 e 29/07; Pengold: Nayra
+  15/11 e 20/11, Hudson 20/11); 24 seguem com alerta (manuais ou compensados).
+
+## 2026-10-30 (7) — Encerramento: versão 20261030.03 aprovada
+
+Usuário conferiu e aprovou em produção a versão `20261030.03` ("ok, tudo
+conferido"), com todos os computadores atualizados. Frente encerrada. Commits:
+`ca92b97`, `6933f31`, `e6951b3`, `6e804c7`, `1d64c8f`. Fica com o usuário a
+conferência dos 32 alertas "Escala indica folga" pela tela.
+
 ## 2026-10-30 (6) — Carlos Andrey 29/07 removido + alerta "Escala indica folga"
 
 - **Correção autorizada em produção:** vínculo do Carlos Andrey em 29/07

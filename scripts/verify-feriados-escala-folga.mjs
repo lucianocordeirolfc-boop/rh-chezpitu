@@ -86,6 +86,72 @@ assert(
   "o alerta só lê: vínculos, escala e tombstones intactos"
 );
 
+// ── Vínculo AUTOMÁTICO sem compensação + escala de folga → some da relação ──
+// Casos reais (2026-10-30): Fernando e Claudiana (somem) e Edna (fica: já tem CO).
+{
+  const d2 = AppData.getCompanyData("Pengold");
+  const auto = (employeeId, extra = {}) => ({
+    employeeId, autoCreated: true, origin: "Automático pela escala", status: "Pendente",
+    compensationDate: "", scheduledCoDate: "", ...extra
+  });
+  d2.employees = [
+    { id: "fer", name: "FERNANDO", status: "Ativo", sundayOffWeeks: "3" },
+    { id: "cla", name: "CLAUDIANA", status: "Ativo" },
+    { id: "edn", name: "EDNA", status: "Ativo", sundayOffWeeks: "3" },
+    { id: "tra", name: "TRABALHA", status: "Ativo" },
+    { id: "man", name: "MANUAL", status: "Ativo", sundayOffWeeks: "3" }
+  ];
+  d2.vacations = [];
+  d2.absences = [];
+  d2.manualScale = {
+    "cla|2026-11-02": "FOLGA",
+    "edn|2026-09-26": { code: "CO", linkedHolidayId: "p15" }
+  };
+  const h15 = {
+    id: "p15", name: "Procl. da República", date: "2026-11-15",
+    workedEmployees: [
+      auto("fer"),
+      auto("edn", { status: "Compensado", compensationDate: "2026-09-26", scheduledCoDate: "2026-09-26",
+        scaleCoDate: "2026-09-26", linkedFromScale: true, linkedHolidayId: "p15" }),
+      auto("tra"),
+      { employeeId: "man", autoCreated: false, origin: "Manual", status: "Pendente" }
+    ]
+  };
+  const h02 = { id: "p02", name: "Finados", date: "2026-11-02", workedEmployees: [auto("cla")] };
+  d2.holidays = [h15, h02];
+  const rowOf = (h, id) => h.workedEmployees.find((w) => w.employeeId === id);
+  const visible = (h, id) => AppData.isWorkedEntryVisibleInHistory(h, rowOf(h, id), d2);
+  const before2 = JSON.stringify(d2.holidays);
+
+  assert(AppData.isAutoLinkVoidedByScale(h15, rowOf(h15, "fer"), d2), "Fernando 15/11 (DOM, automático, Pendente) → anulado pela escala");
+  assert(!visible(h15, "fer"), "Fernando 15/11 não aparece na relação de feriados");
+  assert(!visible(h02, "cla"), "Claudiana 02/11 (FOLGA, automático, Pendente) não aparece");
+  assert(visible(h15, "edn"), "Edna 15/11 continua visível: já tem CO lançado (decisão do usuário)");
+  assert(check(d2.employees[2], "2026-11-15", d2) === "DOM", "Edna 15/11 mantém o alerta 'Escala: DOM'");
+  assert(visible(h15, "tra"), "funcionário que trabalha no feriado continua aparecendo");
+  assert(visible(h15, "man"), "vínculo MANUAL com escala de folga continua aparecendo (com alerta)");
+  assert(JSON.stringify(d2.holidays) === before2, "nada é apagado: os vínculos continuam na base");
+
+  // Depois que a data passa, continua fora (não depende de 'hoje').
+  const past = { ...h02, date: "2026-07-26", workedEmployees: [auto("fer")] };
+  d2.manualScale["fer|2026-07-01"] = "FOLGA"; // julho com escala
+  d2.employees[0].sundayOffWeeks = "4";       // 26/07 = 4º domingo
+  assert(!AppData.isWorkedEntryVisibleInHistory(past, past.workedEmployees[0], d2), "data já passada com escala de folga → continua fora");
+
+  // Escala volta a marcar trabalho → vínculo reaparece sozinho.
+  d2.manualScale["cla|2026-11-02"] = "";
+  assert(visible(h02, "cla"), "escala volta a marcar trabalho → Claudiana reaparece (dado preservado)");
+
+  // Mês sem escala lançada: não anula (padrão do cadastro não é confiável).
+  const noScale = { id: "pX", name: "X", date: "2027-03-28", workedEmployees: [auto("fer")] };
+  assert(AppData.isWorkedEntryVisibleInHistory(noScale, noScale.workedEmployees[0], d2), "mês sem escala lançada → não anula");
+
+  // Contador "Auto escala" ignora os anulados.
+  d2.manualScale["cla|2026-11-02"] = "FOLGA";
+  d2.employees[0].sundayOffWeeks = "3"; // volta ao cadastro real (15/11 = 3º domingo)
+  assert(sandbox.ScaleRules.countAutoPendingHolidays("Pengold") === 1, "contador 'Auto escala' conta só o automático válido (TRABALHA)");
+}
+
 const src = fs.readFileSync(path.join(root, "js/feriados.js"), "utf8");
 assert(src.includes('id: "escalaFolga"') && src.includes("Escala indica folga"), "indicador 'Escala indica folga' na barra");
 assert(src.includes("scale-off-pill") && src.includes('quickView === "escalaFolga"'), "etiqueta na linha e filtro do indicador");

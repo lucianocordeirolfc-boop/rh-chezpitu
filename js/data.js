@@ -4468,6 +4468,59 @@
    * Mantém a mesma semântica do filtro do Controle de Feriados: quando o
    * funcionário não é encontrado ou não tem admissionDate, o vínculo é visível.
    */
+  /**
+   * O mês tem escala lançada? (manual com código, férias ou ausência no mês.)
+   * Sem isso o padrão do cadastro não é confiável para decidir nada.
+   * Fonte única — ScaleRules.monthHasScaleData delega para cá.
+   */
+  function monthHasScaleData(yearMonth, data) {
+    const ym = String(yearMonth || "");
+    if (!ym || !data) return false;
+
+    const manual = data.manualScale || {};
+    for (const key of Object.keys(manual)) {
+      const datePart = String(key).split("|")[1] || "";
+      if (!datePart.startsWith(`${ym}-`)) continue;
+      const entry = manual[key];
+      const code = entry && typeof entry === "object" ? entry.code : entry;
+      if (String(code || "").trim()) return true;
+    }
+
+    const touchesMonth = (start, end) => {
+      const s = String(start || "").slice(0, 7);
+      const e = String(end || start || "").slice(0, 7);
+      return (s && s <= ym && ym <= (e || s)) || s === ym || e === ym;
+    };
+    if ((data.vacations || []).some((v) => touchesMonth(v.startDate, v.endDate))) return true;
+    if ((data.absences || []).some((a) => touchesMonth(a.startDate, a.endDate))) return true;
+
+    return false;
+  }
+
+  /**
+   * Vínculo AUTOMÁTICO anulado pela escala (REGRA FIXA 2026-10-30): o vínculo
+   * nasceu porque a escala dizia "trabalhado", mas hoje a escala daquele dia
+   * marca folga (FOLGA, DOM, FÉRIAS, atestado...) — troca de folga feita depois.
+   * Ele deixa de aparecer em toda relação de feriados (Histórico, cards, modal
+   * CO, relatório), antes e depois da data. Nada é apagado: se a escala voltar
+   * a marcar trabalho, o vínculo reaparece sozinho.
+   *
+   * Só vale para vínculo automático SEM nenhuma compensação. Vínculo manual, ou
+   * com compensação/CO lançado, continua visível (com o alerta "Escala indica
+   * folga") — ali há decisão do usuário a tomar.
+   */
+  function isAutoLinkVoidedByScale(holiday, item, data) {
+    if (!holiday?.date || !item?.employeeId || !data) return false;
+    if (item.autoCreated !== true || item.historyOverride === true) return false;
+    if (!normalizeSearchText(item.origin).includes("automatico")) return false;
+    if (item.compensationDate || item.scheduledCoDate || item.scaleCoDate) return false;
+    if (item.linkedFromScale || item.linkedHolidayId) return false;
+    if (!monthHasScaleData(String(holiday.date).slice(0, 7), data)) return false;
+    const employee = (data.employees || []).find((entry) => entry.id === item.employeeId);
+    if (!employee) return false;
+    return !isWorkedScaleCode(getScaleCode(employee, holiday.date, data));
+  }
+
   function isWorkedEntryVisibleInHistory(holiday, item, data) {
     if (!holiday || holiday.isDeleted) return false;
     if (!item || !item.employeeId) return false;
@@ -4482,6 +4535,7 @@
     if (isManualConfirmed) return true;
     const emp = (data?.employees || []).find((entry) => entry.id === item.employeeId);
     if (emp && emp.admissionDate && holiday.date < emp.admissionDate) return false;
+    if (isAutoLinkVoidedByScale(holiday, item, data)) return false;
     return true;
   }
 
@@ -5364,6 +5418,8 @@
     getAvailableHolidaysForCo,
     getAvailableCoHolidayOptions,
     isWorkedEntryVisibleInHistory,
+    isAutoLinkVoidedByScale,
+    monthHasScaleData,
     resolveWorkedEmployeeEntry,
     isWorkedHolidayPendingInFeriadosControl,
     reconcileCoCompensationLinks,

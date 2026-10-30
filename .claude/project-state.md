@@ -8,13 +8,14 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261021.01` (exibida como `v2026.10.21.01`) — fonte: `js/version.js`
-- **Branch atual:** `main` — sincronizado com `origin/main` em `4b13189`
-- **Último commit:** `4b13189` — chore: carimbo de build 20261021.01 (Hora Extra Noturna + correcoes feriados/Contador)
-- **Status geral:** 🟢 EM PRODUÇÃO — versão `20261021.01` (coluna Hora Extra
-  Noturna no Contador + data de compensação de feriados + Contador não volta ao
-  início) **testada e aprovada pelo usuário em 2026-10-21**. Pendente (frente
-  2026-09-16): validação no computador que estava com erro de sincronização.
+- **Versão atual:** `20261030.03` (exibida como `v2026.10.30.03`) — fonte: `js/version.js`
+- **Branch atual:** `main` — sincronizado com `origin/main` em `1d64c8f`
+- **Último commit:** `1d64c8f` — chore: carimbo de build 20261030.03 (alerta Escala indica folga)
+- **Status geral:** 🟢 EM PRODUÇÃO — versão `20261030.03` (Lixeira, feriado
+  cadastrado não se exclui, alerta "Escala indica folga") **conferida e aprovada
+  pelo usuário em 2026-10-30**. Dados do Carlos Andrey e 4 feriados da Chez
+  Pitu restaurados com autorização. Pendente (frente 2026-09-16): validação no
+  computador que estava com erro de sincronização.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -27,7 +28,34 @@ parte do teste). Corrigir dado real exige **autorização caso a caso**.
 Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 (replicada em `CLAUDE.md`, `AGENT_START.md`, `TEST_CHECKLIST.md`).
 
+**Novas REGRAS FIXAS (2026-10-30):** (1) **Lixeira — nada some:** toda exclusão
+(vínculo, funcionário, férias, ausência) arquiva antes a cópia completa em
+`state.deletedArchive` (`archiveDeletion`); nunca podada. (2) **Feriado
+cadastrado não se exclui** — só o vínculo de um funcionário específico; as
+funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
+
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-10-30 — Nada some do sistema + feriados do Carlos Andrey (em produção, APROVADO)
+
+- ✅ **Diagnóstico (somente leitura do Firebase):** lacunas do Carlos Andrey e de
+  Tiradentes/São Jorge/Trabalhador/Corpus Christi 2026 (Chez Pitu) vieram de
+  exclusões definitivas pela tela, que guardavam só o tombstone.
+- ✅ **Lixeira** (`js/data.js`, `js/lixeira.js`, `js/firebase-sync.js`):
+  botão "Lixeira (N)" em Feriados, Funcionários e Férias/Ausências; restaurar
+  vence o tombstone (`restoredAt`); `normalizeWorkedEmployeeRefs` não descarta
+  mais vínculo sem funcionário. Commit `ca92b97` (`20261030.02`).
+- ✅ **Feriado cadastrado não se exclui** (tela + camada de dados). `ca92b97`.
+- ✅ **Restauração autorizada em produção:** 5 vínculos do Carlos + 4 feriados
+  com 13 vínculos compensados (pelo CO da escala). Depois, a pedido, removidos
+  26/07 (escala DOM) e 29/07 (escala FOLGA) do Carlos — tinham sido excluídos de
+  propósito em 28/09 (erro da restauração). Patches em scratchpad da sessão.
+- ✅ **Alerta "Escala indica folga"** (`js/feriados.js`): etiqueta na linha e
+  indicador que filtra vínculos cuja escala do dia diz não trabalhado; só avisa.
+  Commits `6e804c7` + `1d64c8f` (`20261030.03`). 32 casos na base real
+  (12 Chez Pitu, 20 Pengold) para o usuário conferir.
+- Testes: `npm test` 47/47; `npm run validate` 24/24 (novas suítes
+  `verify-lixeira`, `verify-feriados-escala-folga`).
 
 ### Frente 2026-10-21 — Contador: Hora Extra Noturna + correções Feriados/Contador (em produção, APROVADO)
 
@@ -400,7 +428,7 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Funcionalidades em andamento
 
-- (nenhuma — frente 2026-10-21 concluída e aprovada)
+- (nenhuma — frente 2026-10-30 concluída e aprovada)
 - Aguardando validação do usuário no computador que estava com o erro de
   sincronização.
 
@@ -411,6 +439,12 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   a sincronização do computador" e "relógio do computador fora de hora".
 
 ## Próximas tarefas
+
+- Feriados: conferência pelo usuário dos 32 vínculos com alerta "Escala indica
+  folga" (Excluir vínculo ou corrigir a escala) — ação do usuário na tela.
+- Feriados: não recuperado por falta de evidência — quem trabalhou Tiradentes,
+  São Jorge, Trabalhador e Corpus Christi 2026 (Chez Pitu) sem ter compensado;
+  CO órfão `feriado-mph9gd8l-nlr75` (Cristiane 06/04, Fernando 23/08).
 
 - Feriados: datas de compensação gravadas erradas antes de `20261021.01` (ano
   `0002` etc.) continuam na base — diagnóstico **somente leitura** para listar
@@ -455,6 +489,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 
 ## Pendências de validação
 
+- ✅ **Validado pelo usuário em produção (2026-10-30):** `20261030.03` — Lixeira,
+  feriado não se exclui, restauração e alerta "Escala indica folga" ("ok, tudo
+  conferido"). Todos os computadores atualizados (F5) após a publicação.
+
 - ✅ **Validado pelo usuário em produção (2026-10-21):** `20261021.01` — Hora
   Extra Noturna, data de compensação e navegação do Contador ("testado e aprovado").
 
@@ -492,6 +530,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
+
+- ✅ **`20261030.02` e `20261030.03` — commitados, pushados e deployados**
+  (autorizados pelo usuário). Conferido por `curl`: `index.html` serve
+  `?v=20261030.03` e `feriados.js` publicado contém `scaleOffCodeOnHoliday`.
 
 - ✅ **`20261021.01` — commitado, pushado e deployado.** Conferido por `curl`:
   `index.html` serve `?v=20261021.01`; `contador.js`, `feriados.js` e `app.js`
@@ -558,11 +600,10 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo em 4b13189 — só os arquivos de documentação do encerramento)
+(working tree limpo em 1d64c8f — só .claude/project-state.md do encerramento)
 ```
-> Código e deploy da sessão 2026-10-21 commitados, pushados e em produção
-> (`20261021.01`). O encerramento atualiza apenas documentação (`*.md`, fora do
-> deploy pelo `ignore` do `firebase.json`).
+> Código, documentação e deploy da sessão 2026-10-30 commitados, pushados e em
+> produção (`20261030.03`).
 
 ---
 
@@ -979,3 +1020,27 @@ Fonte: `PROJECT_RULES.md` → "Imutabilidade dos dados já registrados"
 - **Próximo passo:** Nenhuma pendência desta frente. Segue aberta a validação
   da sincronização no outro computador (frente 2026-09-16) e as melhorias
   opcionais em "Próximas tarefas".
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-10-30 17:09
+- **Versão:** 20261030.03 (em produção, aprovada pelo usuário)
+- **Branch:** main (sincronizado com `origin/main` em `1d64c8f`)
+- **Commits:** `ca92b97`, `6933f31`, `e6951b3`, `6e804c7`, `1d64c8f`
+- **Arquivos alterados:** `js/data.js`, `js/lixeira.js` (novo),
+  `js/firebase-sync.js`, `js/feriados.js`, `js/funcionarios.js`, `js/ferias.js`,
+  `js/scale-rules.js`, `js/manual.js`, `css/style.css`, `index.html`,
+  `js/version.js`, `scripts/verify-lixeira.mjs` (novo),
+  `scripts/verify-feriados-escala-folga.mjs` (novo), `scripts/run-validate.mjs`,
+  suítes adaptadas (`verify-exclusao-feriado-definitiva`,
+  `verify-feriados-todos-anos`, `verify-sync-chaves`,
+  `verify-auto-vinculo-vencido-guard`, `run-functional-validation`,
+  `test-offline-recovery`), `PROJECT_RULES.md`, `PROJECT_HISTORY.md`,
+  `CLAUDE.md`, `MANUAL_USUARIO.md`, `.claude/project-state.md`
+- **Resumo:** Lixeira para toda exclusão; feriado cadastrado não se exclui;
+  restauração autorizada dos vínculos do Carlos Andrey e de 4 feriados da Chez
+  Pitu; remoção autorizada de 26/07 e 29/07 do Carlos (folga na escala); alerta
+  "Escala indica folga". Dados de produção alterados só com autorização, via
+  patch ensaiado em memória e conferido depois.
+- **Próximo passo:** Usuário conferir os 32 alertas "Escala indica folga".
+  Segue aberta a validação da sincronização no outro computador (frente
+  2026-09-16).

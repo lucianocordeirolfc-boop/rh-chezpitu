@@ -97,7 +97,11 @@
   function findLinkedEntry(data, employeeId, date) {
     for (const holiday of data.holidays || []) {
       if (holiday.isDeleted || holiday.date !== date) continue;
-      const item = (holiday.workedEmployees || []).find((entry) => entry.employeeId === employeeId);
+      // Vínculo anulado pela escala (automático, sem compensação, dia de folga)
+      // não conta como "lançado": a projeção mostra "Não trabalha (<código>)".
+      const item = (holiday.workedEmployees || []).find(
+        (entry) => entry.employeeId === employeeId && AppData.isWorkedEntryVisibleInHistory(holiday, entry, data)
+      );
       if (item) return { holiday, item };
     }
     return null;
