@@ -7,6 +7,29 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-29 (4) — Deploy: versão automática para os navegadores sempre carregarem a nova
+
+Pedido do usuário: toda melhoria publicada deve ser carregada nos demais
+computadores ao atualizar o navegador.
+
+- **MÉDIO — versão dependia de edição manual** (`scripts/bump-cache.js`,
+  `package.json`): se o `APP_VERSION` não fosse trocado à mão, o deploy saía com
+  os mesmos `?v=` e os JS/CSS antigos continuavam em cache por até 1 h (ocorreu
+  no 1º deploy da 20261029.01). Agora `npm run deploy` roda
+  `bump-cache.js --auto`, que gera a próxima versão sozinho (dia novo →
+  `AAAAMMDD.01`; mesmo dia → revisão seguinte) e troca todos os `?v=`.
+  `npm run bump-cache` (sem `--auto`) mantém o comportamento antigo.
+  `BUILD_DATE` passa a usar a data local (antes UTC: deploy após 21h saía com o
+  dia seguinte).
+- **Cabeçalhos** (`firebase.json`): `/js/**` e `/css/**` de
+  `public, max-age=3600` para `no-cache` (revalida a cada carga; 304 quando não
+  mudou). Cobre também deploys feitos sem o bump (ex.: `deploy:ci`).
+  `index.html` já era `no-store`.
+- Docs: `DEPLOY.md`, `CLAUDE.md` e comentário de `js/version.js` atualizados.
+- Testes: `nextVersion` (6 casos, incluindo 22h30 local) OK; deploy simulado
+  em cópia temporária (25/25 `?v=` trocados; 2 deploys seguidos → .02, .03);
+  `npm test` 47/47; `npm run validate` aprovado. Nenhum dado alterado.
+
 ## 2026-10-29 (3) — Encerramento: versão 20261029.01 aprovada
 
 Usuário testou e aprovou em produção a versão `20261029.01` ("ok testado e

@@ -1,7 +1,10 @@
 /**
  * FONTE ÚNICA DA VERSÃO DO SISTEMA RH Chez Pitu.
  *
- * Para publicar uma nova versão:
+ * `npm run deploy` gera o APP_VERSION automaticamente (bump-cache.js --auto):
+ * dia novo → AAAAMMDD.01; mesmo dia → revisão seguinte. Não é preciso editar.
+ *
+ * Para definir a versão manualmente (sem deploy):
  *   1. Altere APENAS a constante APP_VERSION abaixo.
  *      Formato: AAAAMMDD.RR  (Ano Mês Dia . Revisão)  — ex.: "20260610.02"
  *      Exibida na interface como: v2026.06.10.02

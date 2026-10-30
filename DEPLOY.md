@@ -14,8 +14,10 @@ Realtime Database). A configuração está versionada em `firebase.json` e `.fir
 
 - Alterações **locais** (arquivo + Ctrl+F5) não enviam nada ao Firebase.
 - É preciso **publicar** de novo (`npm run deploy`).
-- Navegadores podem cachear `index.html`; por isso os scripts usam `?v=YYYYMMDD.RR`
-  e o deploy atualiza esse número (`npm run bump-cache`).
+- Os scripts usam `?v=YYYYMMDD.RR`. **Todo `npm run deploy` gera sozinho uma versão
+  nova** (dia novo → `.01`; mesmo dia → revisão seguinte) e troca todos os `?v=`.
+  `index.html` vai com `no-store` e JS/CSS com `no-cache` (o navegador revalida a
+  cada carga), então basta **atualizar a página (F5)** nos demais computadores.
 
 ---
 
@@ -46,7 +48,8 @@ npm run deploy
 ```
 
 Esse comando:
-1. roda `npm run bump-cache` (atualiza `?v=` no `index.html` e carimba build);
+1. roda `node scripts/bump-cache.js --auto` (gera o próximo `APP_VERSION`, atualiza
+   os `?v=` do `index.html` e carimba build) — não é preciso editar a versão à mão;
 2. executa `firebase deploy --only hosting` (envia os arquivos estáticos).
 
 > Só hospedagem é publicada (`--only hosting`). As **regras do Realtime Database**

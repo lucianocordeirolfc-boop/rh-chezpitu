@@ -9,22 +9,62 @@
  *      os dados reais do git/build (best-effort — não falha se git ausente).
  *
  * Para publicar nova versão: edite APP_VERSION em js/version.js e rode este script.
+ *
+ * Com --auto (usado por `npm run deploy`), o APP_VERSION é gerado sozinho a cada
+ * publicação: AAAAMMDD.01 num dia novo, ou a revisão seguinte no mesmo dia
+ * (20261029.01 → 20261029.02). Assim todo deploy troca os ?v= e os navegadores
+ * baixam os arquivos novos ao atualizar a página.
  */
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+// Data local (horário do computador que publica), não UTC.
+function localDateParts(date) {
+  const ymd = `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`;
+  const iso = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  return { ymd, iso };
+}
+
+function nextVersion(current, date = new Date()) {
+  const { ymd } = localDateParts(date);
+  const match = String(current || "").match(/^(\d{8})\.(\d+)$/);
+  if (match && match[1] >= ymd) {
+    // Mesmo dia (ou versão manual "à frente"): só incrementa a revisão.
+    return `${match[1]}.${pad2(Number(match[2]) + 1)}`;
+  }
+  return `${ymd}.01`;
+}
+
+if (require.main !== module) {
+  module.exports = { nextVersion };
+  return;
+}
+
 const root = path.join(__dirname, "..");
 const versionPath = path.join(root, "js", "version.js");
 const indexPath = path.join(root, "index.html");
+const autoVersion = process.argv.includes("--auto");
 
-const versionSrc = fs.readFileSync(versionPath, "utf8");
+let versionSrc = fs.readFileSync(versionPath, "utf8");
 const versionMatch = versionSrc.match(/APP_VERSION\s*=\s*["']([^"']+)["']/);
 if (!versionMatch) {
   console.error("[bump-cache] APP_VERSION não encontrada em js/version.js. Abortado.");
   process.exit(1);
 }
-const version = versionMatch[1];
+let version = versionMatch[1];
+
+if (autoVersion) {
+  const previous = version;
+  version = nextVersion(previous);
+  versionSrc = versionSrc.replace(/(APP_VERSION\s*=\s*)["'][^"']*["']/, `$1"${version}"`);
+  fs.writeFileSync(versionPath, versionSrc, "utf8");
+  console.log(`[bump-cache] APP_VERSION automático: ${previous} → ${version}`);
+}
 
 function git(cmd, fallback) {
   try {
@@ -36,7 +76,7 @@ function git(cmd, fallback) {
 
 const branch = git("git rev-parse --abbrev-ref HEAD", "desconhecido");
 const commit = git("git rev-parse --short HEAD", "desconhecido");
-const buildDate = new Date().toISOString().slice(0, 10);
+const buildDate = localDateParts(new Date()).iso;
 
 // 1. Carimba git/build em js/version.js (apenas os campos automáticos).
 const stampedVersionSrc = versionSrc

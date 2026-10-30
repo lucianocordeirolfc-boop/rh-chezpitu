@@ -10,7 +10,7 @@
     "test:quota": "node scripts/test-storage-quota.mjs",
     "validate": "node scripts/run-validate.mjs",
     "deploy:preview": "firebase hosting:channel:deploy preview",
-    "deploy": "npm run bump-cache && firebase deploy --only hosting",
+    "deploy": "node scripts/bump-cache.js --auto && firebase deploy --only hosting",
     "deploy:ci": "firebase deploy --only hosting --non-interactive"
   },
   "devDependencies": {
