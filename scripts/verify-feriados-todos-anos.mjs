@@ -15,8 +15,8 @@
  *  - merge do Firebase: UNIÃO do calendário (feriado local de 2027 não some);
  *  - merge: exclusão definitiva continua vencendo (tombstone);
  *  - updateHolidayEverywhere: edita calendário + empresas preservando vínculos;
- *  - removeHolidayEverywhere: remove feriado + TODOS os vínculos em todas as
- *    fontes, grava tombstones e não ressuscita via merge nem via auto-sync.
+ *  - removeHolidayEverywhere: RECUSA (feriado cadastrado não se exclui) e não
+ *    toca em nada; exclusões antigas continuam valendo no merge.
  *
  * Usa fixtures em memória — nunca a base de produção.
  *
@@ -278,7 +278,7 @@ console.log("\n=== TESTE: feriados cadastrados de todos os anos (lista/edição/
   );
 }
 
-// ── 6. Exclusão remove feriado + TODOS os vínculos da empresa do escopo ─────
+// ── 6. Feriado cadastrado NÃO se exclui (REGRA FIXA 2026-10-30) ──────────────
 {
   setFixture({
     calendar: [{ id: "cal-x", name: "Feriado X", date: "2027-09-07", companies: ["ambas"] }],
@@ -297,62 +297,34 @@ console.log("\n=== TESTE: feriados cadastrados de todos os anos (lista/edição/
   });
 
   const counts = AppData.countHolidayLinksAllCompanies("2027-09-07", "Feriado X");
-  assert(counts.total === 3, `Contagem prévia de vínculos por empresa (3, obtido ${counts.total})`);
+  assert(counts.total === 3, `Contagem de vínculos por empresa (3, obtido ${counts.total})`);
 
+  const snapshot = () =>
+    JSON.stringify({
+      chez: AppData.state.companies[CO].holidays,
+      peng: AppData.state.companies[PG].holidays,
+      cal: AppData.state.calendarHolidays
+    });
+  const before = snapshot();
   const res = AppData.removeHolidayEverywhere("2027-09-07", "Feriado X", { companies: [CO] });
-  assert(
-    res.ok && res.removedLinks === 2,
-    `Exclusão remove os 2 vínculos da empresa do escopo (obtido ${res.removedLinks})`
-  );
-  assert(
-    !AppData.state.companies[CO].holidays.some((item) => item.name === "Feriado X"),
-    "Feriado e vínculos removidos da empresa do escopo"
-  );
-  assert(
-    AppData.state.companies[PG].holidays.some(
-      (item) => item.name === "Feriado X" && (item.workedEmployees || []).length === 1
-    ),
-    "Feriado e vínculo da OUTRA empresa preservados (sem dano colateral)"
-  );
-  const calX = AppData.state.calendarHolidays.find((item) => item.date === "2027-09-07");
-  assert(
-    calX && calX.companies.join(",") === PG,
-    "Entrada compartilhada do calendário fica só com a outra empresa"
-  );
-  assert(
-    AppData.state.companies[CO].holidays.some((item) => item.id === "h-keep"),
-    "Outros feriados e seus vínculos não são afetados"
-  );
-  assert(
-    AppData.isHolidayTombstoned(CO, "2027-09-07", "Feriado X") &&
-      !AppData.isHolidayTombstoned("__calendar__", "2027-09-07", "Feriado X"),
-    "Tombstone da empresa gravado; calendário sem tombstone (ainda vale p/ Pengold)"
-  );
-  assert(
-    AppData.isWorkedLinkTombstoned(CO, "2027-09-07", "Feriado X", "e1"),
-    "Tombstone de vínculo gravado (auto-vínculo da escala não recria)"
-  );
-
-  // Auto-sync do calendário não recria o feriado excluído
-  AppData.syncCompanyHolidaysFromCalendarEntry(
-    { name: "Feriado X", date: "2027-09-07", companies: ["ambas"] },
-    { save: false }
-  );
-  assert(
-    !AppData.state.companies[CO].holidays.some((item) => item.name === "Feriado X"),
-    "Auto-sync do calendário não recria o feriado excluído"
-  );
-
-  // Excluindo também na outra empresa, a identidade sai do calendário de vez
   const res2 = AppData.removeHolidayEverywhere("2027-09-07", "Feriado X", { companies: [PG] });
+  assert(res.ok === false && res.blocked && res2.ok === false, "removeHolidayEverywhere recusa nas duas empresas");
+  assert(snapshot() === before, "Feriado, vínculos e calendário das duas empresas ficam intactos");
   assert(
-    res2.ok &&
-      !AppData.state.calendarHolidays.some((item) => item.date === "2027-09-07") &&
-      AppData.isHolidayTombstoned("__calendar__", "2027-09-07", "Feriado X"),
-    "Excluída na última empresa, a entrada sai do calendário e ganha tombstone"
+    !AppData.isHolidayTombstoned(CO, "2027-09-07", "Feriado X") &&
+      !AppData.isHolidayTombstoned("__calendar__", "2027-09-07", "Feriado X") &&
+      !AppData.isWorkedLinkTombstoned(CO, "2027-09-07", "Feriado X", "e1"),
+    "Nenhum tombstone de feriado ou de vínculo gravado"
   );
+}
 
-  // E o merge remoto também não
+// ── 7. Exclusão ANTIGA (tombstone já gravado) continua valendo no merge ──────
+{
+  setFixture({ calendar: [], chez: [], pengold: [] });
+  AppData.state.holidayTombstones = {
+    [CO]: { "2027-09-07|feriado x": 5000 },
+    __calendar__: { "2027-09-07|feriado x": 5000 }
+  };
   const merged = AppData.mergeRemoteIntoLocal(AppData.state, {
     companies: {
       [CO]: {
@@ -367,7 +339,7 @@ console.log("\n=== TESTE: feriados cadastrados de todos os anos (lista/edição/
   assert(
     !(merged.companies?.[CO]?.holidays || []).some((item) => item.name === "Feriado X") &&
       !(merged.calendarHolidays || []).some((item) => item.name === "Feriado X"),
-    "Merge do Firebase não ressuscita o feriado excluído nem seus vínculos"
+    "Merge do Firebase não ressuscita feriado excluído antes da regra"
   );
 }
 

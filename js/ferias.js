@@ -693,6 +693,7 @@
               Atestados &amp; Licenças
             </button>
           </div>
+          ${window.LixeiraUI?.toggleButtonHTML({ id: "openAbsenceArchive", company: AppData.getPrimaryPageCompany("ferias"), kinds: ["ferias", "ausencia"] }) || ""}
         </div>
         ${tabContent}
       </div>
@@ -700,6 +701,13 @@
 
     bindEvents(container);
     bindAusenciasRowActions(container);
+    container.querySelector("#openAbsenceArchive")?.addEventListener("click", () => {
+      window.LixeiraUI?.open({
+        company: AppData.getPrimaryPageCompany("ferias"),
+        kinds: ["ferias", "ausencia"],
+        onRestored: () => render(container)
+      });
+    });
     window.CompanyUI?.bindToolbar?.(container, "ferias", () => render(container));
   }
 

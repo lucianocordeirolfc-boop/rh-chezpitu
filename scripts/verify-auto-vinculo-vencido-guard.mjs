@@ -80,8 +80,11 @@ const SR = sb.window.ScaleRules;
 const data = App.getCompanyData(CO);
 
 // Garante escala nos dois meses (dias diferentes dos feriados) → monthHasScaleData true.
-data.manualScale[`e1|${pastMonth}-15`] = "FOLGA";
-data.manualScale[`e1|${recentMonth}-20`] = "FOLGA";
+// O dia é escolhido longe do feriado: com dia fixo, a FOLGA caía no próprio
+// feriado sempre que hoje-10 fosse dia 20 (ex.: 30/10) e o teste reprovava.
+const otherDay = (date, preferred) => (date.slice(8) === preferred ? (preferred === "15" ? "16" : "21") : preferred);
+data.manualScale[`e1|${pastMonth}-${otherDay(past, "15")}`] = "FOLGA";
+data.manualScale[`e1|${recentMonth}-${otherDay(recent, "20")}`] = "FOLGA";
 
 // 1 + 2: recompute dos dois meses
 SR.recomputeScaleIntegrations([pastMonth, recentMonth], { companies: [CO] });

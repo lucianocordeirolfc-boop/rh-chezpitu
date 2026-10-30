@@ -1228,6 +1228,14 @@
       openInactiveEmployeesPicker(container);
     });
 
+    container.querySelector("#btnOpenEmployeeArchive")?.addEventListener("click", () => {
+      window.LixeiraUI?.open({
+        company: AppData.getPrimaryPageCompany("funcionarios"),
+        kinds: ["funcionario"],
+        onRestored: () => window.App.renderCurrent()
+      });
+    });
+
     container.querySelector("#btnOpenAudit")?.addEventListener("click", () => {
       openAuditPopup();
     });
@@ -1442,6 +1450,7 @@
         <div class="page-footer-actions">
           <button type="button" class="secondary btn-sm" data-open-modal="employeeImportModal" title="Aceita arquivos CSV e JSON">Importar dados</button>
           <button type="button" class="secondary btn-sm" id="btnOpenAudit" title="Histórico de quem cadastrou, inativou, reativou ou excluiu funcionários">Auditoria</button>
+          ${window.LixeiraUI?.toggleButtonHTML({ id: "btnOpenEmployeeArchive", company: AppData.getPrimaryPageCompany("funcionarios"), kinds: ["funcionario"] }) || ""}
           <span class="footer-hint">CSV e JSON</span>
         </div>
       </div>

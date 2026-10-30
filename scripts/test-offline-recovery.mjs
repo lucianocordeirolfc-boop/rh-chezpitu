@@ -216,16 +216,15 @@ function runOfflineRecoveryTests() {
   // Ir offline
   nav3.onLine = false;
 
-  // Soft delete
-  AppData3.removeHoliday(holidayId, { company: "Chez Pitu" });
+  // Feriado cadastrado não se exclui (REGRA FIXA 2026-10-30) — nem offline.
+  const removed = AppData3.removeHoliday(holidayId, { company: "Chez Pitu" });
 
-  // Verificar que feriado está marcado como deletado (não removido)
   const holidays = AppData3.getCompanyData("Chez Pitu").holidays;
-  const deleted = holidays.find((h) => h.id === holidayId);
+  const kept = holidays.find((h) => h.id === holidayId);
 
-  assert(deleted !== undefined, "Feriado deve continuar existindo após soft delete (apenas marcado)");
-  assert(deleted?.isDeleted === true, "Flag isDeleted deve ser true após removeHoliday");
-  assert(holidays.length === 1, "Lista original deve manter tamanho (não remove array)");
+  assert(removed === false, "removeHoliday recusa a exclusão (offline também)");
+  assert(kept !== undefined && !kept.isDeleted, "Feriado continua existindo e não é marcado como excluído");
+  assert(holidays.length === 1, "Lista original mantém o tamanho");
 
   // ─────────────────────────────────────────────────────────────────────────
   // TEST 4: Validação de Padroeira de Búzios detecta erro

@@ -7,6 +7,76 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-10-30 (3) — REGRA FIXA: feriado cadastrado não se exclui (só o vínculo)
+
+Pedido do usuário: "nunca um usuário poder excluir um feriado já criado, deve
+apenas excluir o vínculo de um funcionário específico a um feriado".
+
+- `js/feriados.js`: removidos os botões "Excluir" do modal "Gerenciar feriados"
+  e da lista de feriados cadastrados, seus handlers e as confirmações de
+  exclusão de feriado (`confirmDeleteHoliday`, `confirmDeleteHolidayPermanent`,
+  `describeHolidayLinks`). Texto de ajuda orienta a usar Editar / Excluir vínculo.
+- `js/data.js`: `removeHolidayEverywhere`, `removeCompanyHolidayPermanently`,
+  `removeCalendarHolidayPermanently` e `removeHoliday` recusam sempre
+  (`holidayDeleteBlocked`) sem tocar em nada; removidos `archiveHolidayDeletion`
+  e `recordHolidayTombstone` (sem uso). Tombstones antigos continuam valendo.
+  `js/scale-rules.js`: `removeCalendarHoliday` também recusa.
+- Manual (`js/manual.js`, `MANUAL_USUARIO.md`), `PROJECT_RULES.md` (nova seção
+  substitui "Exclusão de feriado (definitiva)") e `CLAUDE.md`.
+- Testes atualizados para exigir a recusa e a preservação dos dados:
+  `verify-exclusao-feriado-definitiva`, `verify-feriados-todos-anos`,
+  `verify-lixeira`, `verify-sync-chaves` (tombstones antigos via helper),
+  `run-functional-validation` (checagem de fonte: nenhuma tela exclui feriado),
+  `test-offline-recovery`. `npm test` 47/47; `npm run validate` 23/23.
+
+## 2026-10-30 (2) — Lixeira: nada some do sistema (feriados do Carlos Andrey)
+
+Relato do usuário: no Controle de Feriados, o Carlos Andrey (Chez Pitu) mostra
+Carnaval e depois pula para 12/11 — "não estava assim".
+
+**Diagnóstico (leitura somente do Firebase de produção, nada gravado):**
+nenhuma perda silenciosa por sincronização. Cada lacuna tem um tombstone de
+exclusão definitiva gravado pela interface (botão com confirmação):
+- vínculos dele removidos por "Excluir vínculo": Padroeira de Búzios 26/07,
+  Comércio Hoteleiro 29/07 e Independência 07/09 (em 28/09/2026); Padroeira do
+  Brasil 12/10 e Finados 02/11 (em 30/10/2026, 13h29 e 13h31);
+- feriados inteiros excluídos da Chez Pitu (com todos os vínculos, de todos os
+  funcionários): Tiradentes, São Jorge e Trabalhador 2026 (07/08, em 10 s) e
+  Corpus Christi 2026 (17/08). Prova: a escala ainda tem COs apontando para os
+  ids desses feriados (ex.: Carlos Andrey, CO 18/06 → São Jorge 23/04).
+- Causa raiz: a exclusão definitiva guardava só a marca, não o conteúdo — não
+  havia como desfazer; a confirmação não dizia quem/qual status saía.
+
+**O que foi feito (código — nenhum dado de produção alterado):**
+- `js/data.js`: Lixeira `state.deletedArchive` (`archiveDeletion`,
+  `listDeletedArchive`, `restoreDeletedArchiveEntry`, `mergeDeletedArchives`)
+  chamada por `removeWorkedEmployeeFromHoliday`, `removeHolidayEverywhere`,
+  `removeCompanyHolidayPermanently`, `removeCalendarHolidayPermanently`,
+  `removeEmployeeFromCompany`, `removeVacation`, `removeAbsence`. Restauração
+  devolve status, compensação e o CO da escala, sem sobrescrever lançamento
+  posterior; `restoredAt` vence o tombstone em `applyHolidayTombstones` /
+  `applyWorkedLinkTombstones` (e `mergeWorkedEmployeeItems` o preserva).
+  `normalizeWorkedEmployeeRefs` não descarta mais vínculo sem funcionário.
+- `js/firebase-sync.js`: lixeira aninhada em `tombstones.__deletedArchive`.
+- `js/lixeira.js` (novo) + botão "Lixeira (N)" em Controle de Feriados,
+  Cadastro de Funcionários e Férias/Ausências; `css/style.css`; `index.html`.
+- `js/feriados.js`: confirmação de "Excluir vínculo" nomeia funcionário,
+  feriado, situação e alerta se já há compensação; "Excluir feriado" lista os
+  vínculos que saem; remoção passa a empresa explícita.
+- Regra fixa nova: `PROJECT_RULES.md` → "Lixeira — nada some do sistema"
+  (resumo em `CLAUDE.md`).
+- `scripts/verify-auto-vinculo-vencido-guard.mjs`: fixture dependente de data
+  (FOLGA no dia 20 caía no próprio feriado quando hoje = dia 30) — já reprovava
+  antes desta alteração.
+
+**Testes:** `scripts/verify-lixeira.mjs` (novo, 55 asserções, cadastrado no
+validate; 15 execuções seguidas sem falha); `npm test` 47/47; `npm run validate`
+23/23; tela da Lixeira no Chrome headless com fixture (excluir → listar →
+restaurar → status/compensação de volta).
+
+**Pendente:** os dados já perdidos não estão na lixeira (exclusões anteriores a
+ela). Recuperação depende de autorização do usuário — ver relatório da sessão.
+
 ## 2026-10-30 — Publicação 20261030.01 (1º deploy com versão automática)
 
 Commit `d2fa97a` publicado. `npm run deploy` gerou sozinho `20261029.01 →

@@ -38,6 +38,7 @@ const SUITES = [
   { name: "Feriados — auto-vínculo não nasce Vencido", script: "scripts/verify-auto-vinculo-vencido-guard.mjs" },
   { name: "Vínculo manual de funcionário", script: "scripts/verify-vinculo-manual.mjs" },
   { name: "Vínculo — tombstone de exclusão", script: "scripts/verify-vinculo-tombstone.mjs" },
+  { name: "Lixeira — nada some do sistema", script: "scripts/verify-lixeira.mjs" },
   { name: "Tombstones em todos os módulos", script: "scripts/verify-tombstones-sync.mjs" },
   { name: "Sincronização newer-wins", script: "scripts/verify-sync-newer-wins.mjs" },
   { name: "Sincronização — chaves, payload e relógio", script: "scripts/verify-sync-chaves.mjs" },

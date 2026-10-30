@@ -43,6 +43,40 @@ o que será alterado descrito antes da execução.
 
 Em caso de dúvida: **não gravar** e perguntar.
 
+## Lixeira — nada some do sistema (REGRA FIXA)
+
+Vigente desde 2026-10-30. Origem: vínculos de feriado do Carlos Andrey (e
+feriados inteiros da Chez Pitu com vínculos compensados) sumiram por exclusões
+definitivas que guardavam só a marca da exclusão (tombstone), não o conteúdo —
+não havia como recuperar.
+
+1. **Toda exclusão definitiva arquiva antes.** Excluir vínculo, excluir
+   funcionário, férias ou ausência grava
+   ANTES, em `state.deletedArchive`, a cópia completa do que sai (status,
+   compensação, CO da escala ligado, vínculos do funcionário), com quem e quando.
+   Função: `archiveDeletion` (js/data.js). **Nova função que remova dado tem de
+   chamá-la** — e ganhar asserção em `scripts/verify-lixeira.mjs`.
+2. **A lixeira nunca é podada.** Nenhuma rotina, sync, seed, dedup ou migração
+   apaga entrada dela. Restaurar só marca `restoredAt`/`restoredBy`.
+3. **Restaurar é ação do usuário** (botão "Lixeira (N)" em Controle de Feriados,
+   Cadastro de Funcionários e Férias/Ausências), com confirmação, e **nunca
+   sobrescreve** dado lançado depois da exclusão: só devolve o que falta; célula
+   da escala alterada depois não é tocada.
+4. **Restauração vence o tombstone.** Item restaurado leva `restoredAt` posterior
+   à exclusão; `applyHolidayTombstones` / `applyWorkedLinkTombstones` mantêm o
+   registro e descartam o tombstone obsoleto — outro PC não o apaga de novo.
+   Sem `restoredAt`, a exclusão continua vencendo (não ressuscita).
+5. **Transporte:** aninhada em `tombstones.__deletedArchive` no Firebase (mesmo
+   motivo dos demais tombstones — sem nó novo de topo). Merge = união por id.
+6. **Rotina automática não descarta vínculo.** `normalizeWorkedEmployeeRefs`
+   preserva o vínculo cujo funcionário não é encontrado no cadastro (antes ele
+   sumia em silêncio).
+7. **Confirmação diz o que sai.** "Excluir vínculo" nomeia funcionário, feriado,
+   situação e alerta quando já há compensação.
+8. **Feriado cadastrado não se exclui** — ver "Feriado cadastrado não se exclui
+   (REGRA FIXA)". A entrada `feriado` da Lixeira existe só para recuperar
+   exclusões feitas antes dessa regra.
+
 ## Padrão visual / Cores (REGRA FIXA)
 
 O sistema segue o **padrão de cores oficial do Grupo Chez Pitu**: **navy + pêssego**.
@@ -245,28 +279,39 @@ A tela principal mostra apenas funcionários **ativos** — o vínculo de quem f
 desligado continua na base, mas só reaparece pelo botão "Mostrar funcionários
 inativos". Ver "Cadastro de Funcionários → Funcionário inativo (REGRA FIXA)".
 
-## Exclusão de feriado (definitiva)
+## Feriado cadastrado não se exclui (REGRA FIXA)
 
-Além do soft-delete (reversível), o Controle de Feriados permite **exclusão
-DEFINITIVA** de um feriado cadastrado, direto pela interface (botão
-"Excluir feriado"):
+Vigente desde 2026-10-30, a pedido do usuário. **Nenhum usuário pode excluir um
+feriado já cadastrado** — nem definitivamente, nem por soft delete. A única
+exclusão permitida no Controle de Feriados é a do **vínculo de um funcionário
+específico** com um feriado ("Excluir vínculo"), que vai para a Lixeira.
 
-- Remove o feriado e **todos os vínculos** (`workedEmployees`), incluindo
-  duplicatas de mesmo **nome + data**.
-- Grava um **tombstone por conteúdo** (`state.holidayTombstones`, escopo empresa
-  ou `__calendar__`) que impede o retorno do feriado por: merge do Firebase
-  (outro PC), seed 2026 e auto-sync do calendário.
-- É **irreversível** e só ocorre por **ação explícita do usuário com confirmação**.
-  Nenhuma rotina automática exclui feriado definitivamente.
-- **Recadastrar** o mesmo feriado (nome + data) pela interface **limpa** o
-  tombstone — o novo cadastro passa a valer normalmente.
+- A tela não tem botão de excluir feriado (modal "Gerenciar feriados" e lista de
+  feriados cadastrados só têm **Editar** e **+ Funcionário**).
+- Na camada de dados, `removeHolidayEverywhere`, `removeCompanyHolidayPermanently`,
+  `removeCalendarHolidayPermanently`, `removeHoliday` (js/data.js) e
+  `ScaleRules.removeCalendarHoliday` **recusam sempre** (`{ ok: false, blocked: true }`
+  / `false`) sem tocar em nada. Novos tombstones de feriado não são gravados.
+- Corrigir nome/data: **Editar** (`updateHolidayEverywhere`, preserva vínculos).
+- Duplicatas de mesmo nome + data continuam sendo **mescladas** automaticamente
+  (`mergeDuplicateHolidaysInBlock`), unindo os vínculos — nada se perde.
+- **Exclusões antigas continuam valendo:** os tombstones gravados antes desta
+  regra (`state.holidayTombstones`) seguem impedindo o retorno por merge, seed e
+  auto-sync. Recuperar um feriado excluído antes da regra só por restauração
+  autorizada (entrada `feriado` da Lixeira, com `restoredAt`).
+- Proibido reintroduzir exclusão de feriado (botão, função ou rotina) sem
+  autorização explícita do usuário. Cobertura: `verify-exclusao-feriado-definitiva.mjs`,
+  `verify-feriados-todos-anos.mjs`, `verify-lixeira.mjs` e a checagem de fonte em
+  `run-functional-validation.mjs`.
 
-Funções: `removeCompanyHolidayPermanently`, `removeCalendarHolidayPermanently`
-(js/data.js). Ver PROJECT_HISTORY.md → 2026-08-06.
+Histórico: a exclusão definitiva existiu de 2026-08-06 a 2026-10-30 e apagou
+Tiradentes, São Jorge, Trabalhador e Corpus Christi 2026 da Chez Pitu com todos
+os vínculos (ver PROJECT_HISTORY.md → 2026-10-30).
 
 ### Exclusão de vínculo (definitiva)
 
-"Excluir vínculo" (funcionário × feriado) também é **definitivo**: grava um
+"Excluir vínculo" (funcionário × feriado) é **definitivo na tela** (vai para a
+Lixeira, de onde pode ser restaurado) e grava um
 **tombstone de vínculo** (`state.workedLinkTombstones`, chave `data|nome|employeeId`)
 que impede a recriação pelo **auto-vínculo da escala**
 (`syncAutoHolidaysWorkedForMonth`) e pela **união do merge** entre PCs. Revincular

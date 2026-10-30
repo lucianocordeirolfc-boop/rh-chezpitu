@@ -1,15 +1,15 @@
 /**
- * Validação focada: EXCLUSÃO DEFINITIVA de feriado (tombstone por conteúdo).
- * Homologação temporária — não versionar.
+ * Validação focada: feriado cadastrado NÃO se exclui (REGRA FIXA 2026-10-30)
+ * e as exclusões antigas (tombstones por conteúdo já gravados) continuam valendo.
  *
  * Cobre:
- *  - removeCompanyHolidayPermanently: remove o registro + duplicatas (mesmo
- *    nome+data) + vínculos, e cria tombstone de conteúdo;
+ *  - removeCompanyHolidayPermanently / removeCalendarHolidayPermanently /
+ *    removeHolidayEverywhere / removeHoliday recusam e não tocam em nada
+ *    (feriado, duplicata, vínculos, calendário, tombstones);
  *  - não ressuscita via merge do Firebase (outro PC ainda com o feriado);
  *  - não ressuscita via seed 2026 (applyHolidaySeed2026 respeita o tombstone);
  *  - não ressuscita via auto-sync do calendário (syncCompanyHolidaysFromCalendarEntry);
- *  - removeCalendarHolidayPermanently: remove entrada do calendário + tombstone,
- *    e o merge não a traz de volta;
+ *  - tombstone antigo de calendário: o merge não traz a entrada de volta;
  *  - recriação explícita (addHoliday) limpa o tombstone e o feriado permanece;
  *  - união de holidayTombstones no merge mantém o deletedAt maior.
  *
@@ -61,22 +61,39 @@ function getHolidays() {
 
 console.log("\n=== TESTE: exclusão DEFINITIVA de feriado ===\n");
 
-// ── 1. Exclusão remove registro + duplicatas + vínculos, e cria tombstone ────
+// ── 1. Nenhuma função de exclusão de feriado apaga nada ──────────────────────
 {
   resetHolidays([
     { id: "h1", name: "Natal", date: "2025-12-25", workedEmployees: [{ employeeId: "e1" }] },
     { id: "h2", name: "Natal", date: "2025-12-25", workedEmployees: [{ employeeId: "e2" }] }, // duplicata
     { id: "h3", name: "Ano Novo", date: "2026-01-01", workedEmployees: [] }
   ]);
-  const res = AppData.removeCompanyHolidayPermanently("h1", { company: CO });
-  assert(res.ok && res.removed === 2, "Remove o registro e a duplicata de mesmo nome+data (2 registros)");
-  const rest = getHolidays();
-  assert(!rest.some((h) => h.name === "Natal"), "Nenhum 'Natal' 2025-12-25 permanece (vínculos vão junto)");
-  assert(rest.some((h) => h.name === "Ano Novo"), "Outros feriados não são afetados");
+  AppData.state.calendarHolidays = [
+    { id: "cal1", name: "Natal", date: "2025-12-25", type: "nacional", companies: ["ambas"] }
+  ];
+  AppData.state.holidayTombstones = {};
+  const before = JSON.stringify({ h: getHolidays(), c: AppData.state.calendarHolidays });
+
+  const r1 = AppData.removeCompanyHolidayPermanently("h1", { company: CO });
+  const r2 = AppData.removeCalendarHolidayPermanently("cal1");
+  const r3 = AppData.removeHolidayEverywhere("2025-12-25", "Natal", { companies: [CO] });
+  const r4 = AppData.removeHoliday("h3", { company: CO });
+  assert(r1.ok === false && r1.blocked === true, "removeCompanyHolidayPermanently recusa (bloqueado)");
+  assert(r2.ok === false && r2.blocked === true, "removeCalendarHolidayPermanently recusa (bloqueado)");
+  assert(r3.ok === false && r3.blocked === true && /Excluir vínculo/.test(r3.error),
+    "removeHolidayEverywhere recusa e orienta a usar Excluir vínculo");
+  assert(r4 === false, "removeHoliday (soft delete) recusa");
   assert(
-    AppData.isHolidayTombstoned(CO, "2025-12-25", "Natal"),
-    "Tombstone de conteúdo criado para Natal 2025-12-25"
+    JSON.stringify({ h: getHolidays(), c: AppData.state.calendarHolidays }) === before,
+    "Feriados, duplicata, vínculos e calendário ficam intactos"
   );
+  assert(!getHolidays().some((h) => h.isDeleted), "Nenhum feriado marcado como excluído");
+  assert(
+    !AppData.isHolidayTombstoned(CO, "2025-12-25", "Natal") &&
+      !AppData.isHolidayTombstoned("__calendar__", "2025-12-25", "Natal"),
+    "Nenhum tombstone de feriado gravado"
+  );
+  assert(Object.keys(AppData.state.deletedArchive || {}).length === 0, "Nada vai para a lixeira (nada saiu)");
 }
 
 // ── 2. Não ressuscita via merge (outro PC ainda tem o feriado) ───────────────
@@ -130,19 +147,8 @@ console.log("\n=== TESTE: exclusão DEFINITIVA de feriado ===\n");
   );
 }
 
-// ── 5. Exclusão definitiva de feriado do CALENDÁRIO + não volta no merge ─────
+// ── 5. Exclusão ANTIGA de feriado do CALENDÁRIO continua valendo no merge ────
 {
-  AppData.state.holidayTombstones = {};
-  AppData.state.calendarHolidays = [
-    { id: "cal1", name: "Teste Tiradentes", date: "2026-04-21", type: "nacional", companies: ["ambas"] }
-  ];
-  const res = AppData.removeCalendarHolidayPermanently("cal1");
-  assert(res.ok && res.removed === 1, "Remove a entrada do calendário");
-  assert(
-    AppData.isHolidayTombstoned("__calendar__", "2026-04-21", "Teste Tiradentes"),
-    "Tombstone de calendário criado"
-  );
-
   const local = { calendarHolidays: [], holidayTombstones: { __calendar__: { "2026-04-21|teste tiradentes": 6000 } } };
   const remote = { calendarHolidays: [{ id: "cal1", name: "Teste Tiradentes", date: "2026-04-21", companies: ["ambas"] }] };
   const merged = AppData.mergeRemoteIntoLocal(local, remote);

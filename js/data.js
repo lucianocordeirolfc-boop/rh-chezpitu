@@ -145,7 +145,8 @@
     cadastro: "Cadastrou",
     inativacao: "Inativou",
     reativacao: "Reativou",
-    exclusao: "Excluiu"
+    exclusao: "Excluiu",
+    restauracao: "Restaurou"
   };
 
   function currentUserEmail() {
@@ -680,6 +681,9 @@
       // Exclusões DEFINITIVAS de VÍNCULO (data|nome|employeeId): { empresa: { chave: deletedAt } }.
       // Impede que o auto-vínculo da escala / o merge recriem um vínculo removido.
       workedLinkTombstones: {},
+      // Lixeira: cópia completa de tudo que foi excluído pela interface
+      // ({ id: entrada }). Nunca é podada; restaurar só marca restoredAt.
+      deletedArchive: {},
       // Trilha de auditoria de funcionários: quem cadastrou/inativou/reativou/
       // excluiu e quando. Ver recordAudit / getAuditLog.
       auditLog: []
@@ -906,15 +910,8 @@
     return migrateTombstoneKeysToRtdbSafe(targetState.holidayTombstones);
   }
 
-  /** Marca uma exclusão definitiva (só na ação do usuário). Mantém o deletedAt maior. */
-  function recordHolidayTombstone(scope, date, name, when = now(), targetState = state) {
-    if (!scope || !date || !name) return;
-    const store = ensureHolidayTombstoneStore(targetState);
-    if (!store[scope]) store[scope] = {};
-    const key = holidayTombstoneKey(date, name);
-    const prev = Number(store[scope][key]) || 0;
-    store[scope][key] = Math.max(prev, Number(when) || now());
-  }
+  // Novos tombstones de feriado não são mais gravados: feriado cadastrado não
+  // se exclui (REGRA FIXA 2026-10-30). Os já existentes continuam valendo.
 
   // Leitura tolerante: aceita a chave escapada (formato atual) e a legada, para
   // que nenhuma exclusão já registrada deixe de valer após a migração.
@@ -963,20 +960,32 @@
    */
   function applyHolidayTombstones(targetState) {
     const store = ensureHolidayTombstoneStore(targetState);
+    // Exceção única ao "não usa updatedAt": restauração explícita pela Lixeira
+    // (restoredAt posterior à exclusão) vence o tombstone e o descarta.
+    const keep = (scope, holiday) => {
+      const deletedAt = tombstoneTime(
+        store[scope],
+        holidayTombstoneKey(holiday?.date, holiday?.name),
+        legacyHolidayTombstoneKey(holiday?.date, holiday?.name)
+      );
+      if (!deletedAt) return true;
+      if ((Number(holiday?.restoredAt) || 0) > deletedAt) {
+        clearHolidayTombstone(scope, holiday.date, holiday.name, targetState);
+        return true;
+      }
+      return false;
+    };
 
     Object.keys(store).forEach((scope) => {
       if (scope === HOLIDAY_TOMBSTONE_CALENDAR_SCOPE) return;
       const block = targetState.companies?.[scope];
       if (!block || !Array.isArray(block.holidays)) return;
-      block.holidays = block.holidays.filter(
-        (holiday) => !isHolidayTombstoned(scope, holiday?.date, holiday?.name, targetState)
-      );
+      block.holidays = block.holidays.filter((holiday) => keep(scope, holiday));
     });
 
     if (store[HOLIDAY_TOMBSTONE_CALENDAR_SCOPE] && Array.isArray(targetState.calendarHolidays)) {
-      targetState.calendarHolidays = targetState.calendarHolidays.filter(
-        (holiday) =>
-          !isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, holiday?.date, holiday?.name, targetState)
+      targetState.calendarHolidays = targetState.calendarHolidays.filter((holiday) =>
+        keep(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, holiday)
       );
     }
   }
@@ -1046,12 +1055,318 @@
       if (!block || !Array.isArray(block.holidays)) return;
       block.holidays.forEach((holiday) => {
         if (!Array.isArray(holiday.workedEmployees)) return;
-        holiday.workedEmployees = holiday.workedEmployees.filter(
-          (item) =>
-            !isWorkedLinkTombstoned(company, holiday.date, holiday.name, item?.employeeId, targetState)
-        );
+        holiday.workedEmployees = holiday.workedEmployees.filter((item) => {
+          const deletedAt = tombstoneTime(
+            store[company],
+            workedLinkTombstoneKey(holiday.date, holiday.name, item?.employeeId),
+            legacyWorkedLinkTombstoneKey(holiday.date, holiday.name, item?.employeeId)
+          );
+          if (!deletedAt) return true;
+          // Restaurado pela Lixeira DEPOIS da exclusão → o vínculo fica e o
+          // tombstone obsoleto sai (senão outro PC o apagaria de novo).
+          if ((Number(item?.restoredAt) || 0) > deletedAt) {
+            clearWorkedLinkTombstone(company, holiday.date, holiday.name, item?.employeeId, targetState);
+            return true;
+          }
+          return false;
+        });
       });
     });
+  }
+
+  /** deletedAt de um tombstone por conteúdo (chave escapada ou legada); 0 se não houver. */
+  function tombstoneTime(bucket, key, legacyKey) {
+    if (!bucket) return 0;
+    return Math.max(Number(bucket[key]) || 0, Number(bucket[legacyKey]) || 0);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LIXEIRA — arquivo de exclusões (REGRA FIXA: nada some do sistema).
+  //
+  // Toda exclusão definitiva feita pela interface (vínculo, feriado,
+  // funcionário, férias, ausência) guarda ANTES uma cópia completa do que sai,
+  // com quem/quando. Os tombstones continuam impedindo a ressurreição pelo
+  // merge, mas o conteúdo não se perde: "Restaurar" devolve o registro (com
+  // compensação, status e o vínculo do CO na escala) e vence o tombstone por
+  // restoredAt. Nenhuma rotina apaga entradas da lixeira; a restauração só
+  // marca restoredAt. Trafega aninhada em "tombstones" no Firebase.
+  // ─────────────────────────────────────────────────────────────────────────
+  const DELETED_ARCHIVE_KIND_LABELS = {
+    vinculo: "Vínculo de feriado",
+    feriado: "Feriado",
+    funcionario: "Funcionário",
+    ferias: "Férias",
+    ausencia: "Ausência"
+  };
+
+  function ensureDeletedArchive(targetState = state) {
+    if (!targetState.deletedArchive || typeof targetState.deletedArchive !== "object" ||
+        Array.isArray(targetState.deletedArchive)) {
+      targetState.deletedArchive = {};
+    }
+    return targetState.deletedArchive;
+  }
+
+  function cloneForArchive(value) {
+    return value === undefined ? null : JSON.parse(JSON.stringify(value));
+  }
+
+  /** Guarda a cópia do que vai ser excluído. Chamar ANTES de remover. */
+  function archiveDeletion(kind, company, summary, payload) {
+    const archive = ensureDeletedArchive();
+    const id = uid("lixeira");
+    archive[id] = {
+      id,
+      kind,
+      company: company || "",
+      summary: String(summary || DELETED_ARCHIVE_KIND_LABELS[kind] || kind),
+      deletedAt: now(),
+      deletedBy: currentUserEmail(),
+      restoredAt: 0,
+      restoredBy: "",
+      payload: cloneForArchive(payload)
+    };
+    return id;
+  }
+
+  /** União por id (nada se perde); restoredAt fica com o maior dos dois lados. */
+  function mergeDeletedArchives(localArchive = {}, remoteArchive = {}) {
+    const merged = {};
+    [remoteArchive || {}, localArchive || {}].forEach((source) => {
+      Object.keys(source).forEach((id) => {
+        const entry = source[id];
+        if (!entry || typeof entry !== "object") return;
+        const prev = merged[id];
+        if (!prev) {
+          merged[id] = { ...entry };
+          return;
+        }
+        if ((Number(entry.restoredAt) || 0) > (Number(prev.restoredAt) || 0)) {
+          merged[id] = { ...prev, restoredAt: entry.restoredAt, restoredBy: entry.restoredBy || "" };
+        }
+      });
+    });
+    return merged;
+  }
+
+  function listDeletedArchive(options = {}) {
+    const kinds = Array.isArray(options.kinds) && options.kinds.length ? options.kinds : null;
+    return Object.values(ensureDeletedArchive())
+      .filter((entry) => entry && entry.id)
+      .filter(
+        (entry) =>
+          !options.company ||
+          entry.company === "Calendário" ||
+          String(entry.company || "").split(", ").includes(options.company)
+      )
+      .filter((entry) => !kinds || kinds.includes(entry.kind))
+      .filter((entry) => options.includeRestored !== false || !entry.restoredAt)
+      .sort((a, b) => (Number(b.deletedAt) || 0) - (Number(a.deletedAt) || 0));
+  }
+
+  /** Entradas da escala (manualScale) cujo CO aponta para algum dos feriados. */
+  function collectScaleLinksToHolidays(data, holidayIds, employeeId) {
+    const ids = new Set(holidayIds);
+    const links = [];
+    Object.keys(data.manualScale || {}).forEach((key) => {
+      if (employeeId && !key.startsWith(`${employeeId}|`)) return;
+      const entry = data.manualScale[key];
+      if (entry && typeof entry === "object" && ids.has(entry.linkedHolidayId)) {
+        links.push({ key, value: cloneForArchive(entry) });
+      }
+    });
+    return links;
+  }
+
+  /**
+   * Devolve à escala o vínculo do CO com o feriado restaurado — só quando a
+   * célula ainda é o "CO" simples deixado pela exclusão (nunca sobrescreve um
+   * lançamento que o usuário fez depois).
+   */
+  function restoreScaleLinks(data, links, holidayIdMap) {
+    if (!data.manualScale) data.manualScale = {};
+    (links || []).forEach((link) => {
+      if (!link?.key || !link.value) return;
+      const current = data.manualScale[link.key];
+      const stillPlainCo = current === "CO" || (current && typeof current === "object" &&
+        current.code === "CO" && !current.linkedHolidayId);
+      if (current !== undefined && !stillPlainCo) return;
+      const value = { ...link.value };
+      if (holidayIdMap?.has(value.linkedHolidayId)) value.linkedHolidayId = holidayIdMap.get(value.linkedHolidayId);
+      data.manualScale[link.key] = value;
+    });
+  }
+
+  function findLiveHolidayByIdentity(data, date, name) {
+    const key = holidayTombstoneKey(date, name);
+    return (data.holidays || []).find(
+      (holiday) => holiday && !holiday.isDeleted && holidayTombstoneKey(holiday.date, holiday.name) === key
+    );
+  }
+
+  /** Recoloca vínculos num feriado sem sobrescrever o que já existe nele hoje. */
+  function restoreWorkedItemsInto(company, holiday, items, restoredAt) {
+    if (!Array.isArray(holiday.workedEmployees)) holiday.workedEmployees = [];
+    let restored = 0;
+    (items || []).forEach((item) => {
+      if (!item?.employeeId) return;
+      clearWorkedLinkTombstone(company, holiday.date, holiday.name, item.employeeId);
+      const existing = holiday.workedEmployees.find((row) => row.employeeId === item.employeeId);
+      if (existing) {
+        Object.assign(existing, mergeWorkedEmployeeItems({ ...item }, existing), { restoredAt });
+        return;
+      }
+      holiday.workedEmployees.push({ ...item, restoredAt });
+      restored += 1;
+    });
+    return restored;
+  }
+
+  function restoreArchivedLink(entry, restoredAt) {
+    const { holiday: ref, item, scaleLinks } = entry.payload || {};
+    if (!ref || !item?.employeeId) return { ok: false, error: "Registro da lixeira incompleto." };
+    const data = getCompanyData(entry.company);
+    const holiday =
+      (data.holidays || []).find((row) => row.id === ref.id && !row.isDeleted) ||
+      findLiveHolidayByIdentity(data, ref.date, ref.name);
+    if (!holiday) {
+      return {
+        ok: false,
+        error: `O feriado "${ref.name}" (${ref.date}) não existe mais em ${entry.company}. ` +
+          "Restaure primeiro o feriado na Lixeira."
+      };
+    }
+    clearWorkedLinkTombstone(entry.company, ref.date, ref.name, item.employeeId);
+    restoreWorkedItemsInto(entry.company, holiday, [item], restoredAt);
+    restoreScaleLinks(data, scaleLinks, new Map([[ref.id, holiday.id]]));
+    syncWorkedEmployeeStatus(
+      holiday.workedEmployees.find((row) => row.employeeId === item.employeeId),
+      holiday.date
+    );
+    return { ok: true, months: [String(holiday.date).slice(0, 7)] };
+  }
+
+  function restoreArchivedHoliday(entry, restoredAt) {
+    const { holidays = [], calendar = [], scaleLinks = [] } = entry.payload || {};
+    const months = new Set();
+    let date = "";
+    let name = "";
+
+    holidays.forEach(({ company, record }) => {
+      if (!company || !record) return;
+      date = record.date;
+      name = record.name;
+      months.add(String(record.date).slice(0, 7));
+      clearHolidayTombstone(company, record.date, record.name);
+      const data = getCompanyData(company);
+      if (!Array.isArray(data.holidays)) data.holidays = [];
+      let target = findLiveHolidayByIdentity(data, record.date, record.name);
+      if (!target) {
+        target = { ...record, workedEmployees: [], isDeleted: false, updatedAt: now(), restoredAt };
+        delete target.deletedAt;
+        data.holidays.push(target);
+      } else {
+        target.restoredAt = restoredAt;
+      }
+      restoreWorkedItemsInto(company, target, record.workedEmployees, restoredAt);
+      (target.workedEmployees || []).forEach((row) => syncWorkedEmployeeStatus(row, target.date));
+      const links = scaleLinks.filter((link) => link.company === company);
+      restoreScaleLinks(data, links, new Map([[record.id, target.id]]));
+    });
+
+    if (!Array.isArray(state.calendarHolidays)) state.calendarHolidays = [];
+    calendar.forEach(({ record, companies }) => {
+      if (!record) return;
+      date = date || record.date;
+      name = name || record.name;
+      clearHolidayTombstone(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, record.date, record.name);
+      const key = holidayTombstoneKey(record.date, record.name);
+      const existing = state.calendarHolidays.find(
+        (row) => holidayTombstoneKey(row?.date, row?.name) === key
+      );
+      const restoredCompanies = Array.isArray(companies) && companies.length ? companies : record.companies;
+      if (!existing) {
+        state.calendarHolidays.push({ ...record, companies: restoredCompanies, updatedAt: now(), restoredAt });
+        return;
+      }
+      if (Array.isArray(existing.companies) && !existing.companies.includes("ambas")) {
+        existing.companies = [...new Set([...existing.companies, ...(restoredCompanies || [])])];
+      }
+      existing.restoredAt = restoredAt;
+    });
+
+    if (!holidays.length && !calendar.length) return { ok: false, error: "Registro da lixeira incompleto." };
+    return { ok: true, months: [...months], date, name };
+  }
+
+  function restoreArchivedRecords(entry, restoredAt) {
+    const data = getCompanyData(entry.company);
+    const payload = entry.payload || {};
+    const months = new Set();
+    const putBack = (collection, record) => {
+      if (!record?.id) return;
+      if (!Array.isArray(data[collection])) data[collection] = [];
+      if (data[collection].some((row) => row.id === record.id)) return;
+      // updatedAt > deletedAt: o tombstone por id deixa de valer (applyTombstonesToState).
+      const deletedAt = Number(state.tombstones?.[collection]?.[entry.company]?.[record.id]) || 0;
+      const updatedAt = Math.max(now(), deletedAt + 1);
+      data[collection].push({ ...record, updatedAt, restoredAt: Math.max(restoredAt, updatedAt) });
+      monthsTouchedByRange(record.startDate, record.endDate).forEach((month) => months.add(month));
+    };
+
+    if (entry.kind === "ferias") putBack("vacations", payload.record);
+    if (entry.kind === "ausencia") putBack("absences", payload.record);
+    if (entry.kind === "funcionario") {
+      putBack("employees", payload.employee);
+      (payload.vacations || []).forEach((record) => putBack("vacations", record));
+      (payload.absences || []).forEach((record) => putBack("absences", record));
+      if (!data.manualScale) data.manualScale = {};
+      (payload.manualScale || []).forEach(({ key, value }) => {
+        if (key && data.manualScale[key] === undefined) data.manualScale[key] = value;
+      });
+      (payload.links || []).forEach(({ holidayId, date, name, item }) => {
+        const holiday =
+          (data.holidays || []).find((row) => row.id === holidayId && !row.isDeleted) ||
+          findLiveHolidayByIdentity(data, date, name);
+        if (holiday) restoreWorkedItemsInto(entry.company, holiday, [item], restoredAt);
+      });
+      applyTombstonesToState(state);
+      recordAudit("restauracao", {
+        employeeId: payload.employee?.id,
+        employeeName: payload.employee?.name,
+        company: entry.company
+      });
+    } else {
+      applyTombstonesToState(state);
+    }
+    return { ok: true, months: [...months] };
+  }
+
+  /**
+   * Restaura uma entrada da lixeira (ação explícita do usuário). Nunca
+   * sobrescreve dado lançado depois da exclusão; só devolve o que falta.
+   */
+  function restoreDeletedArchiveEntry(id, options = {}) {
+    const entry = ensureDeletedArchive()[id];
+    if (!entry) return { ok: false, error: "Item não encontrado na lixeira." };
+    if (entry.restoredAt) return { ok: false, error: "Este item já foi restaurado." };
+
+    // Estritamente depois da exclusão (o tombstone é gravado no mesmo instante
+    // do arquivamento): empate faria a exclusão vencer no merge.
+    const restoredAt = Math.max(now(), (Number(entry.deletedAt) || 0) + 1000);
+    let result;
+    if (entry.kind === "vinculo") result = restoreArchivedLink(entry, restoredAt);
+    else if (entry.kind === "feriado") result = restoreArchivedHoliday(entry, restoredAt);
+    else if (["funcionario", "ferias", "ausencia"].includes(entry.kind)) {
+      result = restoreArchivedRecords(entry, restoredAt);
+    } else result = { ok: false, error: "Tipo de item desconhecido." };
+    if (!result.ok) return result;
+
+    entry.restoredAt = restoredAt;
+    entry.restoredBy = currentUserEmail();
+    if (options.recompute !== false && result.months?.length) runScaleIntegrations(result.months);
+    saveState();
+    return { ...result, entry };
   }
 
   function mergeEmployeesById(localArr = [], remoteArr = []) {
@@ -1561,6 +1876,7 @@
     // (evita ressurreição via união do merge e via auto-vínculo da escala).
     ensureWorkedLinkTombstoneStore(next);
     applyWorkedLinkTombstones(next);
+    ensureDeletedArchive(next);
 
     // Proteção dos dados da empresa: restaura do backup se vazio; atualiza backup se válido.
     recoverCompanyInfoForState(next);
@@ -1647,6 +1963,8 @@
         local.workedLinkTombstones,
         remote.workedLinkTombstones
       ),
+      // Lixeira: união por id — uma exclusão feita em qualquer PC fica guardada.
+      deletedArchive: mergeDeletedArchives(local.deletedArchive, remote.deletedArchive),
       // União das trilhas de auditoria dos dois lados (sem duplicar por id).
       auditLog: mergeAuditLogs(local.auditLog, remote.auditLog)
     };
@@ -2256,6 +2574,8 @@
       tombstones: src.tombstones || {},
       holidayTombstones: src.holidayTombstones || {},
       workedLinkTombstones: src.workedLinkTombstones || {},
+      // Lixeira: o que foi excluído offline não pode sumir antes de sincronizar.
+      deletedArchive: src.deletedArchive || {},
       // Auditoria é pequena e não pode ser perdida no cache enxuto.
       auditLog: Array.isArray(src.auditLog) ? src.auditLog : [],
       companies: {} // dados operacionais vêm do Firebase
@@ -2542,6 +2862,9 @@
     }
     if (prev.linkedHolidayId && !next.linkedHolidayId) merged.linkedHolidayId = prev.linkedHolidayId;
     if (prev.status === "Compensado" && next.status === "Pendente") merged.status = prev.status;
+    // Restauração pela Lixeira precisa sobreviver ao merge (vence o tombstone).
+    const restoredAt = Math.max(Number(prev.restoredAt) || 0, Number(next.restoredAt) || 0);
+    if (restoredAt) merged.restoredAt = restoredAt;
     return merged;
   }
 
@@ -2704,7 +3027,13 @@
 
         let canonicalId = employees.find((employee) => employee.id === ref)?.id;
         if (!canonicalId) canonicalId = idByName.get(normalizeSearchText(ref));
-        if (!canonicalId) return;
+        if (!canonicalId) {
+          // Funcionário não encontrado (cadastro ainda não carregado, outra
+          // empresa, legado): o vínculo é PRESERVADO como está — rotina
+          // automática nunca descarta dado (antes ele sumia em silêncio).
+          if (!byEmployee.has(ref)) byEmployee.set(ref, item);
+          return;
+        }
 
         item.employeeId = canonicalId;
         const prev = byEmployee.get(canonicalId) || {};
@@ -3095,6 +3424,24 @@
 
   function removeEmployeeFromCompany(company, id, shouldSave = true) {
     const data = getCompanyData(company);
+    const employee = (data.employees || []).find((item) => item.id === id);
+    if (employee) {
+      const links = [];
+      (data.holidays || []).forEach((holiday) => {
+        (holiday.workedEmployees || []).forEach((item) => {
+          if (item.employeeId === id) links.push({ holidayId: holiday.id, date: holiday.date, name: holiday.name, item });
+        });
+      });
+      archiveDeletion("funcionario", company, employee.name || id, {
+        employee,
+        vacations: (data.vacations || []).filter((vacation) => vacation.employeeId === id),
+        absences: (data.absences || []).filter((absence) => absence.employeeId === id),
+        manualScale: Object.keys(data.manualScale || {})
+          .filter((key) => key.startsWith(`${id}|`))
+          .map((key) => ({ key, value: data.manualScale[key] })),
+        links
+      });
+    }
     const deletedAt = now();
     // Tombstones: o funcionário e, em cascata, suas férias e ausências — para que
     // o merge com outro PC não ressuscite o funcionário nem registros órfãos.
@@ -3199,7 +3546,15 @@
     const resolvedCompany = company || getPrimaryPageCompany("ferias");
     const data = getCompanyData(resolvedCompany);
     const vacation = data.vacations.find((item) => item.id === id);
-    if (vacation) recordTombstone("vacations", resolvedCompany, id);
+    if (vacation) {
+      archiveDeletion(
+        "ferias",
+        resolvedCompany,
+        `${getEmployeeName(vacation.employeeId, data)} — ${vacation.startDate} a ${vacation.endDate}`,
+        { record: vacation }
+      );
+      recordTombstone("vacations", resolvedCompany, id);
+    }
     data.vacations = data.vacations.filter((item) => item.id !== id);
     if (vacation) runScaleIntegrations(monthsTouchedByRange(vacation.startDate, vacation.endDate));
     saveState();
@@ -3253,7 +3608,15 @@
     const resolvedCompany = company || getPrimaryPageCompany("ferias");
     const data = getCompanyData(resolvedCompany);
     const absence = (data.absences || []).find((item) => item.id === id);
-    if (absence) recordTombstone("absences", resolvedCompany, id);
+    if (absence) {
+      archiveDeletion(
+        "ausencia",
+        resolvedCompany,
+        `${getEmployeeName(absence.employeeId, data)} — ${absence.type || "Ausência"} ${absence.startDate} a ${absence.endDate}`,
+        { record: absence }
+      );
+      recordTombstone("absences", resolvedCompany, id);
+    }
     data.absences = (data.absences || []).filter((item) => item.id !== id);
     if (absence) runScaleIntegrations(monthsTouchedByRange(absence.startDate, absence.endDate));
     saveState();
@@ -3431,25 +3794,21 @@
     return changed;
   }
 
-  /**
-   * Soft delete de feriado — marca como deletado em vez de remover.
-   * Permite restauração posterior.
-   */
-  function removeHoliday(id, options = {}) {
-    const company = options.company || getPrimaryPageCompany("feriados");
-    const data = getCompanyData(company);
-    const holiday = (data.holidays || []).find((h) => h.id === id);
-    if (!holiday) return false;
+  // REGRA FIXA (2026-10-30): feriado cadastrado NUNCA é excluído pelo usuário —
+  // nem marcado como excluído (soft delete). Só o vínculo de um funcionário
+  // sai (removeWorkedEmployeeFromHoliday). As funções de exclusão continuam
+  // exportadas para compatibilidade, mas recusam sempre sem tocar em nada.
+  // Exclusões antigas (tombstones já gravados) continuam valendo.
+  const HOLIDAY_DELETE_BLOCKED =
+    "Feriado cadastrado não pode ser excluído. Para tirar um funcionário, use \"Excluir vínculo\".";
 
-    // Soft delete: marcar com deletedAt em vez de remover
-    holiday.deletedAt = holiday.deletedAt || todayISO();
-    holiday.isDeleted = true;
-    // Carimbo de versão para que o soft-delete VENÇA o merge entre PCs
-    // (mergeHolidayLists usa updatedAt como newer-wins do campo-base).
-    holiday.updatedAt = now();
+  function holidayDeleteBlocked(extra = {}) {
+    return { ok: false, blocked: true, error: HOLIDAY_DELETE_BLOCKED, removed: 0, removedLinks: 0, ...extra };
+  }
 
-    saveState();
-    return true;
+  /** Bloqueado (REGRA FIXA). Antes: soft delete. Retorna false. */
+  function removeHoliday() {
+    return false;
   }
 
   /**
@@ -3478,49 +3837,14 @@
     return (data.holidays || []).filter((h) => !h.isDeleted);
   }
 
-  /**
-   * Exclusão DEFINITIVA de feriado da empresa (irreversível — ação do usuário).
-   * Remove TODOS os registros com o mesmo nome+data (elimina duplicatas) junto
-   * dos seus vínculos (workedEmployees) e cria um tombstone de conteúdo para que
-   * o feriado não retorne via merge do Firebase, seed ou auto-sync do calendário.
-   * Retorna { ok, removed, name, date }.
-   */
-  function removeCompanyHolidayPermanently(id, options = {}) {
-    const company = options.company || getPrimaryPageCompany("feriados");
-    const data = getCompanyData(company);
-    const holiday = (data.holidays || []).find((h) => h.id === id);
-    if (!holiday) return { ok: false, removed: 0 };
-
-    const { name, date } = holiday;
-    const key = holidayTombstoneKey(date, name);
-    const before = data.holidays.length;
-    data.holidays = data.holidays.filter((h) => holidayTombstoneKey(h.date, h.name) !== key);
-    const removed = before - data.holidays.length;
-
-    recordHolidayTombstone(company, date, name);
-    saveState();
-    return { ok: true, removed, name, date };
+  /** Bloqueado (REGRA FIXA): feriado cadastrado não se exclui. */
+  function removeCompanyHolidayPermanently() {
+    return holidayDeleteBlocked();
   }
 
-  /**
-   * Exclusão DEFINITIVA de feriado do calendário (irreversível — ação do usuário).
-   * Remove todas as entradas com o mesmo nome+data e cria tombstone de calendário.
-   * Retorna { ok, removed, name, date }.
-   */
-  function removeCalendarHolidayPermanently(id) {
-    const list = Array.isArray(state.calendarHolidays) ? state.calendarHolidays : [];
-    const holiday = list.find((h) => h.id === id);
-    if (!holiday) return { ok: false, removed: 0 };
-
-    const { name, date } = holiday;
-    const key = holidayTombstoneKey(date, name);
-    const before = list.length;
-    state.calendarHolidays = list.filter((h) => holidayTombstoneKey(h.date, h.name) !== key);
-    const removed = before - state.calendarHolidays.length;
-
-    recordHolidayTombstone(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, date, name);
-    saveState();
-    return { ok: true, removed, name, date };
+  /** Bloqueado (REGRA FIXA): feriado cadastrado não se exclui. */
+  function removeCalendarHolidayPermanently() {
+    return holidayDeleteBlocked();
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -3634,111 +3958,9 @@
     return { total, byCompany };
   }
 
-  /**
-   * Exclusão DEFINITIVA de um feriado nas duas fontes (ação explícita do
-   * usuário): entrada do calendário, feriado do bloco da empresa e TODOS os
-   * vínculos de funcionários daquele feriado.
-   *
-   * Escopo por empresa: por padrão só a empresa da aba ativa. Se a entrada do
-   * calendário atende mais de uma empresa (legado/seed "ambas"), ela é mantida
-   * para as demais — nada da outra empresa é apagado por tabela.
-   *
-   * Grava tombstones de feriado e de vínculo para que nada volte por merge do
-   * Firebase, seed ou auto-sync do calendário. O CO já lançado na escala é
-   * preservado: só perde a referência ao feriado excluído.
-   * Retorna { ok, name, date, companies, removedCalendar, removedHolidays, removedLinks, byCompany }.
-   */
-  function removeHolidayEverywhere(date, name, options = {}) {
-    const targetDate = String(date || "").trim();
-    const targetName = String(name || "").trim();
-    if (!targetDate || !targetName) return { ok: false, removedLinks: 0 };
-
-    const scope = resolveHolidayScopeCompanies(options.companies);
-    if (!scope.length) return { ok: false, removedLinks: 0 };
-    const key = holidayTombstoneKey(targetDate, targetName);
-
-    // ── Calendário: remove só o que pertence ao escopo ────────────────────
-    const list = Array.isArray(state.calendarHolidays) ? state.calendarHolidays : [];
-    const keptCalendar = [];
-    let removedCalendar = 0;
-    list.forEach((holiday) => {
-      if (holidayTombstoneKey(holiday?.date, holiday?.name) !== key) {
-        keptCalendar.push(holiday);
-        return;
-      }
-      const remaining = expandCalendarHolidayCompanies(holiday.companies).filter(
-        (company) => !scope.includes(company)
-      );
-      if (remaining.length) {
-        // Ainda vale para outra empresa: mantém a entrada, sem o escopo excluído.
-        holiday.companies = remaining;
-        keptCalendar.push(holiday);
-        return;
-      }
-      removedCalendar += 1;
-    });
-    state.calendarHolidays = keptCalendar;
-    const stillInCalendar = keptCalendar.some(
-      (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) === key
-    );
-    // Tombstone de calendário só quando a identidade sai por completo — senão
-    // bloquearia o feriado que continua válido para a outra empresa.
-    if (!stillInCalendar) {
-      recordHolidayTombstone(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, targetDate, targetName);
-    }
-
-    // ── Empresas do escopo: feriado + vínculos ────────────────────────────
-    const byCompany = {};
-    let removedHolidays = 0;
-    let removedLinks = 0;
-
-    scope.forEach((company) => {
-      const data = getCompanyData(company);
-      const holidays = Array.isArray(data.holidays) ? data.holidays : [];
-      const doomed = holidays.filter(
-        (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) === key
-      );
-      // Tombstone da empresa mesmo sem registro local: impede que o feriado
-      // volte pelo merge de outro PC que ainda o tenha.
-      recordHolidayTombstone(company, targetDate, targetName);
-      if (!doomed.length) return;
-
-      let links = 0;
-      doomed.forEach((holiday) => {
-        (holiday.workedEmployees || []).forEach((item) => {
-          if (!item?.employeeId) return;
-          links += 1;
-          recordWorkedLinkTombstone(company, holiday.date, holiday.name, item.employeeId);
-        });
-        // Escala: mantém o CO lançado, mas remove o vínculo com o feriado excluído.
-        Object.keys(data.manualScale || {}).forEach((scaleKey) => {
-          const entry = data.manualScale[scaleKey];
-          if (entry && typeof entry === "object" && entry.linkedHolidayId === holiday.id) {
-            data.manualScale[scaleKey] = "CO";
-          }
-        });
-      });
-
-      data.holidays = holidays.filter(
-        (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) !== key
-      );
-      removedHolidays += doomed.length;
-      removedLinks += links;
-      byCompany[company] = { holidays: doomed.length, links };
-    });
-
-    if (options.recompute !== false) runScaleIntegrations([targetDate.slice(0, 7)]);
-    saveState();
-    return {
-      ok: true,
-      name: targetName,
-      date: targetDate,
-      companies: scope,
-      removedCalendar,
-      removedHolidays,
-      removedLinks,
-      byCompany
-    };
+  /** Bloqueado (REGRA FIXA): feriado cadastrado não se exclui — nem pelo calendário. */
+  function removeHolidayEverywhere(date, name) {
+    return holidayDeleteBlocked({ name: String(name || "").trim(), date: String(date || "").trim() });
   }
 
   /**
@@ -3996,6 +4218,17 @@
     const data = getCompanyData(company);
     const holiday = (data.holidays || []).find((item) => item.id === holidayId);
     if (!holiday) return false;
+
+    const removedItem = (holiday.workedEmployees || []).find((item) => item.employeeId === employeeId);
+    if (removedItem) {
+      const employeeName = (data.employees || []).find((row) => row.id === employeeId)?.name || employeeId;
+      archiveDeletion("vinculo", company, `${employeeName} — ${holiday.name} (${holiday.date})`, {
+        holiday: { id: holiday.id, date: holiday.date, name: holiday.name },
+        employeeName,
+        item: removedItem,
+        scaleLinks: collectScaleLinksToHolidays(data, [holidayId], employeeId)
+      });
+    }
 
     const before = (holiday.workedEmployees || []).length;
     holiday.workedEmployees = (holiday.workedEmployees || []).filter((item) => item.employeeId !== employeeId);
@@ -5200,6 +5433,10 @@
     getSystemVersion,
     updateHoliday,
     removeWorkedEmployeeFromHoliday,
+    listDeletedArchive,
+    restoreDeletedArchiveEntry,
+    mergeDeletedArchives,
+    DELETED_ARCHIVE_KIND_LABELS,
     addManualWorkedEmployee,
     removeVacation,
     saveState,

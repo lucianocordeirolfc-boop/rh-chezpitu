@@ -447,15 +447,16 @@ function validateFeriados(AppData, chez) {
   const peng = AppData.getCompanyData("Pengold");
   const pengOnlyId = "h-peng-only-test";
   peng.holidays.push({ id: pengOnlyId, name: "Feriado Pengold", date: "2026-08-15", workedEmployees: [] });
-  AppData.removeHoliday(pengOnlyId, { company: "Pengold", save: false });
-  // Fase 3A — Soft delete: feriado continua existindo mas marcado como deletado
-  const deletedHoliday = peng.holidays.find((h) => h.id === pengOnlyId);
+  const chezBefore = chez.holidays.length;
+  const removed = AppData.removeHoliday(pengOnlyId, { company: "Pengold", save: false });
+  // REGRA FIXA 2026-10-30: feriado cadastrado não se exclui (nem soft delete).
+  const keptHoliday = peng.holidays.find((h) => h.id === pengOnlyId);
   assert(
     area,
-    deletedHoliday?.isDeleted === true && chez.holidays.length > 0,
-    "removeHoliday respeita empresa do filtro Feriados (soft delete — não apaga bloco errado)",
+    removed === false && keptHoliday && !keptHoliday.isDeleted && chez.holidays.length === chezBefore,
+    "removeHoliday recusa: feriado cadastrado não se exclui (nenhuma empresa é tocada)",
     ["js/data.js", "js/feriados.js"],
-    "removeHoliday(id, { company }) — Fase 3A soft delete"
+    "removeHoliday bloqueado — PROJECT_RULES.md → Feriado cadastrado não se exclui"
   );
   AppData.setPageCompany("feriados", "Chez Pitu", { save: false });
 }
@@ -1706,14 +1707,16 @@ function validatePhase2Improvements(AppData) {
     "Editar/Excluir feriado movidos para o modal de cadastro"
   );
 
-  // 6. Feriados — editar/excluir dentro do modal de cadastro, com confirmação
+  // 6. Feriados — editar dentro do modal de cadastro; SEM botão de excluir feriado
   assert(
     area,
     feriados.includes("data-popup-edit-holiday=") &&
-      feriados.includes("data-popup-remove-holiday=") &&
       feriados.includes("renderCompanyHolidaysManager") &&
-      feriados.includes("confirmDeleteHoliday(holidayId)"),
-    "Feriados: editar/excluir e lista de cadastrados dentro do modal, com confirmação",
+      !feriados.includes("data-popup-remove-holiday") &&
+      !feriados.includes("data-remove-calendar-holiday") &&
+      !feriados.includes("AppData.removeHolidayEverywhere") &&
+      !feriados.includes("AppData.removeCompanyHolidayPermanently"),
+    "Feriados: editar no modal; nenhuma tela exclui feriado cadastrado (só vínculo)",
     ["js/feriados.js"],
     "renderCompanyHolidaysManager + bindCompanyHolidayManager"
   );

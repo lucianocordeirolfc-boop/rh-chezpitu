@@ -1650,6 +1650,25 @@ small.progress-hint.progress-tone-info {
 }
 
 /* ─── Seletor "Mostrar funcionários inativos" ─── */
+/* Lixeira (itens excluídos) — js/lixeira.js */
+.modal-center.modal-center-wide {
+  max-width: min(920px, calc(100vw - 32px));
+}
+
+.lixeira-list {
+  max-height: 52vh;
+  overflow-y: auto;
+  margin: 12px 0;
+}
+
+.lixeira-list td small.help-text {
+  display: block;
+}
+
+.lixeira-list tr.is-restored td {
+  color: var(--muted, #6b7a90);
+}
+
 .inactive-picker-list {
   display: grid;
   gap: 6px;

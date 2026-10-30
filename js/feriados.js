@@ -607,35 +607,28 @@
     return { ok: true };
   }
 
-  // Editar/Excluir feriado vivem no modal "Cadastrar feriado" (não no contexto do funcionário).
-  function confirmDeleteHoliday(holidayId) {
-    const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
+  /**
+   * Confirmação de "Excluir vínculo": nomeia funcionário, feriado e status, e
+   * alerta em destaque quando o vínculo já tem compensação (Compensado /
+   * Agendado / CO na escala) — é o histórico que mais dói perder.
+   */
+  function confirmUnlinkWorkedEmployee(company, holidayId, employeeId) {
+    const data = AppData.getCompanyData(company);
     const holiday = (data.holidays || []).find((item) => item.id === holidayId);
-    const total = holiday?.workedEmployees?.length || 0;
-
-    // Fase 3A — Soft delete: não é definitivo, pode ser restaurado
-    const msg = total
-      ? `Marcar o feriado "${holiday?.name || ""}" (${formatDateBR(holiday?.date || "")}) como excluído?\n\n` +
-        `Isso afetará ${total} vínculo(s) de funcionários.\n\n` +
-        `Nota: Esta ação não é definitiva. O feriado pode ser restaurado depois se necessário.`
-      : `Marcar o feriado "${holiday?.name || ""}" como excluído?\n\n` +
-        `Nota: Esta ação não é definitiva. O feriado pode ser restaurado depois se necessário.`;
-
-    return window.confirm(msg);
-  }
-
-  // Exclusão DEFINITIVA (irreversível): remove o feriado e TODOS os vínculos e
-  // impede que ele volte por seed/sincronização. Confirmação explícita e forte.
-  function confirmDeleteHolidayPermanent(holiday) {
-    const total = holiday?.workedEmployees?.length || 0;
-    const linhas = total
-      ? `\n\nIsto vai excluir também ${total} vínculo(s) de funcionário(s) neste feriado.`
-      : "";
+    const item = (holiday?.workedEmployees || []).find((row) => row.employeeId === employeeId);
+    if (!holiday || !item) return false;
+    const employeeName = getEmployee(employeeId, data)?.name || "Funcionário não encontrado";
+    const status = AppData.resolveWorkedHolidayStatus(item, holiday.date).label || item.status || "";
+    const compensation = item.compensationDate ? ` · compensação ${formatDateBR(item.compensationDate)}` : "";
+    const hasHistory = Boolean(item.compensationDate || item.linkedFromScale || /compensado|agendado/i.test(status));
     const msg =
-      `EXCLUIR DEFINITIVAMENTE o feriado "${holiday?.name || ""}" (${formatDateBR(holiday?.date || "")})?` +
-      linhas +
-      `\n\nEsta ação é PERMANENTE e NÃO pode ser desfeita. ` +
-      `O feriado não voltará por sincronização nem por cadastro automático.`;
+      `Excluir o vínculo de ${employeeName}\n` +
+      `com o feriado ${holiday.name} (${formatDateBR(holiday.date)})?\n\n` +
+      `Situação: ${status}${compensation}` +
+      (hasHistory
+        ? `\n\nATENÇÃO: este vínculo já tem compensação registrada. Ele sairá do histórico do funcionário.`
+        : "") +
+      `\n\nO vínculo fica guardado na Lixeira e pode ser restaurado.`;
     return window.confirm(msg);
   }
 
@@ -994,15 +987,15 @@
       button.addEventListener("click", () => {
         const [holidayId, employeeId] = String(button.dataset.unlinkHoliday || "").split("|");
         if (!holidayId || !employeeId) return;
-        if (!window.confirm("Remover o vínculo deste funcionário com este feriado?")) return;
-        AppData.removeWorkedEmployeeFromHoliday(holidayId, employeeId);
+        const company = AppData.getPrimaryPageCompany("feriados");
+        if (!confirmUnlinkWorkedEmployee(company, holidayId, employeeId)) return;
+        AppData.removeWorkedEmployeeFromHoliday(holidayId, employeeId, { company });
         refreshTable(container);
         window.App.renderCurrent();
       });
     });
 
-    // Excluir feriado permanente vive apenas no modal "Gerenciar feriados"
-    // (bindCompanyHolidayManager / data-popup-remove-holiday).
+    // Feriado cadastrado nunca é excluído (REGRA FIXA): só o vínculo sai.
 
     // Data de compensação: grava só ao SAIR do campo (blur) ou com Enter.
     // O "change" do <input type="date"> dispara a cada dígito que forma uma
@@ -1303,41 +1296,8 @@
       });
     });
 
-    root.querySelectorAll("[data-remove-calendar-holiday]").forEach((button) => {
-      if (button.dataset.boundRemoveCalendar) return;
-      button.dataset.boundRemoveCalendar = "1";
-      button.addEventListener("click", () => {
-        const ref = readRegisteredHolidayRef(button);
-        if (!ref) return;
-
-        // Exclusão sempre no escopo da empresa da aba ativa (a outra empresa
-        // mantém o feriado e os vínculos dela).
-        const company = AppData.getActiveCompany();
-        const links = AppData.countHolidayLinksAllCompanies(ref.date, ref.name);
-        const detalhe = links.byCompany[company]
-          ? `\n\nIsto vai excluir também ${links.byCompany[company]} vínculo(s) de funcionário(s) desta empresa.`
-          : "";
-        const message =
-          `EXCLUIR DEFINITIVAMENTE o feriado ${ref.name} (${formatDateBR(ref.date)}) de ${company}?` +
-          detalhe +
-          `\n\nEsta ação é PERMANENTE e NÃO pode ser desfeita. ` +
-          `O feriado não voltará por sincronização nem por cadastro automático.`;
-        if (!window.confirm(message)) return;
-
-        const result = AppData.removeHolidayEverywhere(ref.date, ref.name, { companies: [company] });
-        if (result?.ok) {
-          const vinculos = result.removedLinks
-            ? ` (${result.removedLinks} vínculo(s) removido(s))`
-            : "";
-          window.App?.toast?.(
-            `Feriado "${result.name}" excluído definitivamente${vinculos}.`,
-            "success"
-          );
-        }
-        refreshPopupCalendarList(root);
-        window.App.renderCurrent();
-      });
-    });
+    // REGRA FIXA: feriado cadastrado NÃO pode ser excluído (PROJECT_RULES.md →
+    // "Feriado cadastrado não se exclui"). Só o vínculo de um funcionário sai.
 
     root.querySelectorAll("[data-edit-calendar-holiday]").forEach((button) => {
       if (button.dataset.boundEditCalendar) return;
@@ -1552,8 +1512,10 @@
       button.addEventListener("click", () => {
         const [holidayId, employeeId] = String(button.dataset.removeWorked || "").split("|");
         if (!holidayId || !employeeId) return;
-        if (!window.confirm("Remover o vínculo deste funcionário com este feriado?")) return;
-        AppData.removeWorkedEmployeeFromHoliday(holidayId, employeeId);
+        // Mesma empresa da lista exibida no pop-up (refreshPopupWorkedList).
+        const company = AppData.getActiveCompany();
+        if (!confirmUnlinkWorkedEmployee(company, holidayId, employeeId)) return;
+        AppData.removeWorkedEmployeeFromHoliday(holidayId, employeeId, { company });
         refreshPopupWorkedList(overlay);
         window.App.renderCurrent();
       });
@@ -1638,6 +1600,14 @@
 
     container.querySelector("#openInactiveHolidayEmployees")?.addEventListener("click", () => {
       openInactiveEmployeesPicker();
+    });
+
+    container.querySelector("#openHolidayArchive")?.addEventListener("click", () => {
+      window.LixeiraUI?.open({
+        company: AppData.getPrimaryPageCompany("feriados"),
+        kinds: ["vinculo", "feriado"],
+        onRestored: () => window.App.renderCurrent()
+      });
     });
 
     container.querySelector("#printHolidayReport")?.addEventListener("click", () => {
@@ -1841,7 +1811,6 @@
                 <td class="feriados-manager-count">${vinculos}</td>
                 <td class="actions">
                   <button class="link-button" type="button" data-popup-edit-holiday="${esc(holiday.id)}">Editar</button>
-                  <button class="link-button danger" type="button" data-popup-remove-holiday="${esc(holiday.id)}">Excluir</button>
                 </td>
               </tr>
             `;
@@ -1851,7 +1820,7 @@
 
     return `
       <h4 class="feriados-manager-title">Feriados cadastrados — ${esc(company)} <span class="feriados-manager-badge">${holidays.length}</span></h4>
-      <p class="help-text compact-help">Editar ou excluir afeta todos os funcionários vinculados a este feriado.</p>
+      <p class="help-text compact-help">Editar afeta todos os funcionários vinculados a este feriado. Feriado cadastrado não pode ser excluído — para tirar um funcionário, use "Excluir vínculo".</p>
       <div class="table-wrap table-compact feriados-manager-table">
         <table>
           <thead>
@@ -1875,22 +1844,6 @@
     overlay.querySelectorAll("[data-popup-edit-holiday]").forEach((button) => {
       button.addEventListener("click", () => {
         showEditHolidayModal(button.dataset.popupEditHoliday, () => refreshPopupCompanyHolidayList(overlay));
-      });
-    });
-    overlay.querySelectorAll("[data-popup-remove-holiday]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const holidayId = button.dataset.popupRemoveHoliday;
-        const company = AppData.getPrimaryPageCompany("feriados");
-        const data = AppData.getCompanyData(company);
-        const holiday = (data.holidays || []).find((item) => item.id === holidayId);
-        if (!holiday) return;
-        if (!confirmDeleteHolidayPermanent(holiday)) return;
-        const result = AppData.removeCompanyHolidayPermanently(holidayId, { company });
-        if (result?.ok) {
-          window.App?.toast?.(`Feriado "${result.name}" excluído definitivamente.`, "success");
-        }
-        refreshPopupCompanyHolidayList(overlay);
-        window.App.renderCurrent();
       });
     });
   }
@@ -1969,7 +1922,6 @@
                 <td class="actions" data-holiday-date="${esc(holiday.date)}" data-holiday-name="${esc(holiday.name)}">
                   <button class="link-button success" data-link-employee-cal type="button">+ Funcionário</button>
                   <button class="link-button" data-edit-calendar-holiday type="button">Editar</button>
-                  <button class="link-button danger" data-remove-calendar-holiday type="button">Excluir</button>
                 </td>
               </tr>
             `
@@ -2001,6 +1953,7 @@
         </div>
         <div class="feriados-toolbar-actions">
           ${renderInactiveToggle(rawLines, data)}
+          ${window.LixeiraUI?.toggleButtonHTML({ id: "openHolidayArchive", company, kinds: ["vinculo", "feriado"] }) || ""}
           <button type="button" class="primary" id="openLinkEmployeeHoliday">+ Vincular funcionário a feriado</button>
           <button type="button" class="primary" id="openHolidayRegister">+ Cadastrar feriado</button>
         </div>

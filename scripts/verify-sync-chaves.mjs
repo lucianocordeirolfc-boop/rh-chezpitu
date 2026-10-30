@@ -116,13 +116,22 @@ console.log("[1] Escape de chave do Realtime Database");
   );
 }
 
-// ── 2. Exclusão definitiva de feriado com nome "perigoso" ─────────────────────
-console.log("\n[2] Exclusão definitiva de feriado com . e / no nome");
+// Feriado cadastrado não se exclui mais (REGRA FIXA 2026-10-30), mas a base
+// tem tombstones de exclusões antigas — este helper reproduz um deles.
+function legacyHolidayTombstone(A, date, name) {
+  if (!A.state.holidayTombstones) A.state.holidayTombstones = {};
+  if (!A.state.holidayTombstones[CO]) A.state.holidayTombstones[CO] = {};
+  A.state.holidayTombstones[CO][A.holidayTombstoneKey(date, name)] = Date.now();
+  A.applyHolidayTombstones(A.state);
+}
+
+// ── 2. Exclusão ANTIGA de feriado com nome "perigoso" ─────────────────────────
+console.log("\n[2] Exclusão antiga de feriado com . e / no nome");
 for (const nome of ["Sto. Antônio", "Carnaval 16/02", "Aniversário [Búzios]"]) {
   const sb = loadSandbox();
   const A = sb.AppData;
   A.addHoliday({ name: nome, date: "2026-06-13" }, { company: CO });
-  A.removeHolidayEverywhere("2026-06-13", nome, { companies: [CO] });
+  legacyHolidayTombstone(A, "2026-06-13", nome);
   const v = violationsOfPayload(sb);
   assert(v.length === 0, `"${nome}": payload aceito pelo RTDB${v.length ? " — " + v[0] : ""}`);
   assert(
@@ -332,8 +341,8 @@ console.log("\n[11] Regressão (nomes sem caractere especial)");
   A.addManualWorkedEmployee(h.id, emp.id, { company: CO });
   A.setManualScale(emp.id, "2026-04-20", "FOLGA", { company: CO });
   assert(violationsOfPayload(sb).length === 0, "payload de um estado normal continua válido");
-  A.removeHolidayEverywhere("2026-04-23", "São Jorge", { companies: [CO] });
-  assert(A.isHolidayTombstoned(CO, "2026-04-23", "São Jorge"), "exclusão definitiva de nome simples continua funcionando");
+  legacyHolidayTombstone(A, "2026-04-23", "São Jorge");
+  assert(A.isHolidayTombstoned(CO, "2026-04-23", "São Jorge"), "exclusão antiga de nome simples continua valendo");
   A.addHoliday({ name: "São Jorge", date: "2026-04-23" }, { company: CO });
   assert(!A.isHolidayTombstoned(CO, "2026-04-23", "São Jorge"), "recriar pelo usuário continua limpando o tombstone");
 }
@@ -487,7 +496,7 @@ console.log("\n[16] Guarda: texto perigoso em todos os campos digitáveis");
   A.setManualScale(emp.id, "2026-06-10", "FOLGA", { company: CO });
   A.addAbsence({ employeeId: emp.id, type: "Outro", reason: perigoso, startDate: "2026-06-01", endDate: "2026-06-02" }, { company: CO });
   A.removeWorkedEmployeeFromHoliday(h.id, emp.id, { company: CO });
-  A.removeHolidayEverywhere("2026-06-13", `Feriado ${perigoso}`, { companies: [CO] });
+  legacyHolidayTombstone(A, "2026-06-13", `Feriado ${perigoso}`);
 
   const v = violationsOfPayload(sb);
   assert(v.length === 0, `nenhuma chave é montada com texto do usuário sem escape${v.length ? " — " + v[0] : ""}`);

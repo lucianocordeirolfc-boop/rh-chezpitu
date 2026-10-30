@@ -521,10 +521,10 @@
     AppData.saveState();
   }
 
-  function removeCalendarHoliday(id) {
-    const state = AppData.state;
-    state.calendarHolidays = (state.calendarHolidays || []).filter((item) => item.id !== id);
-    AppData.saveState();
+  // REGRA FIXA: feriado cadastrado não se exclui (só o vínculo de um
+  // funcionário). Mantida para compatibilidade; recusa sempre.
+  function removeCalendarHoliday() {
+    return false;
   }
 
   function updateCalendarHoliday(id, patch = {}) {

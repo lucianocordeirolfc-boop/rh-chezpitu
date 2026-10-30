@@ -248,7 +248,9 @@ if (window.firebase && firebase.apps.length) {
       tombstones: {
         ...(state.tombstones || {}),
         __holidayTombstones: state.holidayTombstones || {},
-        __workedLinkTombstones: state.workedLinkTombstones || {}
+        __workedLinkTombstones: state.workedLinkTombstones || {},
+        // Lixeira (cópia do que foi excluído) — mesmo nó, mesma regra do RTDB.
+        __deletedArchive: state.deletedArchive || {}
       },
       // Trilha de auditoria (cadastro/inativação/reativação/exclusão).
       auditLog: state.auditLog || [],
@@ -328,9 +330,10 @@ if (window.firebase && firebase.apps.length) {
     const rawTombstones = data.tombstones || {};
     const nestedHolidayTombstones = rawTombstones.__holidayTombstones || null;
     const nestedWorkedLinkTombstones = rawTombstones.__workedLinkTombstones || null;
+    const nestedDeletedArchive = rawTombstones.__deletedArchive || null;
     const idTombstones = {};
     Object.keys(rawTombstones).forEach((k) => {
-      if (k === "__holidayTombstones" || k === "__workedLinkTombstones") return;
+      if (k === "__holidayTombstones" || k === "__workedLinkTombstones" || k === "__deletedArchive") return;
       idTombstones[k] = rawTombstones[k];
     });
 
@@ -350,6 +353,7 @@ if (window.firebase && firebase.apps.length) {
       // Extraídos do nó tombstones (com fallback ao formato antigo top-level).
       holidayTombstones: nestedHolidayTombstones || data.holidayTombstones || {},
       workedLinkTombstones: nestedWorkedLinkTombstones || {},
+      deletedArchive: nestedDeletedArchive || {},
       auditLog: Array.isArray(data.auditLog) ? data.auditLog : []
     };
   }

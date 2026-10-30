@@ -84,6 +84,10 @@
        compensação (CO) na Escala daquele funcionário.</p>
     <p class="manual-note">Vincula apenas o funcionário escolhido (nunca todos). Se já existir vínculo,
        o sistema avisa e não cria duplicado.</p>
+    <p><strong>Feriado cadastrado não pode ser excluído.</strong> Para corrigir nome ou data, use <strong>Editar</strong>.
+       Para tirar um funcionário de um feriado, use <strong>Excluir vínculo</strong> na linha dele: a confirmação mostra
+       o funcionário, o feriado e a situação. O vínculo excluído vai para a <strong>Lixeira</strong> (botão
+       <strong>Lixeira (N)</strong>, no topo da tela), de onde pode ser <strong>restaurado</strong> com status e compensação.</p>
     <p><strong>Incluir um feriado anterior ao Corpus Christi (retroativo):</strong> para datas do início do ano
        (Ano Novo, Carnaval, Quarta-feira de Cinzas, Tiradentes, São Jorge), use <strong>+ Cadastrar feriado</strong>
        informando a data (ex.: <code>01/01</code>, <code>18/02</code>) e depois <strong>+ Vincular funcionário a feriado</strong>.</p>

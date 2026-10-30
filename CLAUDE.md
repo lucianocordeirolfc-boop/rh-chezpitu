@@ -57,6 +57,22 @@ vale-transporte, ausências/férias, lançamentos do Contador e cadastro.
 
 Detalhamento completo: PROJECT_RULES.md → "Imutabilidade dos dados já registrados".
 
+## Lixeira — nada some do sistema (REGRA FIXA)
+
+Toda exclusão definitiva (vínculo, feriado, funcionário, férias, ausência)
+guarda antes a cópia completa em `state.deletedArchive` (`archiveDeletion`) e
+pode ser restaurada pela tela. A lixeira nunca é podada. Função nova que remova
+dado tem de arquivar antes e ganhar teste em `scripts/verify-lixeira.mjs`.
+Detalhamento: PROJECT_RULES.md → "Lixeira — nada some do sistema".
+
+## Feriado cadastrado não se exclui (REGRA FIXA)
+
+Nenhum usuário pode excluir feriado já cadastrado. Só se exclui o **vínculo de
+um funcionário específico** com o feriado ("Excluir vínculo"). As funções de
+exclusão de feriado recusam sempre; não reintroduzir botão/função/rotina de
+exclusão sem autorização explícita. Detalhamento: PROJECT_RULES.md →
+"Feriado cadastrado não se exclui".
+
 ## Persistência
 
 Nunca apagar dados existentes.

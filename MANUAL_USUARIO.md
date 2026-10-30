@@ -115,6 +115,11 @@ A partir daí, o feriado fica disponível para compensação (código CO) na Esc
 
 > **Regras de segurança:** vincula apenas o funcionário escolhido (nunca todos). Se o funcionário já estiver vinculado àquele feriado, o sistema avisa e não cria duplicado.
 
+### Feriado cadastrado não se exclui
+- Feriado já cadastrado **não pode ser excluído**. Para corrigir nome ou data, use **Editar**.
+- Para tirar um funcionário de um feriado, use **Excluir vínculo** na linha dele. A confirmação mostra funcionário, feriado e situação (e avisa se já houver compensação).
+- Todo vínculo excluído vai para a **Lixeira** (botão **Lixeira (N)** no topo da tela) e pode ser **restaurado** com status e compensação. A Lixeira também existe no Cadastro de Funcionários e em Férias/Ausências.
+
 ### Incluir um feriado anterior ao Corpus Christi (retroativo)
 Use quando precisar registrar um feriado de início do ano (ex.: **Ano Novo**, **Carnaval**, **Quarta-feira de Cinzas**, **Tiradentes**, **São Jorge**) — datas anteriores ao Corpus Christi.
 
