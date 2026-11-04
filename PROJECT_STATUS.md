@@ -9,11 +9,25 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261021.01 (Contador: Hora Extra Noturna + correções Feriados/Contador)
-**Data:** 2026-10-21
+**Versão:** 20261104.01 (Cadastro: Cargo em lista suspensa)
+**Data:** 2026-11-04
 **Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
 
 ## Último Deploy
+
+Data: 04/11/2026
+Versão: 20261104.01 (Firebase Hosting — chez-pitu-rh) — **aprovada pelo usuário**
+Commits: `0e9010b` (feat) + `a8176ba` (carimbo)
+
+**Cadastro — Cargo em lista suspensa.** Lista com os cargos já cadastrados e
+opção "➕ Cadastrar novo cargo"; grafia parecida assume o cargo da lista. Nenhum
+dado gravado foi alterado. Detalhes em `PROJECT_HISTORY.md` → 2026-11-04.
+
+**Cache-busting:** todos os `?v=` do index.html em `20261104.01`.
+
+> Versões `20261030.02` a `20261030.04`: ver `PROJECT_HISTORY.md` → 2026-10-30.
+
+## Deploy 20261021.01
 
 Data: 21/10/2026
 Versão: 20261021.01 (Firebase Hosting — chez-pitu-rh) — **aprovada pelo usuário**

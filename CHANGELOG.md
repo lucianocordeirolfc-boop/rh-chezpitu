@@ -1,3 +1,9 @@
+2026-11-04 - Cadastro: Cargo em lista suspensa (20261104.01)
+- [MELHORIA] Campo Cargo do pop-up de funcionario virou lista suspensa com os cargos ja cadastrados, mais "Cadastrar novo cargo". Cargo novo com a grafia de um existente (maiusculas, acentos, espacos) assume o da lista
+- [NOTA] Nenhum dado gravado foi alterado; grafias erradas ja salvas aparecem na lista ate serem corrigidas pela edicao. Importacao CSV/JSON inalterada
+- Arquivos: js/funcionarios.js, js/manual.js, MANUAL_USUARIO.md, PROJECT_RULES.md, scripts/verify-cargo-lista-suspensa.mjs, scripts/run-validate.mjs
+- verify-cargo-lista-suspensa 23/23; npm test 47/47; npm run validate 25/25. Aprovado pelo usuario em producao
+
 2026-10-21 - Contador: Hora Extra Noturna; Feriados: data de compensacao; Contador volta ao inicio (20261021.01)
 - [NOVO] Contador: coluna/campo "Hora Extra Noturna" (HH:MM ate 200:00) no pop-up, grade, Resumo e PDF; demais colunas abreviadas (H. Extra, Gratif., Comiss., Cons. Int., Dom. Mulher, Ad. Not.)
 - [CORRECAO] ALTO: data de compensacao dos feriados era gravada no meio da digitacao (20-10-2026 -> 0002-10-20). Agora grava ao sair do campo/Enter; ano fora de 2000-2100 recusado; sincronizacao nao redesenha a tabela com o campo em foco

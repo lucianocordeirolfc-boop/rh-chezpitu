@@ -8,14 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261030.03` (exibida como `v2026.10.30.03`) — fonte: `js/version.js`
-- **Branch atual:** `main` — sincronizado com `origin/main` em `1d64c8f`
-- **Último commit:** `1d64c8f` — chore: carimbo de build 20261030.03 (alerta Escala indica folga)
-- **Status geral:** 🟢 EM PRODUÇÃO — versão `20261030.03` (Lixeira, feriado
-  cadastrado não se exclui, alerta "Escala indica folga") **conferida e aprovada
-  pelo usuário em 2026-10-30**. Dados do Carlos Andrey e 4 feriados da Chez
-  Pitu restaurados com autorização. Pendente (frente 2026-09-16): validação no
-  computador que estava com erro de sincronização.
+- **Versão atual:** `20261104.01` (exibida como `v2026.11.04.01`) — fonte: `js/version.js`
+- **Branch atual:** `main` — sincronizado com `origin/main` em `a8176ba`
+- **Último commit:** `a8176ba` — chore: carimbo de build 20261104.01 (Cargo em lista suspensa)
+- **Status geral:** 🟢 EM PRODUÇÃO — versão `20261104.01` (Cargo em lista
+  suspensa) **testada e aprovada pelo usuário em 2026-11-04**. Pendente (frente
+  2026-09-16): validação no computador que estava com erro de sincronização.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -35,6 +33,16 @@ cadastrado não se exclui** — só o vínculo de um funcionário específico; a
 funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-11-04 — Cadastro: Cargo em lista suspensa (em produção, APROVADO)
+
+- ✅ **Lista suspensa no pop-up de funcionário** (`js/funcionarios.js`): cargos já
+  cadastrados (2 empresas, inclusive inativos) + "➕ Cadastrar novo cargo". Cargo
+  novo com a grafia de um existente (caixa, acento, espaços) assume o da lista
+  (`resolveNewRole`). Sem migração; nenhum dado gravado foi alterado.
+- Commits `0e9010b` (feat) + `a8176ba` (carimbo). Testes: nova suíte
+  `verify-cargo-lista-suspensa` 23/23 (fixtures, Chrome real); `npm test` 47/47;
+  `npm run validate` 25/25.
 
 ### Frente 2026-10-30 — Nada some do sistema + feriados do Carlos Andrey (em produção, APROVADO)
 
@@ -428,7 +436,7 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Funcionalidades em andamento
 
-- (nenhuma — frente 2026-10-30 concluída e aprovada)
+- (nenhuma — frente 2026-11-04 concluída e aprovada)
 - Aguardando validação do usuário no computador que estava com o erro de
   sincronização.
 
@@ -440,8 +448,13 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Próximas tarefas
 
-- Feriados: conferência pelo usuário dos 32 vínculos com alerta "Escala indica
-  folga" (Excluir vínculo ou corrigir a escala) — ação do usuário na tela.
+- Cadastro (opcional, se o usuário pedir): levantamento **somente leitura** de
+  cargos com grafias parecidas na base. Grafias erradas já salvas aparecem na
+  lista até serem corrigidas pela edição. Importação CSV/JSON segue aceitando o
+  texto do arquivo.
+- Feriados: conferência pelo usuário dos vínculos com alerta "Escala indica
+  folga" (eram 32; 24 após `20261030.04`, leitura de 2026-10-30) — Excluir vínculo
+  ou corrigir a escala, ação do usuário na tela.
 - Feriados: não recuperado por falta de evidência — quem trabalhou Tiradentes,
   São Jorge, Trabalhador e Corpus Christi 2026 (Chez Pitu) sem ter compensado;
   CO órfão `feriado-mph9gd8l-nlr75` (Cristiane 06/04, Fernando 23/08).
@@ -489,6 +502,9 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Pendências de validação
 
+- ✅ **Validado pelo usuário em produção (2026-11-04):** `20261104.01` — Cargo em
+  lista suspensa ("testado e aprovado").
+
 - ✅ **Validado pelo usuário em produção (2026-10-30):** `20261030.03` — Lixeira,
   feriado não se exclui, restauração e alerta "Escala indica folga" ("ok, tudo
   conferido"). Todos os computadores atualizados (F5) após a publicação.
@@ -530,6 +546,10 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
+
+- ✅ **`20261104.01` — commitado, pushado e deployado** (autorizações separadas
+  do usuário). Conferido por `curl`: web.app e firebaseapp.com na versão nova;
+  `funcionarios.js` publicado contém `roleSelect`/`resolveNewRole`.
 
 - ✅ **`20261030.02` e `20261030.03` — commitados, pushados e deployados**
   (autorizados pelo usuário). Conferido por `curl`: `index.html` serve
@@ -600,10 +620,10 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo em 1d64c8f — só .claude/project-state.md do encerramento)
+(working tree limpo após o commit de encerramento)
 ```
-> Código, documentação e deploy da sessão 2026-10-30 commitados, pushados e em
-> produção (`20261030.03`).
+> Registros de encerramento da sessão 2026-11-04 commitados e pushados. Código e
+> deploy em produção (`20261104.01`).
 
 ---
 
@@ -1044,3 +1064,21 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 - **Próximo passo:** Usuário conferir os 32 alertas "Escala indica folga".
   Segue aberta a validação da sincronização no outro computador (frente
   2026-09-16).
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-11-04 14:23
+- **Versão:** 20261104.01 (em produção, aprovada pelo usuário)
+- **Branch:** main (sincronizado com `origin/main` em `a8176ba`)
+- **Commits:** `0e9010b`, `a8176ba`
+- **Arquivos alterados:** `js/funcionarios.js`, `js/manual.js`, `index.html`,
+  `js/version.js`, `scripts/verify-cargo-lista-suspensa.mjs` (novo),
+  `scripts/run-validate.mjs`, `MANUAL_USUARIO.md`, `PROJECT_RULES.md`,
+  `PROJECT_HISTORY.md`, `PROJECT_STATUS.md`, `CHANGELOG.md`,
+  `.claude/project-state.md`
+- **Resumo:** Campo Cargo do Cadastro em lista suspensa, com opção de novo cargo
+  e reaproveitamento de grafia já existente. Testes com fixtures; nenhum dado de
+  produção alterado. Aprovado pelo usuário.
+- **Próximo passo:** Nenhuma pendência desta entrega.
+  Seguem abertos: levantamento opcional de cargos parecidos, conferência dos
+  alertas "Escala indica folga" e validação da sincronização no outro computador
+  (frente 2026-09-16).

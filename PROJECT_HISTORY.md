@@ -22,6 +22,9 @@ Pedido do usuário: evitar erro de digitação no campo Cargo.
 - Testes: nova suíte `scripts/verify-cargo-lista-suspensa.mjs` (fixtures, Chrome
   real; 23 asserções), cadastrada em `scripts/run-validate.mjs`; `npm test` 47/47;
   `npm run validate` 25/25.
+- **Publicação:** versão `20261104.01`, commits `0e9010b` (feat) + `a8176ba`
+  (carimbo), com push para `origin/main`. Conferida por leitura em produção e
+  **testada e aprovada pelo usuário** no mesmo dia.
 
 ## 2026-10-30 (8) — Vínculo automático com folga na escala some da relação
 
