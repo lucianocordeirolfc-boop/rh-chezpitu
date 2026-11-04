@@ -61,6 +61,8 @@ Logo abaixo das abas, use o menu horizontal para navegar:
 
 O funcionário é cadastrado na **empresa da aba ativa**. O cadastro é a fonte oficial de empresa, setor e cargo.
 
+O **Cargo** é escolhido em lista suspensa, com os cargos já cadastrados. Se o cargo ainda não existir, use **➕ Cadastrar novo cargo**; se ele já existir com outra grafia (maiúsculas ou acentos), o sistema usa o da lista.
+
 ---
 
 ## 5. Escala de Folga

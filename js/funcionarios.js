@@ -64,6 +64,8 @@
     );
   }
 
+  const NEW_ROLE_VALUE = "__new_role__";
+
   const listFilters = {
     search: "",
     company: "todos",
@@ -500,6 +502,30 @@
     );
   }
 
+  function roleSelectOptions(allEmployees) {
+    const roles = uniqueSorted(allEmployees.map((e) => String(e.role || "").trim()));
+    return (
+      `<option value="">— Selecionar cargo —</option>` +
+      roles.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join("") +
+      `<option value="${NEW_ROLE_VALUE}">➕ Cadastrar novo cargo</option>`
+    );
+  }
+
+  /**
+   * Cargo digitado em "Cadastrar novo cargo". Se já existir com outra grafia
+   * (caixa, acento, espaços), devolve o da lista: é isso que impede nascer
+   * "garcom" ao lado de "Garçom".
+   */
+  function resolveNewRole(roleSelect, typed) {
+    const clean = String(typed || "").replace(/\s+/g, " ").trim();
+    const key = AppData.normalizeSearchText(clean);
+    const match = [...(roleSelect?.options || [])].find(
+      (option) =>
+        option.value && option.value !== NEW_ROLE_VALUE && AppData.normalizeSearchText(option.value) === key
+    );
+    return match ? match.value : clean;
+  }
+
   function sundaySelectorHTML(sundayOffWeeks, doubleSundayOff) {
     const weeks = String(sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean);
     const isDouble = doubleSundayOff === "true" || doubleSundayOff === true;
@@ -575,7 +601,12 @@
         <label>CTPS<input name="ctps" required autocomplete="off"></label>
       </div>
       <div class="func-form-row cols-3">
-        <label>Cargo<input name="role" required></label>
+        <label>Cargo
+          <select id="roleSelect" name="role" required>
+            ${roleSelectOptions(allEmployees)}
+          </select>
+          <input id="newRoleInput" class="func-dept-new-input" placeholder="Nome do novo cargo" style="display:none" autocomplete="off">
+        </label>
         <label class="func-dept-label">Setor
           <select id="departmentSelect" name="department" required>
             ${departmentSelectOptions(allEmployees, "")}
@@ -635,6 +666,11 @@
     if (deptSelect) deptSelect.value = "";
     if (newDeptInput) { newDeptInput.style.display = "none"; newDeptInput.value = ""; }
 
+    const roleSelect = form.querySelector("#roleSelect");
+    const newRoleInput = form.querySelector("#newRoleInput");
+    if (roleSelect) roleSelect.value = "";
+    if (newRoleInput) { newRoleInput.style.display = "none"; newRoleInput.value = ""; }
+
     form.querySelectorAll(".sunday-off-check").forEach((cb) => { cb.checked = false; });
     const doubleCheck = form.querySelector(".double-sunday-check");
     if (doubleCheck) doubleCheck.checked = false;
@@ -652,7 +688,7 @@
     if (companyField) companyField.value = company;
 
     Object.entries(employee).forEach(([key, value]) => {
-      if (["department", "sundayOffWeeks", "doubleSundayOff", "fixedDayHistory"].includes(key)) return;
+      if (["role", "department", "sundayOffWeeks", "doubleSundayOff", "fixedDayHistory"].includes(key)) return;
       const field = form.elements[key];
       if (!field) return;
       field.value = key === "vtDaily" ? AppData.formatVtInput(value) : value ?? "";
@@ -732,6 +768,20 @@
       }
     }
 
+    // Cargo fora da lista nunca se perde: abre em "novo cargo" com o valor salvo.
+    const roleSelect = form.querySelector("#roleSelect");
+    const newRoleInput = form.querySelector("#newRoleInput");
+    if (roleSelect) {
+      const role = String(employee.role || "").trim();
+      const optionExists = [...roleSelect.options].some((o) => o.value === role && o.value !== NEW_ROLE_VALUE);
+      roleSelect.value = !role || optionExists ? role : NEW_ROLE_VALUE;
+      if (newRoleInput) {
+        const isLegacy = roleSelect.value === NEW_ROLE_VALUE;
+        newRoleInput.style.display = isLegacy ? "" : "none";
+        newRoleInput.value = isLegacy ? role : "";
+      }
+    }
+
     const sundayWeeks = String(employee.sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean);
     form.querySelectorAll(".sunday-off-check").forEach((cb) => {
       cb.checked = sundayWeeks.includes(cb.value);
@@ -774,6 +824,18 @@
       }
     });
 
+    const roleSelect = form.querySelector("#roleSelect");
+    const newRoleInput = form.querySelector("#newRoleInput");
+    roleSelect?.addEventListener("change", () => {
+      if (roleSelect.value === NEW_ROLE_VALUE) {
+        newRoleInput.style.display = "";
+        newRoleInput.focus();
+      } else {
+        newRoleInput.style.display = "none";
+        newRoleInput.value = "";
+      }
+    });
+
     setupSundayCheckboxes(form);
 
     const vtField = form.elements.vtDaily;
@@ -789,6 +851,16 @@
       const formData = new FormData(form);
       const payload = Object.fromEntries(formData.entries());
       if (!payload.fixedDay) payload.fixedDay = "";
+
+      if (payload.role === NEW_ROLE_VALUE) {
+        const newRole = resolveNewRole(roleSelect, newRoleInput?.value);
+        if (!newRole) {
+          alert("Informe o nome do novo cargo.");
+          newRoleInput?.focus();
+          return;
+        }
+        payload.role = newRole;
+      }
 
       if (payload.defaultShift === "__new_shift__") {
         const newShift = (newShiftInput?.value || "").trim();

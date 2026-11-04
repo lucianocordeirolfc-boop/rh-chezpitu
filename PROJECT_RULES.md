@@ -126,6 +126,16 @@ Cada funcionário deve ter:
 
 employeeId é o vínculo principal do sistema.
 
+### Cargo em lista suspensa
+
+No pop-up de funcionário, Cargo é lista suspensa montada a partir dos cargos já
+cadastrados (todas as empresas, inclusive inativos), mais "➕ Cadastrar novo
+cargo". Cargo novo digitado com a grafia de um existente (caixa, acento, espaços)
+assume o da lista (`resolveNewRole`, js/funcionarios.js). Não existe cadastro
+separado de cargos e nada é migrado: cargo já salvo continua como está, e só muda
+por edição do usuário. Importação CSV/JSON mantém o texto do arquivo. Cobertura:
+`scripts/verify-cargo-lista-suspensa.mjs`.
+
 ### Funcionário inativo (REGRA FIXA)
 
 Funcionário com status **Inativo** não aparece nas telas operacionais:

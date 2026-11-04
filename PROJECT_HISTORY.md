@@ -7,6 +7,22 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-04 — Cargo em lista suspensa no Cadastro de Funcionários
+
+Pedido do usuário: evitar erro de digitação no campo Cargo.
+
+- **Mudança:** `js/funcionarios.js` — Cargo passa de campo de texto para lista
+  suspensa com os cargos já cadastrados, no padrão do Setor, mais "➕ Cadastrar
+  novo cargo". Cargo novo com a grafia de um existente (caixa, acento, espaços)
+  assume o da lista (`resolveNewRole`).
+- **Dados:** nenhuma migração; nada gravado na base. Grafias erradas já salvas
+  continuam aparecendo na lista até o usuário corrigir pela edição.
+- **Fora do escopo:** importação CSV/JSON continua aceitando o texto do arquivo.
+- Documentação: `PROJECT_RULES.md`, `MANUAL_USUARIO.md`, `js/manual.js`.
+- Testes: nova suíte `scripts/verify-cargo-lista-suspensa.mjs` (fixtures, Chrome
+  real; 23 asserções), cadastrada em `scripts/run-validate.mjs`; `npm test` 47/47;
+  `npm run validate` 25/25.
+
 ## 2026-10-30 (8) — Vínculo automático com folga na escala some da relação
 
 Relato do usuário: Fernando 15/11, Edna 15/11 e Claudiana 02/11 apareciam no

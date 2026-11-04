@@ -52,6 +52,7 @@
       <li><strong>Salvar</strong>.</li>
     </ol>
     <p>O funcionário é cadastrado na empresa da aba ativa. O cadastro é a fonte oficial de empresa, setor e cargo.</p>
+    <p>O <strong>Cargo</strong> é escolhido em lista suspensa, com os cargos já cadastrados. Se o cargo ainda não existir, use <strong>➕ Cadastrar novo cargo</strong>; se ele já existir com outra grafia (maiúsculas ou acentos), o sistema usa o da lista.</p>
 
     <h3>5. Escala de Folga</h3>
     <ol>
