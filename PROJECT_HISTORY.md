@@ -29,7 +29,10 @@ Pedido do usuário: exportar os dados do cadastro para Excel, de forma linear e 
   40 asserções, inclusive "dados idênticos antes/depois"), cadastrada em
   `scripts/run-validate.mjs`; arquivo gerado conferido também com leitor
   independente (openpyxl); `npm test` 47/47; `npm run validate` 26/26.
-- **Publicação:** pendente (sem commit/deploy até autorização).
+- **Publicação:** versão `20261110.01`, commits `b619188` (feat) + `72302fd`
+  (carimbo); deploy no Firebase Hosting em 2026-11-10, conferido por leitura em
+  produção (version.js, xlsx-export.js e botão no funcionarios.js). Push para
+  `origin/main` aguardando autorização; teste do usuário em produção pendente.
 
 ## 2026-11-04 — Cargo em lista suspensa no Cadastro de Funcionários
 
