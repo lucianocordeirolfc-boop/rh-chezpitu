@@ -32,7 +32,8 @@ Pedido do usuário: exportar os dados do cadastro para Excel, de forma linear e 
 - **Publicação:** versão `20261110.01`, commits `b619188` (feat) + `72302fd`
   (carimbo); deploy no Firebase Hosting em 2026-11-10, conferido por leitura em
   produção (version.js, xlsx-export.js e botão no funcionarios.js). Push para
-  `origin/main` aguardando autorização; teste do usuário em produção pendente.
+  `origin/main` feito em 2026-11-10 (`c2bba33`). **Testada e aprovada pelo
+  usuário** em produção no mesmo dia.
 
 ## 2026-11-04 — Cargo em lista suspensa no Cadastro de Funcionários
 
