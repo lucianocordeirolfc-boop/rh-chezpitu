@@ -136,6 +136,16 @@ separado de cargos e nada é migrado: cargo já salvo continua como está, e só
 por edição do usuário. Importação CSV/JSON mantém o texto do arquivo. Cobertura:
 `scripts/verify-cargo-lista-suspensa.mjs`.
 
+### Exportar Excel
+
+Botão "Exportar Excel" na Lista de funcionários gera `.xlsx` (gerador próprio
+`js/xlsx-export.js`, sem dependência externa) com a base **completa** da empresa
+da aba ativa — ativos e inativos, ignorando filtros de tela. Uma linha por
+funcionário, uma coluna por campo (`EXPORT_COLUMNS`/`buildEmployeeExportSheet`
+em js/funcionarios.js). CPF, CTPS, CNPJ e ID saem como texto; datas como data
+real; VT como número em R$. Somente leitura: nunca grava nada. Campo novo no
+cadastro deve ganhar coluna aqui. Cobertura: `scripts/verify-exportar-excel.mjs`.
+
 ### Funcionário inativo (REGRA FIXA)
 
 Funcionário com status **Inativo** não aparece nas telas operacionais:

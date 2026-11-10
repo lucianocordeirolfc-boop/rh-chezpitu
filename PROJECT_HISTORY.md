@@ -7,6 +7,30 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-10 — Exportar Excel no Cadastro de Funcionários
+
+Pedido do usuário: exportar os dados do cadastro para Excel, de forma linear e correta.
+
+- **Mudança:** novo `js/xlsx-export.js` (gerador `.xlsx` próprio: zip sem
+  compressão + Office Open XML; sem CDN/biblioteca) e botão **Exportar Excel** na
+  Lista de funcionários (`js/funcionarios.js`: `EXPORT_COLUMNS`,
+  `buildEmployeeExportSheet`, `exportEmployeesToExcel`). `index.html` carrega o
+  novo script antes de `funcionarios.js`.
+- **Conteúdo:** uma linha por funcionário, 23 colunas (empresa, razão social,
+  CNPJ, ID interno, nome, CPF, CTPS, cargo, setor, status, admissão,
+  desligamento, folga vigente/nova/a partir de, horário, domingos de folga,
+  2 domingos/mês, VT, origem, observações, cadastrado/atualizado em). Base
+  completa da empresa da aba ativa (ativos + inativos), sem filtros de tela.
+  CPF/CTPS/CNPJ/ID como texto; datas como data real; VT como número em R$;
+  cabeçalho congelado com autofiltro.
+- **Dados:** somente leitura; nenhuma gravação, migração ou alteração.
+- Documentação: `PROJECT_RULES.md`, `MANUAL_USUARIO.md`, `js/manual.js`.
+- Testes: nova suíte `scripts/verify-exportar-excel.mjs` (fixtures, Chrome real;
+  40 asserções, inclusive "dados idênticos antes/depois"), cadastrada em
+  `scripts/run-validate.mjs`; arquivo gerado conferido também com leitor
+  independente (openpyxl); `npm test` 47/47; `npm run validate` 26/26.
+- **Publicação:** pendente (sem commit/deploy até autorização).
+
 ## 2026-11-04 — Cargo em lista suspensa no Cadastro de Funcionários
 
 Pedido do usuário: evitar erro de digitação no campo Cargo.

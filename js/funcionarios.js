@@ -1092,6 +1092,117 @@
     });
   }
 
+  // ── Exportação para Excel (somente leitura) ─────────────────────────────
+  // Uma linha por funcionário, uma coluna por campo do cadastro. Exporta a base
+  // completa da empresa da aba ativa — ativos e inativos —, sem aplicar os
+  // filtros de tela, para que a planilha traga "todos os dados".
+  const EXPORT_COLUMNS = [
+    { header: "Empresa", width: 14 },
+    { header: "Razão social", width: 30 },
+    { header: "CNPJ", width: 20 },
+    { header: "ID interno", width: 22 },
+    { header: "Nome", width: 34 },
+    { header: "CPF", width: 16 },
+    { header: "CTPS", width: 16 },
+    { header: "Cargo", width: 22 },
+    { header: "Setor", width: 18 },
+    { header: "Status", width: 10 },
+    { header: "Admissão", width: 12 },
+    { header: "Desligamento", width: 13 },
+    { header: "Folga fixa (vigente)", width: 18 },
+    { header: "Nova folga fixa", width: 16 },
+    { header: "Nova folga a partir de", width: 20 },
+    { header: "Horário", width: 18 },
+    { header: "Domingos de folga", width: 18 },
+    { header: "2 domingos/mês", width: 15 },
+    { header: "VT diário", width: 12 },
+    { header: "Origem", width: 11 },
+    { header: "Observações", width: 40 },
+    { header: "Cadastrado em", width: 17 },
+    { header: "Atualizado em", width: 17 }
+  ];
+
+  function exportSundayWeeks(value) {
+    const weeks = String(value || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return weeks.map((n) => `${n}º`).join(", ");
+  }
+
+  function exportVtValue(value) {
+    if (value === "" || value === null || value === undefined) return null;
+    const number = typeof value === "number" ? value : AppData.parseVtDaily(value);
+    return Number.isFinite(number) ? { type: "currency", value: number } : { type: "text", value };
+  }
+
+  function buildEmployeeExportSheet(company) {
+    const info = AppData.getCompanyData(company)?.companyInfo || {};
+    const employees = AppData.sortEmployeesByName(
+      (AppData.getCompanyData(company)?.employees || []).filter((employee) => employee?.id)
+    );
+    const today = AppData.todayISO();
+
+    const rows = employees.map((employee) => {
+      const vigente =
+        typeof AppData.resolveFixedDayForDate === "function"
+          ? AppData.resolveFixedDayForDate(employee, today)
+          : employee.fixedDay || "";
+      const pending = AppData.getFixedDayChangeInfo?.(employee) || null;
+      const inactive = !AppData.isEmployeeActive(employee);
+      return [
+        company,
+        info.legalName || company,
+        { type: "text", value: info.cnpj || "" },
+        { type: "text", value: employee.id },
+        employee.name || "",
+        { type: "text", value: employee.cpf || "" },
+        { type: "text", value: employee.ctps || "" },
+        employee.role || "",
+        employee.department || "",
+        employee.status || "",
+        { type: "date", value: employee.admissionDate || "" },
+        inactive ? { type: "date", value: employee.deactivatedAt || "" } : null,
+        vigente || "",
+        pending ? pending.nextDay || "Sem folga" : "",
+        pending ? { type: "date", value: pending.effectiveFrom } : null,
+        employee.defaultShift || "",
+        exportSundayWeeks(employee.sundayOffWeeks),
+        employee.doubleSundayOff === true || employee.doubleSundayOff === "true",
+        exportVtValue(employee.vtDaily),
+        employee.source === "imported" ? "Importado" : "Manual",
+        employee.notes || "",
+        { type: "datetime", value: employee.createdAt },
+        { type: "datetime", value: employee.updatedAt }
+      ];
+    });
+
+    return { name: `Funcionários ${company}`, columns: EXPORT_COLUMNS, rows };
+  }
+
+  function exportEmployeesToExcel() {
+    if (!window.XlsxExport) {
+      alert("Exportação para Excel indisponível. Atualize a página (Ctrl+F5).");
+      return;
+    }
+    const company = AppData.getActiveCompany();
+    const sheet = buildEmployeeExportSheet(company);
+    if (!sheet.rows.length) {
+      alert(`Nenhum funcionário cadastrado em ${company}.`);
+      return;
+    }
+    const slug = AppData.normalizeSearchText
+      ? AppData.normalizeSearchText(company).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+      : "empresa";
+    try {
+      window.XlsxExport.download(`funcionarios-${slug || "empresa"}-${AppData.todayISO()}.xlsx`, sheet);
+      window.App?.toast?.(`${sheet.rows.length} funcionário(s) exportado(s) para Excel.`, "success");
+    } catch (error) {
+      console.error("[Cadastro] Falha ao exportar Excel:", error);
+      alert("Não foi possível gerar a planilha Excel.");
+    }
+  }
+
   function renderInactiveToggle(allEmployees) {
     const inactives = window.InactiveEmployeesUI?.listInactive(allEmployees) || [];
     const visibleCount = inactives.filter((employee) => listFilters.visibleInactiveIds.has(employee.id)).length;
@@ -1296,6 +1407,10 @@
       openEmployeePopup(container);
     });
 
+    container.querySelector("#btnExportEmployeesExcel")?.addEventListener("click", () => {
+      exportEmployeesToExcel();
+    });
+
     container.querySelector("#btnShowInactiveEmployees")?.addEventListener("click", () => {
       openInactiveEmployeesPicker(container);
     });
@@ -1491,6 +1606,7 @@
             </div>
             <div class="func-table-card-actions">
               ${renderInactiveToggle(allEmployees)}
+              <button type="button" class="secondary btn-sm" id="btnExportEmployeesExcel" title="Baixa planilha .xlsx com todos os funcionários da empresa (ativos e inativos)">Exportar Excel</button>
               <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo funcionário</button>
             </div>
           </div>
@@ -1546,5 +1662,5 @@
     }
   }
 
-  window.FuncionariosModule = { render };
+  window.FuncionariosModule = { render, buildEmployeeExportSheet };
 })();

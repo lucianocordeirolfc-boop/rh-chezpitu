@@ -63,6 +63,8 @@ O funcionário é cadastrado na **empresa da aba ativa**. O cadastro é a fonte 
 
 O **Cargo** é escolhido em lista suspensa, com os cargos já cadastrados. Se o cargo ainda não existir, use **➕ Cadastrar novo cargo**; se ele já existir com outra grafia (maiúsculas ou acentos), o sistema usa o da lista.
 
+**Exportar Excel:** o botão **Exportar Excel**, na Lista de funcionários, baixa uma planilha `.xlsx` com **todos** os funcionários da empresa da aba ativa (ativos e inativos, sem considerar os filtros da tela). Cada linha é um funcionário e cada coluna um campo do cadastro: empresa, razão social, CNPJ, ID interno, nome, CPF, CTPS, cargo, setor, status, admissão, desligamento, folga fixa (vigente e agendada), horário, domingos de folga, VT diário, origem, observações e datas de cadastro/atualização. CPF e CTPS saem como texto (zeros à esquerda preservados); datas e VT saem como data e valor reais do Excel. A exportação apenas lê os dados — nada é alterado.
+
 ---
 
 ## 5. Escala de Folga
