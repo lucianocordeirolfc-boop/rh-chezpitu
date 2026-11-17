@@ -22,6 +22,8 @@ folgar todo sábado e domingo (caso Jéssica).
 - Simulação com a base: Manutenção Chez Pitu passa de 1,5 para 0,8 folga/semana
   em sex/sáb; Bar Pengold sem ganho (domingos do setor já com 2).
 - Testes: `verify-segunda-folga.mjs` 43; `verify-segunda-folga-ui.mjs` 19.
+- **Publicação:** versão `20261117.07`, commit `49d7c02` + carimbo; deploy e
+  push autorizados pelo usuário em 2026-11-17.
 
 ## 2026-11-17 (4) — 2ª folga semanal (5x2): cadastro, sugestão por setor e alerta na escala
 
