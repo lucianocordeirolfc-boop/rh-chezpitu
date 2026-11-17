@@ -34,6 +34,21 @@ feriados (inclusive 29/07 Comércio Hoteleiro e os de 2027), na Pengold não.
   `npm test` 47/47; `npm run validate` 27/27.
 - **Fora do escopo (decisão do usuário):** 01/01/2026 Ano Novo da Pengold
   continua ausente (tombstone anterior à regra de 30/10; prazo já vencido).
+- **Publicação:** versão `20261117.01`, commits `5c8b885` (feat) + `de4fef5`
+  (carimbo); deploy no Firebase Hosting em 2026-11-17.
+- **Correção de dados em produção (autorizada pelo usuário, lista aprovada
+  de 17 itens):** `extendHolidayToCompanies(..., ["Pengold"])` incluiu na
+  Pengold, sem vínculos, 16 feriados (Carnaval 2027 … 01/01/2028). Conferido:
+  bloco da Chez Pitu idêntico antes/depois; vínculos da Pengold 271 → 271;
+  as duas empresas com 34 feriados.
+- **29/07/2026 Comércio Hoteleiro — recusado pela trava:** tombstone na
+  Pengold gravado em 2026-08-17 (exclusão anterior à regra de 30/10, sem cópia
+  na Lixeira). Pendente de decisão do usuário (recriar com `overrideTombstone`).
+- **Defeito encontrado na aplicação e corrigido:** a empresa recusada pela
+  trava ainda era acrescentada ao calendário (ficou uma entrada de calendário
+  29/07 → Pengold, sem bloco nem vínculos; o auto-vínculo respeita o tombstone,
+  então não gera vínculos). `extendHolidayToCompanies` não inclui mais empresa
+  bloqueada no calendário; +2 asserções (suíte com 32).
 
 ## 2026-11-10 — Exportar Excel no Cadastro de Funcionários
 

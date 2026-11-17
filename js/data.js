@@ -3854,7 +3854,9 @@
     // Calendário: o merge entre PCs une as empresas, então acrescentar é seguro.
     const coveredByCalendar = (company) =>
       calendarEntries.some((holiday) => calendarHolidayTargetsCompany(holiday, company));
-    const missingInCalendar = targets.filter((company) => !coveredByCalendar(company));
+    // Empresa recusada pela trava de tombstone não entra no calendário.
+    const blocked = new Set(skipped.filter((item) => item.reason !== "já cadastrado").map((item) => item.company));
+    const missingInCalendar = targets.filter((company) => !blocked.has(company) && !coveredByCalendar(company));
     if (missingInCalendar.length && !isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, targetDate, targetName)) {
       if (calendarEntries.length) {
         const entry = calendarEntries[0];

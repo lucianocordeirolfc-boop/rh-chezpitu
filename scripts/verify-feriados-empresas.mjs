@@ -209,6 +209,14 @@ console.log("\n=== TESTE: feriado de uma empresa estendido à outra (Chez Pitu �
     "Feriado excluído antes na Pengold não é recriado sem autorização"
   );
   assert(AppData.state.companies[PG].holidays.length === 0, "Nada gravado na Pengold quando bloqueado");
+  assert(
+    !AppData.state.calendarHolidays.find((h) => h.id === "cal-x").companies.includes(PG),
+    "Bloqueado pela trava: Pengold também NÃO entra no calendário"
+  );
+  assert(
+    !AppData.listRegisteredHolidays(PG).some((item) => item.date === "2027-04-23"),
+    "Bloqueado pela trava: feriado não aparece na lista da Pengold"
+  );
   const forced = AppData.extendHolidayToCompanies("2027-04-23", "São Jorge", [PG], {
     save: false,
     overrideTombstone: true
