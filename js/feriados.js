@@ -24,6 +24,44 @@
     return AppData.formatDateBR(isoDate);
   }
 
+  // Tipos de feriado. "Vale para" padrão: feriado de lei (nacional/estadual/
+  // municipal) e de convenção coletiva (categoria) vale para TODAS as empresas;
+  // "interno" só para a empresa da aba. (2026-11-17: antes todo feriado novo
+  // ficava só na empresa da aba e a outra empresa não o enxergava.)
+  const HOLIDAY_TYPES = [
+    { value: "nacional", label: "Nacional", allCompanies: true },
+    { value: "estadual", label: "Estadual", allCompanies: true },
+    { value: "municipal", label: "Municipal", allCompanies: true },
+    { value: "categoria", label: "Categoria (CCT)", allCompanies: true },
+    { value: "interno", label: "Interno", allCompanies: false }
+  ];
+
+  function holidayTypeLabel(type) {
+    return HOLIDAY_TYPES.find((item) => item.value === type)?.label || String(type || "");
+  }
+
+  function holidayTypeOptions(selected = "nacional") {
+    return HOLIDAY_TYPES.map(
+      (item) => `<option value="${item.value}" ${item.value === selected ? "selected" : ""}>${item.label}</option>`
+    ).join("");
+  }
+
+  function defaultScopeForType(type) {
+    const def = HOLIDAY_TYPES.find((item) => item.value === type);
+    return def && !def.allCompanies ? AppData.getActiveCompany() : "ambas";
+  }
+
+  /** Empresas que ainda NÃO têm este feriado (data + nome) cadastrado. */
+  function companiesMissingHoliday(date, name) {
+    const key = AppData.normalizeSearchText(name);
+    return AppData.getCompanies().filter(
+      (company) =>
+        !AppData.listRegisteredHolidays(company).some(
+          (item) => item.date === date && AppData.normalizeSearchText(item.name) === key
+        )
+    );
+  }
+
   function alertLabel(daysLeft) {
     if (daysLeft < 0) return "Vencido";
     if (daysLeft <= 5) return "Faltam 5 dias";
@@ -1247,6 +1285,10 @@
       AppData.saveState();
     } else {
       AppData.addHoliday({ name, date, workedEmployees });
+      // 2026-11-17: feriado NOVO vale para as duas empresas (lei/CCT). A outra
+      // empresa recebe só o registro do feriado, sem vínculos; os funcionários
+      // marcados aqui continuam só nesta empresa.
+      AppData.extendHolidayToCompanies(date, name, ["ambas"]);
     }
     return true;
   }
@@ -1260,8 +1302,12 @@
     // Recriação explícita pelo usuário: limpa tombstone anterior (empresa + calendário)
     // para que o feriado recadastrado não seja removido pela regra de exclusão definitiva.
     AppData.clearHolidayTombstones?.(name, date);
-    // Vinculado à empresa da aba ativa (sem seletor de empresa — evita dados cruzados).
-    const companies = [AppData.getActiveCompany()];
+    // "Vale para": empresa(s) escolhida(s) no formulário. Cada empresa recebe o
+    // seu próprio registro do feriado; vínculos de funcionário continuam
+    // separados por empresa (não há dado cruzado).
+    const scope = String(formData.get("scope") || "").trim();
+    const companies =
+      scope === "ambas" ? AppData.getCompanies() : [scope || AppData.getActiveCompany()];
     ScaleRules.addCalendarHoliday({
       name,
       date,
@@ -1329,6 +1375,36 @@
     // REGRA FIXA: feriado cadastrado NÃO pode ser excluído (PROJECT_RULES.md →
     // "Feriado cadastrado não se exclui"). Só o vínculo de um funcionário sai.
 
+    root.querySelectorAll("[data-extend-holiday]").forEach((button) => {
+      if (button.dataset.boundExtendHoliday) return;
+      button.dataset.boundExtendHoliday = "1";
+      button.addEventListener("click", () => {
+        const ref = readRegisteredHolidayRef(button);
+        const target = button.dataset.extendHoliday;
+        if (!ref || !target) return;
+        const ok = window.confirm(
+          `Cadastrar "${ref.name}" (${formatDateBR(ref.date)}) também em ${target}?
+
+` +
+            "Nada é apagado: os vínculos de funcionários desta empresa não mudam e o feriado entra em " +
+            `${target} sem vínculos.`
+        );
+        if (!ok) return;
+        const result = AppData.extendHolidayToCompanies(ref.date, ref.name, [target]);
+        if (!result?.ok) {
+          alert(result?.error || "Não foi possível estender o feriado.");
+          return;
+        }
+        if (result.added.length) {
+          window.App?.toast?.(`"${result.name}" cadastrado também em ${result.added.join(", ")}.`, "success");
+        } else {
+          const reason = result.skipped.map((item) => `${item.company}: ${item.reason}`).join("; ");
+          alert(`Nada foi alterado. ${reason}`);
+        }
+        refreshPopupCalendarList(root);
+      });
+    });
+
     root.querySelectorAll("[data-edit-calendar-holiday]").forEach((button) => {
       if (button.dataset.boundEditCalendar) return;
       button.dataset.boundEditCalendar = "1";
@@ -1357,9 +1433,7 @@
           AppData.normalizeSearchText(item.name) === AppData.normalizeSearchText(ref.name)
       ) || { ...ref, type: "nacional", workedCount: 0 };
 
-    const typeOptions = ["nacional", "estadual", "municipal", "interno"]
-      .map((t) => `<option value="${t}" ${(holiday.type || "nacional") === t ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`)
-      .join("");
+    const typeOptions = holidayTypeOptions(holiday.type || "nacional");
 
     const picker = document.createElement("div");
     picker.id = "calendarEditPicker";
@@ -1453,16 +1527,19 @@
       <div class="feriados-register-content">
         <form id="calendarHolidayForm" class="popup-form feriados-popup-form feriados-panel-form">
           <div class="feriados-panel-body">
-            <p class="help-text compact-help">Calendário vinculado à empresa da aba ativa: <strong>${esc(company)}</strong>.</p>
+            <p class="help-text compact-help">Feriado de lei ou de convenção coletiva vale para as duas empresas; "Interno" só para <strong>${esc(company)}</strong>. Os vínculos de funcionários continuam separados por empresa.</p>
             <div class="popup-grid">
               ${renderCalendarHolidayNameField()}
               <label class="popup-field">Data<input type="date" name="date" required value="${AppData.todayISO()}"></label>
               <label class="popup-field">Tipo
-                <select name="type">
-                  <option value="nacional">Nacional</option>
-                  <option value="estadual">Estadual</option>
-                  <option value="municipal">Municipal</option>
-                  <option value="interno">Interno</option>
+                <select name="type" data-holiday-type-select>${holidayTypeOptions("nacional")}</select>
+              </label>
+              <label class="popup-field">Vale para
+                <select name="scope" data-holiday-scope-select>
+                  <option value="ambas" selected>Ambas as empresas</option>
+                  ${AppData.getCompanies()
+                    .map((item) => `<option value="${esc(item)}">Somente ${esc(item)}</option>`)
+                    .join("")}
                 </select>
               </label>
             </div>
@@ -1578,6 +1655,12 @@
       if (!submitWorkedHolidayForm(event.currentTarget)) return;
       closeHolidayRegisterPopup();
       window.App.renderCurrent();
+    });
+
+    // Tipo define o "Vale para" padrão (lei/CCT → ambas; interno → aba ativa).
+    overlay.querySelector("[data-holiday-type-select]")?.addEventListener("change", (event) => {
+      const scopeSelect = overlay.querySelector("[data-holiday-scope-select]");
+      if (scopeSelect) scopeSelect.value = defaultScopeForType(event.currentTarget.value);
     });
 
     overlay.querySelector("#calendarHolidayForm")?.addEventListener("submit", (event) => {
@@ -1947,11 +2030,17 @@
               <tr>
                 <td>${formatDateBR(holiday.date)}</td>
                 <td>${esc(holiday.name)}</td>
-                <td>${esc(holiday.type)}</td>
+                <td>${esc(holidayTypeLabel(holiday.type))}</td>
                 <td class="feriados-manager-count">${holiday.workedCount}</td>
                 <td class="actions" data-holiday-date="${esc(holiday.date)}" data-holiday-name="${esc(holiday.name)}">
                   <button class="link-button success" data-link-employee-cal type="button">+ Funcionário</button>
                   <button class="link-button" data-edit-calendar-holiday type="button">Editar</button>
+                  ${companiesMissingHoliday(holiday.date, holiday.name)
+                    .map(
+                      (other) =>
+                        `<button class="link-button" data-extend-holiday="${esc(other)}" type="button" title="Cadastrar este feriado também em ${esc(other)} (sem vínculos)">+ ${esc(other)}</button>`
+                    )
+                    .join("")}
                 </td>
               </tr>
             `

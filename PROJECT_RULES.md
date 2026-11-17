@@ -299,6 +299,25 @@ A tela principal mostra apenas funcionários **ativos** — o vínculo de quem f
 desligado continua na base, mas só reaparece pelo botão "Mostrar funcionários
 inativos". Ver "Cadastro de Funcionários → Funcionário inativo (REGRA FIXA)".
 
+### Feriado vale para as duas empresas (REGRA FIXA)
+
+Vigente desde 2026-11-17, a pedido do usuário (as duas empresas seguem a mesma
+convenção coletiva). Feriado de lei (nacional/estadual/municipal) e de
+convenção coletiva (tipo `categoria`, "Categoria (CCT)") vale para **Chez Pitu
+e Pengold**. Só o tipo `interno` fica restrito a uma empresa.
+
+- Cadastro do calendário: campo **"Vale para"** (padrão "Ambas").
+- Feriado NOVO criado pelo formulário de vínculo ou pela importação também é
+  estendido às duas empresas.
+- Função única: `extendHolidayToCompanies` (js/data.js) — **somente aditiva**:
+  cria o feriado na empresa alvo **sem vínculos** e acrescenta a empresa no
+  calendário; nunca altera nome/data/tipo nem vínculos; respeita tombstone da
+  empresa alvo (só recria com `overrideTombstone`).
+- Vínculos (`workedEmployees`) continuam **separados por empresa**.
+- Botão "+ <outra empresa>" em Gerenciar feriados para o que faltar.
+
+Cobertura: `scripts/verify-feriados-empresas.mjs`.
+
 ## Feriado cadastrado não se exclui (REGRA FIXA)
 
 Vigente desde 2026-10-30, a pedido do usuário. **Nenhum usuário pode excluir um

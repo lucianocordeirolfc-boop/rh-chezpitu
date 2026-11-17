@@ -7,6 +7,34 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-17 — Feriados: cadastro na Chez Pitu não chegava à Pengold
+
+Relato do usuário: no Controle de Feriados da Chez Pitu aparecem todos os
+feriados (inclusive 29/07 Comércio Hoteleiro e os de 2027), na Pengold não.
+
+- **Causa raiz (leitura da base real):** os três caminhos de criação de
+  feriado gravavam só na empresa da aba ativa — formulário do calendário
+  (`companies: [aba]`), formulário "feriado + funcionários" (`addHoliday`) e
+  importação (`findOrCreateHoliday`). Chez Pitu tinha 34 feriados, Pengold 17.
+- **Decisão do usuário:** as duas empresas seguem a mesma convenção coletiva;
+  feriados de lei e de CCT (inclusive 2027) valem para as duas.
+- **Mudança:** `js/data.js` — nova `extendHolidayToCompanies` (somente
+  aditiva: cria o feriado na empresa alvo sem vínculos, acrescenta a empresa no
+  calendário, respeita tombstone); importação estende feriado novo às duas
+  empresas. `js/feriados.js` — campo "Vale para" (padrão Ambas; Interno = só
+  a aba), tipo "Categoria (CCT)", botão "+ <outra empresa>" em Gerenciar
+  feriados, formulário de vínculo estende feriado novo. Vínculos continuam
+  separados por empresa.
+- Regra fixa em `PROJECT_RULES.md` ("Feriado vale para as duas empresas");
+  `MANUAL_USUARIO.md` e `js/manual.js` atualizados.
+- Testes: nova suíte `scripts/verify-feriados-empresas.mjs` (fixtures; 30
+  asserções, inclusive "bloco da Chez Pitu idêntico antes/depois"), cadastrada
+  em `scripts/run-validate.mjs`; checagem antiga de `run-functional-validation`
+  ("criação vinculada à aba ativa") atualizada para a regra nova autorizada;
+  `npm test` 47/47; `npm run validate` 27/27.
+- **Fora do escopo (decisão do usuário):** 01/01/2026 Ano Novo da Pengold
+  continua ausente (tombstone anterior à regra de 30/10; prazo já vencido).
+
 ## 2026-11-10 — Exportar Excel no Cadastro de Funcionários
 
 Pedido do usuário: exportar os dados do cadastro para Excel, de forma linear e correta.

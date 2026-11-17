@@ -3794,6 +3794,91 @@
     return changed;
   }
 
+  /**
+   * Estende um feriado já cadastrado (identidade data + nome) a outras empresas.
+   * Operação SOMENTE ADITIVA (2026-11-17): acrescenta as empresas na entrada do
+   * calendário e cria o feriado — sem vínculos — no bloco de cada empresa alvo
+   * que ainda não o tem. Nunca altera nome/data/tipo, nunca toca em vínculos
+   * (workedEmployees) de nenhuma empresa e nunca remove nada.
+   *
+   * Feriado com tombstone na empresa alvo (excluído lá antes da regra fixa) NÃO
+   * é recriado, salvo `options.overrideTombstone === true` (ação explícita).
+   * Retorna { ok, error, name, date, added: [empresas], skipped: [{company, reason}] }.
+   */
+  function extendHolidayToCompanies(date, name, companies, options = {}) {
+    const targetDate = String(date || "").trim();
+    const targetName = String(name || "").trim();
+    if (!targetDate || !targetName) return { ok: false, error: "Feriado não informado.", added: [], skipped: [] };
+
+    const key = holidayTombstoneKey(targetDate, targetName);
+    const known = getCompanies();
+    const targets = (Array.isArray(companies) ? companies : [])
+      .flatMap((company) => (company === "ambas" ? known : [company]))
+      .filter((company, index, list) => known.includes(company) && list.indexOf(company) === index);
+    if (!targets.length) return { ok: false, error: "Nenhuma empresa válida informada.", added: [], skipped: [] };
+
+    const sameIdentity = (holiday) => holiday?.date && holiday?.name && !holiday.isDeleted &&
+      holidayTombstoneKey(holiday.date, holiday.name) === key;
+    const companyHas = (company) => (getCompanyData(company).holidays || []).some(sameIdentity);
+
+    if (!Array.isArray(state.calendarHolidays)) state.calendarHolidays = [];
+    const calendarEntries = state.calendarHolidays.filter(sameIdentity);
+    const holderCompanies = known.filter(companyHas);
+    if (!calendarEntries.length && !holderCompanies.length) {
+      return { ok: false, error: "Feriado não encontrado no cadastro.", added: [], skipped: [] };
+    }
+
+    const added = [];
+    const skipped = [];
+    let changed = false;
+
+    targets.forEach((company) => {
+      if (companyHas(company)) {
+        skipped.push({ company, reason: "já cadastrado" });
+        return;
+      }
+      if (isHolidayTombstoned(company, targetDate, targetName)) {
+        if (options.overrideTombstone !== true) {
+          skipped.push({ company, reason: "excluído anteriormente nesta empresa (tombstone)" });
+          return;
+        }
+        clearHolidayTombstone(company, targetDate, targetName);
+      }
+      const data = getCompanyData(company);
+      if (!data.holidays) data.holidays = [];
+      data.holidays.push({ id: uid("feriado"), name: targetName, date: targetDate, workedEmployees: [], updatedAt: now() });
+      added.push(company);
+      changed = true;
+    });
+
+    // Calendário: o merge entre PCs une as empresas, então acrescentar é seguro.
+    const coveredByCalendar = (company) =>
+      calendarEntries.some((holiday) => calendarHolidayTargetsCompany(holiday, company));
+    const missingInCalendar = targets.filter((company) => !coveredByCalendar(company));
+    if (missingInCalendar.length && !isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, targetDate, targetName)) {
+      if (calendarEntries.length) {
+        const entry = calendarEntries[0];
+        entry.companies = [...new Set([...(entry.companies || []), ...missingInCalendar])];
+        entry.updatedAt = now();
+      } else {
+        state.calendarHolidays.push({
+          id: `cal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          date: targetDate,
+          name: targetName,
+          type: options.type || "nacional",
+          // Só as empresas alvo: a empresa que já tinha o feriado (sem entrada de
+          // calendário) mantém exatamente o comportamento de antes.
+          companies: [...missingInCalendar],
+          updatedAt: now()
+        });
+      }
+      changed = true;
+    }
+
+    if (changed && options.save !== false) saveState();
+    return { ok: true, name: targetName, date: targetDate, added, skipped, changed };
+  }
+
   // REGRA FIXA (2026-10-30): feriado cadastrado NUNCA é excluído pelo usuário —
   // nem marcado como excluído (soft delete). Só o vínculo de um funcionário
   // sai (removeWorkedEmployeeFromHoliday). As funções de exclusão continuam
@@ -5107,7 +5192,7 @@
     return data.employees.find((employee) => employee.id === employeeId)?.name || "Funcionário não encontrado";
   }
 
-  function findOrCreateHoliday(data, name, date) {
+  function findOrCreateHoliday(data, name, date, onCreate) {
     const holidayName = String(name || "").trim();
     const holidayDate = String(date || "").trim();
     let holiday = data.holidays.find((item) => item.name === holidayName && item.date === holidayDate);
@@ -5120,6 +5205,7 @@
         workedEmployees: []
       };
       data.holidays.push(holiday);
+      if (typeof onCreate === "function") onCreate(holiday);
     }
 
     return holiday;
@@ -5209,6 +5295,7 @@
   }
 
   function importHolidaysBatch(rows, options = {}) {
+    const createdHolidays = [];
     const fallbackCompany = options.fallbackCompany || getPrimaryPageCompany("funcionarios");
     const mapRow = options.mapRow || ((row) => row);
     const result = { imported: 0, skipped: 0, messages: [] };
@@ -5261,7 +5348,9 @@
         return;
       }
 
-      const holiday = findOrCreateHoliday(data, holidayName, workedDate);
+      const holiday = findOrCreateHoliday(data, holidayName, workedDate, (created) =>
+        createdHolidays.push({ date: created.date, name: created.name })
+      );
       const existing = holiday.workedEmployees.find((item) => item.employeeId === employee.id);
 
       if (existing) {
@@ -5280,6 +5369,14 @@
 
       touched = true;
       result.imported += 1;
+    });
+
+    // 2026-11-17: feriado NOVO criado pela importação vale para todas as
+    // empresas (só o registro do feriado, sem vínculos — estes ficam na
+    // empresa da linha importada). Feriado de lei/CCT é comum às duas.
+    createdHolidays.forEach((created) => {
+      const extended = extendHolidayToCompanies(created.date, created.name, ["ambas"], { save: false });
+      if (extended.changed) touched = true;
     });
 
     if (touched) saveState();
@@ -5538,6 +5635,7 @@
     addHoliday,
     syncCompanyHolidaysFromCalendarEntry,
     syncAllCalendarHolidaysToCompanies,
+    extendHolidayToCompanies,
     resolveWorkedHolidayStatus,
     syncWorkedEmployeeStatus,
     linkScaleCoToHoliday,

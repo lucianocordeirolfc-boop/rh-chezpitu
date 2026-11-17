@@ -1817,7 +1817,7 @@ function validatePhase2Improvements(AppData) {
     "Lista de cadastrados com edição/exclusão dentro do modal"
   );
 
-  // Aba Calendário: sem seletor de empresa; vinculado à aba ativa; com editar
+  // Aba Calendário: "Vale para" (lei/CCT = ambas); listagem por empresa; com editar
   const scaleRules = read("js/scale-rules.js");
   assert(
     area,
@@ -1828,12 +1828,15 @@ function validatePhase2Improvements(AppData) {
   );
   assert(
     area,
-    feriados.includes("const companies = [AppData.getActiveCompany()];") &&
+    // 2026-11-17 (autorizado pelo usuário): criação escolhe "Vale para"
+    // (ambas por padrão para feriado de lei/CCT); listagem segue por empresa.
+    feriados.includes('name="scope"') &&
       feriados.includes("AppData.listRegisteredHolidays(company)") &&
-      read("js/data.js").includes("function calendarHolidayTargetsCompany"),
-    "Calendário: criação e listagem vinculadas à empresa da aba ativa",
+      read("js/data.js").includes("function calendarHolidayTargetsCompany") &&
+      read("js/data.js").includes("function extendHolidayToCompanies"),
+    "Calendário: criação com 'Vale para' e listagem filtrada por empresa",
     ["js/feriados.js", "js/data.js"],
-    "submitCalendarHolidayForm usa getActiveCompany; listRegisteredHolidays filtra por empresa"
+    "submitCalendarHolidayForm usa o campo scope; listRegisteredHolidays filtra por empresa"
   );
   assert(
     area,

@@ -101,8 +101,19 @@ Tela para registrar **quem trabalhou em um feriado** e acompanhar a compensaçã
 
 ### Cadastrar um feriado
 1. Clique em **+ Cadastrar feriado**.
-2. Informe nome, data e tipo.
+2. Informe nome, data, tipo e **Vale para**.
 3. **Salvar feriado**.
+
+**Vale para:** feriado de lei (Nacional, Estadual, Municipal) e de convenção
+coletiva (**Categoria (CCT)**, ex.: Dia do Hoteleiro 29/07) vale para **as duas
+empresas** — é o padrão. "Interno" vale só para a empresa da aba. Cada empresa
+recebe o seu registro do feriado; os funcionários vinculados continuam separados
+por empresa. Feriado novo criado ao vincular funcionários ou por importação
+também passa a existir nas duas empresas (sem vínculos na outra).
+
+**Feriado faltando na outra empresa:** em **Gerenciar feriados**, o botão
+**+ Pengold** / **+ Chez Pitu** aparece quando o feriado ainda não existe na
+outra empresa. Ele só acrescenta o feriado (sem vínculos); nada é apagado.
 
 ### Vincular um funcionário a um feriado (manual)
 Use quando o funcionário trabalhou em um feriado e precisa compensar.

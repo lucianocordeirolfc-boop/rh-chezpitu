@@ -74,7 +74,7 @@
        Para alterar, use o botão <strong>Editar</strong> na linha do registro.</p>
 
     <h3>7. Controle de Feriados</h3>
-    <p><strong>Cadastrar um feriado:</strong> clique em <strong>+ Cadastrar feriado</strong>, informe nome, data e tipo, e salve.</p>
+    <p><strong>Cadastrar um feriado:</strong> clique em <strong>+ Cadastrar feriado</strong>, informe nome, data, tipo e <strong>Vale para</strong>, e salve. Feriado de lei ou de convenção coletiva (tipo <strong>Categoria (CCT)</strong>) vale para as duas empresas (padrão); "Interno" só para a empresa da aba. Os vínculos de funcionários continuam separados por empresa. Se faltar um feriado na outra empresa, use o botão <strong>+ Pengold</strong> / <strong>+ Chez Pitu</strong> em Gerenciar feriados (só acrescenta, sem vínculos).</p>
     <p><strong>Vincular um funcionário a um feriado (manual):</strong></p>
     <ol>
       <li>Clique em <strong>+ Vincular funcionário a feriado</strong> (topo da tela, ao lado de "+ Cadastrar feriado").</li>
