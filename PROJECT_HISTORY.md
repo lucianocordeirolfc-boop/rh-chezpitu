@@ -28,6 +28,8 @@ seguinte).
   validate. Dados de produção: nenhum alterado (o histórico é criado na
   próxima alteração de cada funcionário; registros sem histórico seguem o
   valor atual, igual a antes).
+- **Publicação:** versão `20261117.08`, commit `c561f78` + carimbo; deploy e
+  push autorizados pelo usuário em 2026-11-17.
 
 ## 2026-11-17 (5) — 2ª folga também no domingo (fim de semana)
 
