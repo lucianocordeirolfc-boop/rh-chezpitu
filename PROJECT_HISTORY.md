@@ -59,6 +59,11 @@ feriados (inclusive 29/07 Comércio Hoteleiro e os de 2027), na Pengold não.
   agora grava `restoredAt` (mesmo mecanismo da Lixeira, que vence o tombstone);
   aplicado também ao registro 29/07 da Pengold em produção. +2 asserções
   (suíte com 34), inclusive merge com tombstone antigo de outro PC.
+- **Publicação final:** versão `20261117.03` (`4065496` + `c4413a4`); push para
+  `origin/main` autorizado e feito em 2026-11-17. Conferência só de leitura
+  após recarregar: Chez Pitu 34 / Pengold 34 feriados, nenhum faltando;
+  29/07 na Pengold com `restoredAt`; vínculos Pengold 271. Aguardando teste e
+  aprovação do usuário.
 
 ## 2026-11-10 — Exportar Excel no Cadastro de Funcionários
 
