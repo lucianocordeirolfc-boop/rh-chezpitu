@@ -3831,6 +3831,7 @@
     const added = [];
     const skipped = [];
     let changed = false;
+    const overridden = new Set();
 
     targets.forEach((company) => {
       if (companyHas(company)) {
@@ -3843,10 +3844,15 @@
           return;
         }
         clearHolidayTombstone(company, targetDate, targetName);
+        overridden.add(company);
       }
       const data = getCompanyData(company);
       if (!data.holidays) data.holidays = [];
-      data.holidays.push({ id: uid("feriado"), name: targetName, date: targetDate, workedEmployees: [], updatedAt: now() });
+      const record = { id: uid("feriado"), name: targetName, date: targetDate, workedEmployees: [], updatedAt: now() };
+      // Recriação sobre tombstone: restoredAt faz a recriação vencer o tombstone
+      // que outro PC ainda tenha (o merge de tombstones é por união/max).
+      if (overridden.has(company)) record.restoredAt = now();
+      data.holidays.push(record);
       added.push(company);
       changed = true;
     });

@@ -222,6 +222,25 @@ console.log("\n=== TESTE: feriado de uma empresa estendido à outra (Chez Pitu �
     overrideTombstone: true
   });
   assert(forced.added.includes(PG), "Com overrideTombstone (ação explícita) o feriado é recriado");
+  const recreated = AppData.state.companies[PG].holidays.find((h) => h.date === "2027-04-23");
+  assert(Number(recreated?.restoredAt) > 1000, "Recriação sobre tombstone leva restoredAt");
+  // Outro PC ainda com o tombstone antigo: a recriação precisa sobreviver ao merge.
+  const merged = AppData.mergeRemoteIntoLocal(
+    clone({
+      companies: { [CO]: AppData.state.companies[CO], [PG]: AppData.state.companies[PG] },
+      calendarHolidays: AppData.state.calendarHolidays,
+      holidayTombstones: AppData.state.holidayTombstones
+    }),
+    {
+      companies: { [CO]: clone(AppData.state.companies[CO]), [PG]: { companyInfo: { legalName: PG }, holidays: [] } },
+      calendarHolidays: [],
+      holidayTombstones: { [PG]: { "2027-04-23|sao jorge": 1000 } }
+    }
+  );
+  assert(
+    (merged.companies?.[PG]?.holidays || []).some((h) => h.date === "2027-04-23"),
+    "Recriação vence o tombstone antigo de outro PC no merge"
+  );
 }
 
 // ── 7. Feriado inexistente: recusa sem gravar ───────────────────────────────

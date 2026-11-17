@@ -49,6 +49,16 @@ feriados (inclusive 29/07 Comércio Hoteleiro e os de 2027), na Pengold não.
   29/07 → Pengold, sem bloco nem vínculos; o auto-vínculo respeita o tombstone,
   então não gera vínculos). `extendHolidayToCompanies` não inclui mais empresa
   bloqueada no calendário; +2 asserções (suíte com 32).
+  Publicado em `20261117.02` (`af443d3` + `f64ae8c`).
+- **29/07/2026 na Pengold — recriado (decisão do usuário: opção "a"):**
+  `extendHolidayToCompanies(..., { overrideTombstone: true })`, sem vínculos;
+  Chez Pitu intacta, vínculos Pengold 271 → 271, as duas com 34 feriados.
+  Prazo de compensação desse feriado vence em 2026-11-26.
+- **Proteção da recriação entre PCs:** o merge de tombstones é por união/max,
+  então outro PC com o tombstone antigo apagaria o feriado de novo. A recriação
+  agora grava `restoredAt` (mesmo mecanismo da Lixeira, que vence o tombstone);
+  aplicado também ao registro 29/07 da Pengold em produção. +2 asserções
+  (suíte com 34), inclusive merge com tombstone antigo de outro PC.
 
 ## 2026-11-10 — Exportar Excel no Cadastro de Funcionários
 
