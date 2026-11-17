@@ -272,6 +272,84 @@ console.log("\n=== TESTE: feriado de uma empresa estendido à outra (Chez Pitu �
   }
 }
 
+// ── 7c. Renomear carrega os vínculos excluídos; tipo persiste sem calendário
+{
+  setFixture({
+    calendar: [],
+    chez: [
+      { id: "h-mai", name: "01 de Mario - Trabalho - 2027", date: "2027-05-01", workedEmployees: [{ employeeId: "e1" }] }
+    ]
+  });
+  AppData.state.workedLinkTombstones = { [CO]: { "2027-05-01|01 de mario - trabalho - 2027|e-del": 1234 } };
+  AppData.state.companies[CO].employees = [];
+  const linksBefore = AppData.state.companies[CO].holidays[0].workedEmployees.map((i) => i.employeeId).join();
+  const result = AppData.updateHolidayEverywhere(
+    "2027-05-01",
+    "01 de Mario - Trabalho - 2027",
+    { name: "Dia do Trabalhador", type: "nacional" },
+    { companies: [CO], recompute: false }
+  );
+  assert(result.ok, "Renomear feriado funciona");
+  assert(
+    AppData.isWorkedLinkTombstoned(CO, "2027-05-01", "Dia do Trabalhador", "e-del"),
+    "Vínculo excluído continua bloqueado com o NOME NOVO (não volta pelo auto-vínculo)"
+  );
+  assert(
+    AppData.isWorkedLinkTombstoned(CO, "2027-05-01", "01 de Mario - Trabalho - 2027", "e-del"),
+    "Marca antiga preservada (aditivo)"
+  );
+  assert(
+    AppData.state.companies[CO].holidays[0].workedEmployees.map((i) => i.employeeId).join() === linksBefore,
+    "Vínculos existentes intactos na renomeação"
+  );
+  const listed = AppData.listRegisteredHolidays(CO).find((item) => item.date === "2027-05-01");
+  assert(listed?.name === "Dia do Trabalhador", "Nome novo na lista");
+
+  const typed = AppData.updateHolidayEverywhere("2027-05-01", "Dia do Trabalhador", { type: "municipal" }, { companies: [CO], recompute: false });
+  const listedType = AppData.listRegisteredHolidays(CO).find((item) => item.date === "2027-05-01")?.type;
+  assert(typed.ok && listedType === "municipal", `Tipo persiste em feriado sem calendário (obtido ${listedType})`);
+  assert(
+    !AppData.listRegisteredHolidays(PG).some((item) => item.date === "2027-05-01"),
+    "Entrada de tipo criada só para a empresa editada"
+  );
+  const moved = AppData.updateHolidayEverywhere("2027-05-01", "Dia do Trabalhador", { date: "2027-05-03" }, { companies: [CO], recompute: false });
+  assert(
+    moved.ok && AppData.isWorkedLinkTombstoned(CO, "2027-05-03", "Dia do Trabalhador", "e-del"),
+    "Mudar a DATA também carrega o vínculo excluído"
+  );
+  const n = AppData.carryWorkedLinkTombstones(CO, "2027-05-01", "01 de Mario - Trabalho - 2027", "2027-05-01", "Dia do Trabalhador");
+  assert(n === 0, "Cópia idempotente (já carregada não duplica)");
+}
+
+// ── 7d. Vínculo que VOLTOU depois da exclusão não é apagado em silêncio ────
+{
+  setFixture({
+    chez: [
+      { id: "h-fin", name: "Ninados - 2027", date: "2027-11-02", workedEmployees: [{ employeeId: "e-volta", origin: "Automático pela escala" }] }
+    ]
+  });
+  AppData.state.workedLinkTombstones = {
+    [CO]: { "2027-11-02|ninados - 2027|e-volta": 1000, "2027-11-02|ninados - 2027|e-fora": 1000 }
+  };
+  AppData.updateHolidayEverywhere("2027-11-02", "Ninados - 2027", { name: "Finados" }, { companies: [CO], recompute: false });
+  assert(
+    !AppData.isWorkedLinkTombstoned(CO, "2027-11-02", "Finados", "e-volta"),
+    "Funcionário vinculado hoje: marca NÃO é copiada (evita exclusão silenciosa sem Lixeira)"
+  );
+  assert(
+    AppData.isWorkedLinkTombstoned(CO, "2027-11-02", "Finados", "e-fora"),
+    "Funcionário não vinculado: marca copiada (não volta pelo auto-vínculo)"
+  );
+  const merged = AppData.mergeRemoteIntoLocal(
+    clone({ companies: { [CO]: AppData.state.companies[CO], [PG]: AppData.state.companies[PG] }, calendarHolidays: AppData.state.calendarHolidays, workedLinkTombstones: AppData.state.workedLinkTombstones }),
+    clone({ companies: { [CO]: AppData.state.companies[CO], [PG]: AppData.state.companies[PG] }, calendarHolidays: AppData.state.calendarHolidays, workedLinkTombstones: AppData.state.workedLinkTombstones })
+  );
+  assert(
+    (merged.companies?.[CO]?.holidays || []).some((h) => (h.workedEmployees || []).some((i) => i.employeeId === "e-volta")),
+    "Após sincronizar, o vínculo atual continua lá"
+  );
+}
+
 // ── 8. Checagem de fonte do formulário ──────────────────────────────────────
 {
   const src = fs.readFileSync(path.join(root, "js/feriados.js"), "utf8");

@@ -62,10 +62,27 @@
     }
   }
 
+  /**
+   * Escala em edição com alterações não salvas: pergunta antes de sair do
+   * módulo/trocar empresa. Retorna false se o usuário quiser continuar editando.
+   */
+  function confirmLeaveScaleEdit() {
+    if (activeModuleId() !== "escala" || !window.EscalaModule?.isEditing?.()) return true;
+    if (
+      window.EscalaModule.hasUnsavedChanges?.() &&
+      !window.confirm("Há alterações na escala que ainda NÃO foram salvas. Sair e descartar as alterações?")
+    ) {
+      return false;
+    }
+    window.EscalaModule.discardEdit?.();
+    return true;
+  }
+
   /** Menu horizontal (ribbon) — troca de módulo dentro da empresa ativa. */
   function setupRibbon() {
     document.querySelectorAll(".ribbon-item").forEach((button) => {
       button.addEventListener("click", () => {
+        if (button.dataset.module !== activeModuleId() && !confirmLeaveScaleEdit()) return;
         flushModuleBeforeLeave();
         render(button.dataset.module);
       });
@@ -86,6 +103,7 @@
       tab.addEventListener("click", () => {
         const company = tab.dataset.company;
         if (!company || company === AppData.getActiveCompany()) return;
+        if (!confirmLeaveScaleEdit()) return;
         flushModuleBeforeLeave();
         AppData.setActiveCompany(company);
         updateCompanyTabsUI();

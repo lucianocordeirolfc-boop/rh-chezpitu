@@ -29,8 +29,61 @@
     printSector: "",
     printMonthYear: "",
     printIssueDate: AppData.todayISO(),
-    printNotes: ""
+    printNotes: "",
+    // Edição da escala (2026-11-17): a grade fica somente-leitura até clicar em
+    // "Editar escala". As alterações ficam num RASCUNHO (não gravado) e só vão
+    // para a base no "Salvar escala" — e só se a regra 5x2 estiver cumprida
+    // por todos os funcionários (js/scale-5x2.js).
+    editing: false,
+    draft: new Map()
   };
+
+  function draftKey(company, employeeId, date) {
+    return `${company}|${employeeId}|${date}`;
+  }
+
+  function getDraftEntry(company, employeeId, date) {
+    return scaleState.draft.get(draftKey(company, employeeId, date));
+  }
+
+  function setDraftEntry(company, employeeId, date, code, linkedHolidayId = null) {
+    scaleState.draft.set(draftKey(company, employeeId, date), {
+      company,
+      employeeId,
+      date,
+      code,
+      linkedHolidayId: linkedHolidayId || null
+    });
+  }
+
+  function hasDraftChanges() {
+    return scaleState.draft.size > 0;
+  }
+
+  function discardDraft() {
+    scaleState.draft.clear();
+    scaleState.editing = false;
+  }
+
+  /** Sai do modo edição (pergunta se houver alterações não salvas). */
+  function confirmLeaveEdit() {
+    if (!scaleState.editing) return true;
+    if (
+      hasDraftChanges() &&
+      !window.confirm("Há alterações na escala que ainda NÃO foram salvas. Descartar as alterações?")
+    ) {
+      return false;
+    }
+    discardDraft();
+    return true;
+  }
+
+  /** Código final considerando o rascunho da edição (não gravado). */
+  function effectiveScaleCode(employee, date, data) {
+    const company = employee._scaleCompany || getViewCompany();
+    const entry = getDraftEntry(company, employee.id, date);
+    return AppData.getScaleCode(employee, date, data, entry ? entry.code : undefined);
+  }
 
   let renderLock = false;
   let pendingRender = false;
@@ -164,15 +217,30 @@
   }
 
   function getScaleCell(employee, date, data) {
-    const finalCode = AppData.getScaleCode(employee, date, data);
-    const manualCode = getManualCode(employee.id, date, data);
-    const absenceConflict = AppData.getScaleAbsenceConflict(employee, date, data);
+    const company = employee._scaleCompany || getViewCompany();
+    const draftEntry = getDraftEntry(company, employee.id, date);
+    const finalCode = effectiveScaleCode(employee, date, data);
+    const manualCode = draftEntry
+      ? draftEntry.code === "__AUTO__"
+        ? undefined
+        : draftEntry.code
+      : getManualCode(employee.id, date, data);
+    const absenceConflict = draftEntry ? null : AppData.getScaleAbsenceConflict(employee, date, data);
     const isManual = manualCode !== undefined && !absenceConflict && finalCode !== "FÉRIAS";
-    const linkedHolidayName = finalCode === "CO" ? getLinkedHolidayName(employee.id, date, data) : null;
+    let linkedHolidayName = null;
+    if (finalCode === "CO") {
+      if (draftEntry?.linkedHolidayId) {
+        const holiday = (data.holidays || []).find((h) => h.id === draftEntry.linkedHolidayId);
+        linkedHolidayName = holiday ? holiday.name || holiday.date : null;
+      } else if (!draftEntry) {
+        linkedHolidayName = getLinkedHolidayName(employee.id, date, data);
+      }
+    }
 
     return {
       finalCode,
       isManual,
+      isDraft: Boolean(draftEntry),
       absenceConflict,
       linkedHolidayName,
       receivesVT: AppData.VT_WORKED_CODES.has(finalCode)
@@ -277,7 +345,7 @@
     return employees.reduce((stats, employee) => {
       const employeeData = getScaleDataForEmployee(employee, data);
       days.forEach((day) => {
-        const code = AppData.getScaleCode(employee, day, employeeData);
+        const code = effectiveScaleCode(employee, day, employeeData);
         if (code === "FOLGA" || code === "DOM") stats.daysOff += 1;
         if (code === "FÉRIAS") stats.vacations += 1;
         if (code === "CO") stats.compensations += 1;
@@ -335,7 +403,7 @@
 
   function renderCoverageSetupStatus() {
     if (!window.ScaleRules?.getCoveragePrincipalStatus) {
-      return `<p class="scale-coverage-error">Regras TR/TM/MR não carregadas. Use Ctrl+F5 para atualizar.</p>`;
+      return `<p class="scale-coverage-error">Regras de cobertura não carregadas. Use Ctrl+F5 para atualizar.</p>`;
     }
 
     let statusList = [];
@@ -362,7 +430,7 @@
 
     return `
       <div class="scale-coverage-setup scale-coverage-setup-warn">
-        ${missing.length ? `<p><strong>Atenção:</strong> não foi possível localizar no cadastro ativo: ${missing.map((item) => esc(item.displayName)).join(", ")}. Os alertas TR/TM/MR dependem desses nomes no cadastro de funcionários (Chez Pitu ou Pengold).</p>` : ""}
+        ${missing.length ? `<p><strong>Atenção:</strong> não foi possível localizar no cadastro ativo: ${missing.map((item) => esc(item.displayName)).join(", ")}. Os alertas de cobertura dependem desses nomes no cadastro de funcionários (Chez Pitu ou Pengold).</p>` : ""}
         ${inactive.length ? `<p><strong>Atenção:</strong> funcionário principal inativo: ${inactive.map((item) => esc(item.matchedName)).join(", ")}.</p>` : ""}
         <ul>
           ${statusList
@@ -410,7 +478,12 @@
     `;
   }
 
+  function coverageRulesActive() {
+    return window.ScaleRules?.hasCoverageRules ? window.ScaleRules.hasCoverageRules() : true;
+  }
+
   function renderCoverageAlerts(alerts) {
+    if (!coverageRulesActive()) return "";
     const list = Array.isArray(alerts) ? alerts : [];
     const setupBlock = renderCoverageSetupStatus();
     const rulesReady = Boolean(window.ScaleRules?.recomputeScaleIntegrations);
@@ -424,7 +497,7 @@
           <h3>Alertas de cobertura <span class="coverage-alert-count">0 alertas</span></h3>
           ${rulesWarning}
           ${setupBlock}
-          <p class="help-text compact-help">Nenhuma pendência de cobertura TR, TM ou MR neste mês. Regras: Catherina (TR), André (TM), Rosana (MR). Não se aplica a férias nem atestado.</p>
+          <p class="help-text compact-help">Nenhuma pendência de cobertura neste mês. Não se aplica a férias nem atestado.</p>
         </section>
       `;
     }
@@ -541,13 +614,22 @@
           <input id="scaleSearch" type="search" value="${esc(scaleState.search)}" placeholder="Nome, cargo ou setor">
         </label>
       </div>
-      <div class="scale-actions scale-actions-compact">
+      ${
+        scaleState.editing
+          ? `<div class="scale-actions scale-actions-compact scale-actions-editing">
+        <span class="scale-edit-badge">✎ Editando${hasDraftChanges() ? ` · ${scaleState.draft.size} alteração(ões) não salva(s)` : ""}</span>
         <button id="copyPreviousScale" class="secondary btn-sm" type="button">Copiar anterior</button>
         <button id="clearScaleMonth" class="secondary btn-sm" type="button">Limpar mês</button>
+        <button id="cancelScaleEdit" class="secondary btn-sm" type="button">Cancelar</button>
+        <button id="saveScale" class="primary btn-sm scale-save-btn" type="button">Salvar escala</button>
+      </div>`
+          : `<div class="scale-actions scale-actions-compact">
+        <button id="editScale" class="primary btn-sm scale-edit-btn" type="button">✎ Editar escala</button>
         <button id="exportScaleExcel" class="secondary btn-sm" type="button">Excel</button>
         <button id="previewScalePrint" class="secondary btn-sm" type="button">Prévia</button>
         <button id="printScale" class="primary btn-sm" type="button">Imprimir</button>
-      </div>
+      </div>`
+      }
     `;
   }
 
@@ -567,7 +649,7 @@
     `;
   }
 
-  function renderScaleTable(data, employees, days, alertLookups) {
+  function renderScaleTable(data, employees, days, alertLookups, violationsByEmployee = new Map()) {
     const holidayDates = getHolidayDates(data);
     const { alertDays, alertCells } = alertLookups || { alertDays: new Set(), alertCells: new Set() };
     // Meses passados são somente-leitura para funcionários inativos: evita edição
@@ -593,13 +675,13 @@
       return `<th class="scale-day-head ${dayClasses}"><span class="day-num">${dateDay}</span><small class="day-week">${weekdayInitial(day)}</small></th>`;
     }).join("");
 
-    const coverageIndicatorRow = `
+    const coverageIndicatorRow = !coverageRulesActive() ? "" : `
       <tr class="scale-coverage-indicator-row">
         <th class="coverage-indicator-label">Cobertura</th>
         ${days
           .map((day) =>
             alertDays.has(day)
-              ? `<th class="coverage-alert-day coverage-indicator-cell" title="Pendência TR/TM/MR neste dia">!</th>`
+              ? `<th class="coverage-alert-day coverage-indicator-cell" title="Pendência de cobertura neste dia">!</th>`
               : `<th class="coverage-indicator-cell"></th>`
           )
           .join("")}
@@ -636,11 +718,11 @@
                 const title = `${employee.name} - ${day}: ${code || "Trabalho normal"}${linkedName ? ` (${linkedName})` : ""}${conflictNote}`;
 
                 return `
-                  <td class="scale-cell ${codeClass(code)} ${dayClasses} ${cell.isManual ? "manual-cell" : ""} ${cell.absenceConflict ? "absence-conflict-cell" : ""}" title="${esc(title)}">
-                    <select class="scale-select" data-employee="${employee.id}" data-date="${day}" data-scale-company="${esc(scaleCompany)}" aria-label="Escala de ${esc(employee.name)} em ${day}"${lockRow ? " disabled" : ""}>
+                  <td class="scale-cell ${codeClass(code)} ${dayClasses} ${cell.isManual ? "manual-cell" : ""} ${cell.isDraft ? "draft-cell" : ""} ${cell.absenceConflict ? "absence-conflict-cell" : ""}" title="${esc(title)}">
+                    <select class="scale-select" data-employee="${employee.id}" data-date="${day}" data-scale-company="${esc(scaleCompany)}" aria-label="Escala de ${esc(employee.name)} em ${day}"${lockRow || !scaleState.editing ? " disabled" : ""}>
                       ${codeOptions(code, cell.isManual)}
                     </select>
-                    <span class="scale-cell-code">${esc(displayCode(code))}</span>
+                    <span class="scale-cell-code">${esc(printCode(code))}</span>
                     ${linkedName ? `<span class="co-holiday-tag" title="${esc(linkedName)}">${esc(linkedName)}</span>` : ""}
                   </td>
                 `;
@@ -651,10 +733,16 @@
               ? `<small class="emp-company-tag">${esc(employee._scaleCompany)}</small>`
               : "";
 
+            const rowViolations = violationsByEmployee.get(`${scaleCompany}|${employee.id}`) || [];
+            const violationFlag = rowViolations.length
+              ? `<small class="scale-5x2-flag" title="${esc(rowViolations.map((item) => item.message).join(" | "))}">⚠ falta folga (5x2)</small>`
+              : "";
+
             return `
-              <tr class="${employee._isInactive ? "scale-row-inactive" : ""}${lockRow ? " scale-row-locked" : ""}">
+              <tr class="${employee._isInactive ? "scale-row-inactive" : ""}${lockRow ? " scale-row-locked" : ""}${rowViolations.length ? " scale-row-5x2-violation" : ""}">
                 <th class="employee-sticky employee-name-only" title="${esc(employee.name)}${employee._isInactive ? (lockRow ? " (inativo — somente leitura)" : " (inativo)") : ""}">
                   <span class="emp-name-text">${displayName(employee.name)}</span>
+                  ${violationFlag}
                   ${companyTag}
                   ${employee.defaultShift ? `<small class="emp-shift-label">${esc(employee.defaultShift)}</small>` : ""}
                 </th>
@@ -670,7 +758,7 @@
 
     return `
       <div class="table-wrap scale-wrap scale-wrap-compact">
-        <table class="scale-table scale-table-compact">
+        <table class="scale-table scale-table-compact scale-table-v2${scaleState.editing ? " is-editing" : " is-readonly"}">
           <thead>
             <tr>
               <th class="employee-sticky">
@@ -841,8 +929,11 @@
     render(container, scaleState.yearMonth);
   }
 
+  // Copiar anterior / Limpar mês trabalham no RASCUNHO da edição: nada é
+  // gravado até o "Salvar escala" (que exige a regra 5x2 cumprida).
   function copyPreviousScale() {
-    const data = AppData.getCompanyData(getViewCompany());
+    const company = getViewCompany();
+    const data = AppData.getCompanyData(company);
     const targetDays = AppData.getDaysInMonth(scaleState.yearMonth);
     const sourceDays = AppData.getDaysInMonth(previousMonth(scaleState.yearMonth));
     const sourceByDayNumber = new Map(sourceDays.map((day) => [day.slice(-2), day]));
@@ -855,32 +946,176 @@
 
         const sourceKey = `${employee.id}|${sourceDay}`;
         if (!Object.prototype.hasOwnProperty.call(data.manualScale, sourceKey)) return;
+        const source = data.manualScale[sourceKey];
+        const code = typeof source === "object" ? source?.code : source;
+        // CO é a compensação de UM feriado: não se copia para outro mês.
+        if (code === undefined || code === "CO") return;
 
-        data.manualScale[`${employee.id}|${targetDay}`] = data.manualScale[sourceKey];
+        setDraftEntry(company, employee.id, targetDay, code);
         copied += 1;
       });
     });
 
-    AppData.runScaleIntegrations([scaleState.yearMonth]);
-    AppData.saveState();
     return copied;
   }
 
   function clearMonth() {
-    const data = AppData.getCompanyData(getViewCompany());
+    const company = getViewCompany();
+    const data = AppData.getCompanyData(company);
     const days = new Set(AppData.getDaysInMonth(scaleState.yearMonth));
     let removed = 0;
 
+    // Rascunho deste mês volta ao automático.
+    [...scaleState.draft.values()].forEach((entry) => {
+      if (entry.company === company && days.has(entry.date)) {
+        scaleState.draft.delete(draftKey(company, entry.employeeId, entry.date));
+      }
+    });
     Object.keys(data.manualScale).forEach((key) => {
-      const [, date] = key.split("|");
+      const [employeeId, date] = key.split("|");
       if (!days.has(date)) return;
-      delete data.manualScale[key];
+      setDraftEntry(company, employeeId, date, "__AUTO__");
       removed += 1;
     });
 
-    AppData.runScaleIntegrations([scaleState.yearMonth]);
-    AppData.saveState();
     return removed;
+  }
+
+  /** Funcionários cobrados pela regra 5x2: todos da empresa, sem filtros de tela. */
+  function employeesFor5x2(data) {
+    const company = getViewCompany();
+    return (data.employees || [])
+      .filter((employee) => isActiveEmployee(employee) || inactiveVisibleForMonth(employee, scaleState.yearMonth))
+      .map((employee) => ({ ...employee, _scaleCompany: company }));
+  }
+
+  function validate5x2(data) {
+    if (!window.Scale5x2) return { enforced: false, weeks: [], violations: [] };
+    return window.Scale5x2.validateMonth({
+      yearMonth: scaleState.yearMonth,
+      employees: employeesFor5x2(data),
+      getCode: (employee, date) => effectiveScaleCode(employee, date, data)
+    });
+  }
+
+  function groupViolations(result) {
+    const company = getViewCompany();
+    const map = new Map();
+    (result?.violations || []).forEach((item) => {
+      const key = `${company}|${item.employeeId}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(item);
+    });
+    return map;
+  }
+
+  function render5x2Banner(result) {
+    if (!window.Scale5x2) return "";
+    const firstWeek = window.Scale5x2.firstEnforcedMonday();
+    if (!result.enforced) {
+      if (scaleState.yearMonth < "2026-11") return "";
+      return `<div class="scale-5x2-banner scale-5x2-info"><strong>Escala 5x2 (EC 141/2026):</strong> a partir da semana de ${esc(AppData.formatDateBR(firstWeek))} cada funcionário precisa de 2 folgas (F ou D) por semana. Este mês ainda não é cobrado.</div>`;
+    }
+    const total = result.violations.length;
+    const people = new Set(result.violations.map((item) => item.employeeId)).size;
+    return total
+      ? `<div class="scale-5x2-banner scale-5x2-bad"><strong>Escala 5x2:</strong> ${people} funcionário(s) sem as 2 folgas semanais (${total} semana(s)). A escala só pode ser salva quando todos cumprirem a regra.</div>`
+      : `<div class="scale-5x2-banner scale-5x2-ok"><strong>Escala 5x2:</strong> todos os funcionários com 2 folgas semanais nas semanas cobradas deste mês.</div>`;
+  }
+
+  function show5x2ViolationsPopup(result) {
+    document.getElementById("scale5x2Popup")?.remove();
+    const byEmployee = new Map();
+    result.violations.forEach((item) => {
+      if (!byEmployee.has(item.employeeId)) byEmployee.set(item.employeeId, { name: item.employeeName, items: [] });
+      byEmployee.get(item.employeeId).items.push(item);
+    });
+    const rows = [...byEmployee.values()]
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      .map(
+        (group) => `
+        <li>
+          <strong>Funcionário ${esc(displayName(group.name))}</strong>
+          <ul>
+            ${group.items
+              .map(
+                (item) =>
+                  `<li>${item.missing === 1 ? "falta 1 folga semanal" : `faltam ${item.missing} folgas semanais`} — semana de ${esc(AppData.formatDateBR(item.weekStart))} a ${esc(AppData.formatDateBR(item.weekEnd))} (tem ${item.restDays} de 2)</li>`
+              )
+              .join("")}
+          </ul>
+        </li>`
+      )
+      .join("");
+
+    const overlay = document.createElement("div");
+    overlay.className = "popup-overlay";
+    overlay.id = "scale5x2Popup";
+    overlay.innerHTML = `
+      <div class="popup-card scale-5x2-popup" role="alertdialog" aria-labelledby="scale5x2Title">
+        <div class="popup-header">
+          <h3 id="scale5x2Title">Escala não salva — regra 5x2 não cumprida</h3>
+          <button class="popup-close" type="button" data-close-5x2>✕</button>
+        </div>
+        <p class="help-text">Desde 16/12/2026 (EC 141/2026) cada funcionário precisa de <strong>2 folgas por semana</strong> (F ou D — CO não conta). Ajuste as folgas abaixo e clique em <strong>Salvar escala</strong> de novo. Nada foi gravado.</p>
+        <ul class="scale-5x2-list">${rows}</ul>
+        <div class="popup-actions">
+          <button class="primary btn-sm" type="button" data-close-5x2>Voltar e ajustar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll("[data-close-5x2]").forEach((button) =>
+      button.addEventListener("click", () => overlay.remove())
+    );
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) overlay.remove();
+    });
+  }
+
+  /** Salvar: valida a 5x2 sobre o rascunho; só grava se todos cumprirem. */
+  function saveScaleDraft(container) {
+    const company = getViewCompany();
+    const data = AppData.getCompanyData(company);
+    const result = validate5x2(data);
+    if (result.violations.length) {
+      show5x2ViolationsPopup(result);
+      return false;
+    }
+
+    // Só o que realmente difere do que está gravado.
+    const entries = [...scaleState.draft.values()].filter((entry) => {
+      const stored = AppData.getManualScaleEntry(entry.employeeId, entry.date, AppData.getCompanyData(entry.company));
+      if (entry.code === "__AUTO__") return stored !== undefined;
+      const storedCode = typeof stored === "object" ? stored?.code : stored;
+      const storedLink = typeof stored === "object" ? stored?.linkedHolidayId || null : null;
+      return storedCode !== entry.code || storedLink !== (entry.linkedHolidayId || null);
+    });
+
+    const byCompany = new Map();
+    entries.forEach((entry) => {
+      if (!byCompany.has(entry.company)) byCompany.set(entry.company, []);
+      byCompany.get(entry.company).push(entry);
+    });
+    const warnings = [];
+    let applied = 0;
+    byCompany.forEach((list, entryCompany) => {
+      const outcome = AppData.applyManualScaleBatch(list, entryCompany);
+      applied += outcome.applied;
+      warnings.push(...outcome.warnings);
+    });
+
+    discardDraft();
+    renderCurrent(container);
+    if (warnings.length) {
+      window.App?.toast?.(`Escala salva com avisos: ${warnings.join(" | ")}`, "warning", 8000);
+    } else {
+      window.App?.toast?.(
+        applied ? `Escala salva (${applied} alteração(ões)).` : "Escala salva — nenhuma alteração pendente.",
+        "success"
+      );
+    }
+    return true;
   }
 
   function exportExcel(employees, days, data) {
@@ -1101,6 +1336,10 @@
     window.CompanyUI?.bindToolbar?.(container, "escala", (nextCompany) => {
       if (AppData.isPageCompanyAll(nextCompany)) return;
       if (nextCompany === getViewCompany()) return;
+      if (!confirmLeaveEdit()) {
+        renderCurrent(container);
+        return;
+      }
       scaleLog("change company", nextCompany);
       lastCompanySwitchAt = Date.now();
       window.clearTimeout(container._scaleSearchTimer);
@@ -1113,12 +1352,20 @@
     });
 
     container.querySelector("#scaleMonth").addEventListener("change", () => {
+      if (!confirmLeaveEdit()) {
+        renderCurrent(container);
+        return;
+      }
       setPeriodFromControls(container);
       scheduleMonthIntegrations(scaleState.yearMonth);
       renderCurrent(container);
     });
 
     container.querySelector("#scaleYear").addEventListener("change", () => {
+      if (!confirmLeaveEdit()) {
+        renderCurrent(container);
+        return;
+      }
       setPeriodFromControls(container);
       scheduleMonthIntegrations(scaleState.yearMonth);
       renderCurrent(container);
@@ -1204,10 +1451,11 @@
 
       let detachOutsideClick = null;
 
+      // Edição em rascunho: cancelar/fechar só desfaz a escolha na tela; o CO
+      // escolhido entra no rascunho e só vincula o feriado no "Salvar escala".
       picker.querySelector("#coPickerCancel").addEventListener("click", () => {
         detachOutsideClick?.();
         backdrop.remove();
-        AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
         renderCurrent(container);
       });
 
@@ -1215,7 +1463,6 @@
         if (!eligible.length) {
           detachOutsideClick?.();
           backdrop.remove();
-          AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
           renderCurrent(container);
           return;
         }
@@ -1228,21 +1475,16 @@
 
         detachOutsideClick?.();
         backdrop.remove();
-        const result = AppData.setManualScale(resolvedEmployeeId, date, "CO", linkedId, scaleCompany);
-        if (result?.coWarning) window.App?.toast?.(result.coWarning, "warning", 5000);
+        setDraftEntry(scaleCompany || getViewCompany(), resolvedEmployeeId, date, "CO", linkedId);
         renderCurrent(container);
-        window.App.renderCurrent();
       });
 
       setTimeout(() => {
         const outsideClick = (e) => {
           if (!wrapper.contains(e.target)) {
             detachOutsideClick?.();
-            const entry = AppData.getManualScaleEntry(resolvedEmployeeId, date, data);
-            if (typeof entry !== "object") {
-              AppData.setManualScale(resolvedEmployeeId, date, "__AUTO__", null, scaleCompany);
-              renderCurrent(container);
-            }
+            backdrop.remove();
+            renderCurrent(container);
           }
         };
         detachOutsideClick = () => document.removeEventListener("mousedown", outsideClick);
@@ -1298,7 +1540,6 @@
       picker.querySelector("#rangePickerCancel").addEventListener("click", function () {
         detachOutsideClick?.();
         backdrop.remove();
-        AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
         renderCurrent(container);
       });
 
@@ -1332,18 +1573,16 @@
           return;
         }
 
-        var cur = new Date(startStr + "T00:00:00");
-        var end = new Date(endStr + "T00:00:00");
+        // Rascunho: os dias entram na edição e só são gravados no "Salvar escala".
         var count = 0;
-        while (cur <= end) {
-          var dayStr = cur.toISOString().slice(0, 10);
-          AppData.setManualScale(employeeId, dayStr, code, null, scaleCompany);
-          cur.setDate(cur.getDate() + 1);
+        var dayStr = startStr;
+        while (dayStr <= endStr) {
+          setDraftEntry(scaleCompany || getViewCompany(), employeeId, dayStr, code);
+          dayStr = window.Scale5x2 ? window.Scale5x2.addDays(dayStr, 1) : new Date(new Date(dayStr + "T12:00:00").getTime() + 86400000).toISOString().slice(0, 10);
           count++;
         }
         renderCurrent(container);
-        window.App.renderCurrent();
-        if (window.App?.toast) window.App.toast(label + " registrado(a) para " + count + " dia(s).", "success", 3000);
+        if (window.App?.toast) window.App.toast(label + " marcado(a) em " + count + " dia(s) — clique em Salvar escala para gravar.", "info", 3500);
       });
 
       var detachOutsideClick = null;
@@ -1351,7 +1590,7 @@
         var outsideClick = function (e) {
           if (!wrapper.contains(e.target)) {
             detachOutsideClick?.();
-            AppData.setManualScale(employeeId, date, "__AUTO__", null, scaleCompany);
+            backdrop.remove();
             renderCurrent(container);
           }
         };
@@ -1481,16 +1720,8 @@
             scaleCompany
           );
         } else {
-          const result = AppData.setManualScale(
-            select.dataset.employee,
-            select.dataset.date,
-            select.value,
-            null,
-            scaleCompany
-          );
-          if (result?.coWarning) window.App?.toast?.(result.coWarning, "warning", 5000);
+          setDraftEntry(scaleCompany, select.dataset.employee, select.dataset.date, select.value);
           renderCurrent(container);
-          window.App.renderCurrent();
         }
       });
 
@@ -1501,6 +1732,7 @@
 
       cell.addEventListener("dblclick", (e) => {
         e.preventDefault();
+        if (!scaleState.editing || select.disabled) return;
         var code = select.value === "__AUTO__" ? "" : select.value;
         if (!code || code === "" || code === "FOLGA" || code === "DOM") {
           var empId = select.dataset.employee;
@@ -1514,31 +1746,51 @@
       });
     });
 
-    container.querySelector("#copyPreviousScale").addEventListener("click", () => {
+    container.querySelector("#editScale")?.addEventListener("click", () => {
+      scaleState.editing = true;
+      scaleState.draft.clear();
+      scaleState.previewVisible = false;
+      renderCurrent(container);
+    });
+
+    container.querySelector("#cancelScaleEdit")?.addEventListener("click", () => {
+      if (!confirmLeaveEdit()) return;
+      renderCurrent(container);
+    });
+
+    container.querySelector("#saveScale")?.addEventListener("click", () => {
+      saveScaleDraft(container);
+    });
+
+    container.querySelector("#copyPreviousScale")?.addEventListener("click", () => {
       const copied = copyPreviousScale();
-      alert(`${copied} marcações manuais copiadas da escala anterior.`);
+      window.App?.toast?.(
+        `${copied} marcação(ões) copiada(s) da escala anterior para a edição — clique em Salvar escala para gravar.`,
+        "info",
+        4000
+      );
       renderCurrent(container);
     });
 
-    container.querySelector("#clearScaleMonth").addEventListener("click", () => {
-      if (!confirm("Limpar todas as alterações manuais deste mês? Folgas fixas, férias e CO automáticos serão preservados.")) return;
+    container.querySelector("#clearScaleMonth")?.addEventListener("click", () => {
+      if (!confirm("Limpar todas as alterações manuais deste mês na edição? Folgas fixas, férias e ausências são preservadas. Nada é gravado até clicar em Salvar escala.")) return;
       const removed = clearMonth();
-      alert(`${removed} alterações manuais removidas.`);
+      window.App?.toast?.(`${removed} marcação(ões) manual(is) voltam ao automático na edição.`, "info", 4000);
       renderCurrent(container);
     });
 
-    container.querySelector("#exportScaleExcel").addEventListener("click", () => {
+    container.querySelector("#exportScaleExcel")?.addEventListener("click", () => {
       exportExcel(employees, days, data);
     });
 
-    container.querySelector("#previewScalePrint").addEventListener("click", async () => {
+    container.querySelector("#previewScalePrint")?.addEventListener("click", async () => {
       scaleState.previewVisible = true;
       await ensureLogoForActiveCompany();
       renderCurrent(container);
       container.querySelector(".scale-print-preview-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
-    container.querySelector("#printScale").addEventListener("click", async () => {
+    container.querySelector("#printScale")?.addEventListener("click", async () => {
       scaleState.previewVisible = true;
       await ensureLogoForActiveCompany();
       renderCurrent(container);
@@ -1588,6 +1840,8 @@
       const coverageAlerts = getAlertsForView();
       const alertLookups = buildAlertLookups(coverageAlerts);
       const absenceConflicts = collectAbsenceConflicts(data, employees, days);
+      const rule5x2 = validate5x2(data);
+      const violationsByEmployee = groupViolations(rule5x2);
 
       container.innerHTML = `
         ${renderCoverageAlerts(coverageAlerts)}
@@ -1600,12 +1854,13 @@
             </div>
           </div>
           ${renderToolbar(data)}
+          ${render5x2Banner(rule5x2)}
           ${renderStats(employees, days, data, coverageAlerts.length)}
           <details class="scale-legend-details">
             <summary>Legenda de códigos</summary>
             <div class="legend legend-compact">${renderLegend()}</div>
           </details>
-          ${renderScaleTable(data, employees, days, alertLookups)}
+          ${renderScaleTable(data, employees, days, alertLookups, violationsByEmployee)}
         </article>
         ${renderPrintArea(data, employees, days)}
       `;
@@ -1652,5 +1907,20 @@
     }, 250);
   }
 
-  window.EscalaModule = { render, softRefreshFromSync, getViewCompany };
+  // Fechar/recarregar a página com alterações não salvas na escala: avisa.
+  window.addEventListener("beforeunload", (event) => {
+    if (scaleState.editing && hasDraftChanges()) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  });
+
+  window.EscalaModule = {
+    render,
+    softRefreshFromSync,
+    getViewCompany,
+    isEditing: () => scaleState.editing,
+    hasUnsavedChanges: () => scaleState.editing && hasDraftChanges(),
+    discardEdit: () => discardDraft()
+  };
 })();

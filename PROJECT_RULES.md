@@ -181,6 +181,32 @@ Trocar empresa não pode apagar dados.
 
 Trocar mês não pode apagar dados.
 
+### Editar / Salvar e regra 5x2 (REGRA FIXA)
+
+Vigente desde 2026-11-17, a pedido do usuário (EC 141/2026, art. 7º, XV).
+
+- A grade abre **somente-leitura**. "Editar escala" libera; as alterações ficam
+  num **rascunho em memória** (`scaleState.draft`) e só são gravadas no
+  **"Salvar escala"** (`AppData.applyManualScaleBatch` — mesma regra de
+  `setManualScale` por item, inclusive vínculo de CO; recalcula e salva uma
+  vez). A grade **não chama `setManualScale` diretamente**.
+- **Salvar só grava se a 5x2 estiver cumprida por todos os funcionários da
+  empresa** (sem filtros de tela). Senão: pop-up "Funcionário X — falta N folga
+  semanal (semana de … a …)" e nada é gravado.
+- Regra (`js/scale-5x2.js`, fonte única): semana segunda→domingo; cobrada a
+  partir da 1ª semana completa após 16/12/2026 (21/12/2026); ≥ 2 dias F/DOM por
+  semana; CO não conta; dispensa com FÉRIAS/ATESTADO/LICENÇA/SUSPENSÃO na
+  semana ou admissão/desligamento dentro dela; semana avaliada no mês do
+  domingo (lê o mês anterior).
+- Copiar anterior / Limpar mês operam no rascunho (CO não é copiado).
+- Férias/ausência abertas pela escala continuam gravando na hora (cadastros
+  próprios).
+- Sair com rascunho pendente (mês, ano, empresa, módulo, fechar a página)
+  pergunta antes de descartar.
+- Ainda NÃO validado: limite de 42h semanais (a escala não registra horas).
+
+Cobertura: `scripts/verify-escala-5x2.mjs`, `scripts/verify-escala-editar-salvar.mjs`.
+
 ## Impressão da Escala — geometria da folha (REGRA FIXA)
 
 Vigente desde 2026-09-07 (`20260907.01`). Ver `PROJECT_HISTORY.md` →
@@ -236,19 +262,20 @@ Códigos importantes:
 - D = Domingo
 - FÉRIAS = Férias
 - CO = Folga compensatória
-- TR = cobertura Catherina
-- TM = cobertura André
+- TR = Tarde Recepção (turno comum)
+- TM = Tarde Manutenção (turno comum)
 - MR = cobertura Rosana
 
 ## Regras de cobertura
 
-Catherina Victoria de Azeredo:
-- Sempre que estiver de folga ou ausência, deve haver outro funcionário com código TR.
+2026-11-17 (pedido do usuário): retiradas as regras de cobertura de Catherina
+(TR) e André Justo (TM). Alertas TR/TM já gravados na base são ignorados na
+leitura (`ScaleRules.isActiveCoverageAlert`) — nada é apagado. No mesmo dia
+saiu também a observação da Rosana (MR): `COVERAGE_PRINCIPALS` vazio, painel de
+cobertura, linha "Cobertura" da grade e cartões do Dashboard ocultos
+(`ScaleRules.hasCoverageRules()`).
 
-André Justo de Barros:
-- Sempre que estiver de folga ou ausência, deve haver outro funcionário com código TM.
-
-Rosana Santos de Freitas:
+Histórico (regra inativa) — Rosana Santos de Freitas:
 - Sempre que estiver de folga ou ausência, deve haver outro funcionário com código MR.
 
 Férias e atestados também devem respeitar regras de cobertura quando aplicável.
@@ -332,6 +359,13 @@ específico** com um feriado ("Excluir vínculo"), que vai para a Lixeira.
   `ScaleRules.removeCalendarHoliday` **recusam sempre** (`{ ok: false, blocked: true }`
   / `false`) sem tocar em nada. Novos tombstones de feriado não são gravados.
 - Corrigir nome/data: **Editar** (`updateHolidayEverywhere`, preserva vínculos).
+  Desde 2026-11-17 a edição **copia as marcas de vínculo excluído**
+  (`carryWorkedLinkTombstones`) para o nome/data novos — sem isso o
+  auto-vínculo recriava vínculos excluídos (caso "01 de Mario"/"Ninados" 2027).
+  Exceção: funcionário vinculado HOJE ao feriado não recebe a marca (o merge o
+  apagaria em silêncio, sem Lixeira) — decisão do usuário.
+  E o **tipo** passa a persistir também em feriado que só existe no bloco da
+  empresa (cria a entrada de calendário da empresa editada).
 - Duplicatas de mesmo nome + data continuam sendo **mescladas** automaticamente
   (`mergeDuplicateHolidaysInBlock`), unindo os vínculos — nada se perde.
 - **Exclusões antigas continuam valendo:** os tombstones gravados antes desta

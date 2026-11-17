@@ -57,10 +57,15 @@
 
     <h3>5. Escala de Folga</h3>
     <ol>
-      <li>Abra <strong>Escala de Folga</strong> e selecione o <strong>mês/ano</strong>.</li>
-      <li>Para cada dia, escolha o código do funcionário (trabalho, FOLGA, FÉRIAS, CO, etc.).</li>
-      <li>As alterações são salvas automaticamente.</li>
+      <li>Abra <strong>Escala de Folga</strong> e selecione o <strong>mês/ano</strong>. A grade abre só para consulta.</li>
+      <li>Clique em <strong>✎ Editar escala</strong> e escolha os códigos (trabalho, F, D, CO etc.). A célula alterada fica com contorno tracejado: ainda não foi gravada.</li>
+      <li>Clique em <strong>Salvar escala</strong> (ou <strong>Cancelar</strong> para descartar). Copiar anterior e Limpar mês também só valem depois de salvar.</li>
     </ol>
+    <p><strong>Escala 5x2 (EC 141/2026):</strong> a partir da semana de 21/12/2026 cada funcionário precisa de
+       <strong>2 folgas por semana</strong> (segunda a domingo; F e D contam, CO não). A escala só é salva se todos
+       cumprirem — senão abre um aviso com o nome do funcionário e a semana em que falta folga. Semanas com férias,
+       atestado, licença, suspensão, admissão ou desligamento não são cobradas.</p>
+    <p><strong>Alertas de cobertura:</strong> retirados (Catherina, André e Rosana). TR, TM e MR são turnos comuns.</p>
     <p><strong>Compensar feriado trabalhado (CO):</strong> lance o código <strong>CO</strong> no dia da compensação,
        escolha <strong>qual feriado</strong> está sendo compensado e confirme. Só aparecem os feriados em que
        aquele funcionário está vinculado como tendo trabalhado (ver seção 7). Após vincular, o feriado sai da lista.</p>

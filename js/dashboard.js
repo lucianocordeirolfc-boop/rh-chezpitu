@@ -42,7 +42,9 @@
     const holidayStats = { pending: 0, agendado: 0, vencido: 0, compensado: 0, deadlineAlerts: 0 };
     const companySet = new Set(companies);
     const scopedCoverageAlerts = (AppData.state.coverageAlerts || []).filter(
-      (alert) => companySet.has(alert.principalCompany)
+      (alert) =>
+        companySet.has(alert.principalCompany) &&
+        (window.ScaleRules?.isActiveCoverageAlert ? window.ScaleRules.isActiveCoverageAlert(alert) : true)
     );
     let coverageAlertCount = scopedCoverageAlerts.length;
     let autoHolidayPending = 0;
@@ -107,6 +109,8 @@
     const companies = AppData.resolveCompaniesForPage("dashboard", { allowAll: true });
     const metrics = aggregateDashboardMetrics(companies);
 
+    // Sem regra de cobertura ativa (2026-11-17), cartão e painel ficam ocultos.
+    const coverageOn = window.ScaleRules?.hasCoverageRules ? window.ScaleRules.hasCoverageRules() : true;
     container.innerHTML = `
       ${window.CompanyUI?.renderToolbar?.("dashboard", { allowAll: true }) || ""}
       <div class="dash-metrics">
@@ -116,7 +120,7 @@
         <article class="stat-chip chip-warning"><span>Feriados pend.</span><strong>${metrics.holidayStats.pending}</strong></article>
         <article class="stat-chip chip-info"><span>Feriados agend.</span><strong>${metrics.holidayStats.agendado}</strong></article>
         <article class="stat-chip chip-danger"><span>Feriados venc.</span><strong>${metrics.holidayStats.vencido}</strong></article>
-        <article class="stat-chip ${metrics.coverageAlertCount > 0 ? "chip-danger" : "chip-default"}"><span>Alertas cobertura</span><strong>${metrics.coverageAlertCount}</strong></article>
+        ${coverageOn ? `<article class="stat-chip ${metrics.coverageAlertCount > 0 ? "chip-danger" : "chip-default"}"><span>Alertas cobertura</span><strong>${metrics.coverageAlertCount}</strong></article>` : ""}
         <article class="stat-chip ${metrics.autoHolidayPending > 0 ? "chip-warning" : "chip-default"}"><span>Feriados auto pend.</span><strong>${metrics.autoHolidayPending}</strong></article>
         <article class="stat-chip highlight"><span>${isAll ? "Total grupo" : "Total empresa"}</span><strong>${metrics.totalEmployees}</strong></article>
         <article class="stat-chip ${metrics.deadlineAlerts.length > 0 ? "chip-danger" : "chip-default"}"><span>Alertas prazo</span><strong>${metrics.holidayStats.deadlineAlerts}</strong></article>
@@ -149,13 +153,13 @@
             (item) => `<li><strong>${esc(item.employee)}</strong><span>${esc(item.holiday)} · CO em ${AppData.formatDateBR(item.date)}</span></li>`
           )}
         </article>
-        <article class="card card-compact dash-panel">
+        ${coverageOn ? `<article class="card card-compact dash-panel">
           <h3>Alertas de cobertura</h3>
           ${listItems(
             metrics.coverageAlertsPreview,
             (alert) => `<li><strong>${esc(alert.principalName || alert.message)}</strong><span>${esc(alert.message)}</span></li>`
           )}
-        </article>
+        </article>` : ""}
         <article class="card card-compact dash-panel">
           <h3>Alertas de prazo</h3>
           ${listItems(

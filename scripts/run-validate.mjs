@@ -34,6 +34,8 @@ const SUITES = [
   { name: "Quota de armazenamento", script: "scripts/test-storage-quota.mjs" },
   { name: "Feriados — lista completa/editar/excluir", script: "scripts/verify-feriados-todos-anos.mjs" },
   { name: "Feriados — valer para as duas empresas", script: "scripts/verify-feriados-empresas.mjs" },
+  { name: "Escala — regra 5x2 (EC 141/2026)", script: "scripts/verify-escala-5x2.mjs" },
+  { name: "Escala — Editar/Salvar com 5x2 (navegador)", script: "scripts/verify-escala-editar-salvar.mjs" },
   { name: "Feriados — exclusão definitiva", script: "scripts/verify-exclusao-feriado-definitiva.mjs" },
   { name: "Feriados — vínculos retroativos", script: "scripts/verify-feriados-retroativos.mjs" },
   { name: "Feriados — auto-vínculo não nasce Vencido", script: "scripts/verify-auto-vinculo-vencido-guard.mjs" },

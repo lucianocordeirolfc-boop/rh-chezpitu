@@ -69,10 +69,33 @@ O **Cargo** é escolhido em lista suspensa, com os cargos já cadastrados. Se o 
 
 ## 5. Escala de Folga
 
-1. Abra **Escala de Folga**.
-2. Selecione o **mês/ano** desejado.
-3. Para cada dia, escolha o código do funcionário (trabalho, FOLGA, FÉRIAS, CO, etc.).
-4. As alterações são salvas automaticamente.
+1. Abra **Escala de Folga** e selecione o **mês/ano**.
+2. A grade abre **somente para consulta**. Clique em **✎ Editar escala**.
+3. Para cada dia, escolha o código do funcionário (trabalho, F, D, CO etc.).
+   A célula alterada fica com contorno tracejado pêssego: ainda **não foi
+   gravada**.
+4. Clique em **Salvar escala**. **Cancelar** descarta tudo o que não foi salvo.
+   Trocar de mês, de empresa ou de módulo com alterações pendentes pergunta
+   antes de descartar.
+
+**Copiar anterior** e **Limpar mês** ficam dentro da edição e também só valem
+depois do **Salvar escala**. Férias e ausências registradas pelos quadros da
+escala continuam sendo gravadas na hora (são cadastros de Férias/Ausências).
+
+### Regra da escala 5x2 (EC 141/2026)
+- A partir da semana de **21/12/2026** (primeira semana completa depois de
+  16/12/2026), cada funcionário precisa de **2 folgas por semana**
+  (segunda a domingo). Contam **F** (folga) e **D** (folga de domingo);
+  **CO não conta** como folga semanal.
+- A escala **só é salva** se todos os funcionários da empresa cumprirem a regra.
+  Se faltar folga para alguém, abre um aviso como: *Funcionário André Justo de
+  Barros — falta 1 folga semanal (semana de 21/12/2026 a 27/12/2026)*. Nada é
+  gravado até corrigir.
+- O nome de quem não cumpre aparece marcado em vermelho na grade
+  ("⚠ falta folga (5x2)") e a faixa acima da grade mostra o resumo.
+- Semana com férias, atestado, licença ou suspensão, e semana de admissão ou
+  desligamento, não é cobrada.
+- A semana que atravessa dois meses é cobrada no mês em que termina (domingo).
 
 ### Compensar feriado trabalhado (CO)
 1. No dia em que o funcionário vai compensar, lance o código **CO**.
@@ -80,6 +103,12 @@ O **Cargo** é escolhido em lista suspensa, com os cargos já cadastrados. Se o 
 3. Selecione o feriado e confirme.
 
 > Só aparecem no quadro os feriados em que **aquele funcionário** está vinculado como tendo trabalhado (ver seção 7). Após vincular o CO, o feriado sai da lista.
+
+---
+
+### Alertas de cobertura
+As observações de cobertura (Catherina, André Justo e Rosana) foram retiradas
+em 17/11/2026. TR, TM e MR continuam como turnos comuns da escala.
 
 ---
 

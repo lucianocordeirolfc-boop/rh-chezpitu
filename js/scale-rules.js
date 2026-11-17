@@ -1,26 +1,15 @@
 (function () {
   const NAME_PARTICLES = new Set(["de", "da", "do", "das", "dos", "e"]);
 
-  const COVERAGE_PRINCIPALS = [
-    {
-      nameKey: "catherina victoria de azeredo",
-      displayName: "Catherina Victoria de Azeredo",
-      coverageCode: "TR",
-      aliases: ["catherina victoria azeredo", "catherina azeredo"]
-    },
-    {
-      nameKey: "andre justo de barros",
-      displayName: "André Justo de Barros",
-      coverageCode: "TM",
-      aliases: ["andre justo barros", "andre barros"]
-    },
-    {
-      nameKey: "rosana santos de freitas",
-      displayName: "Rosana Santos de Freitas",
-      coverageCode: "MR",
-      aliases: ["rosana santos freitas", "rosana freitas"]
-    }
-  ];
+  // 2026-11-17 (pedido do usuário): retiradas as regras de cobertura de
+  // Catherina (TR) e André Justo (TM). Os códigos TR/TM continuam existindo
+  // como turnos comuns; só deixam de gerar alerta de cobertura.
+  // 2026-11-17 (pedido do usuário): retirada também a observação de cobertura
+  // da Rosana (MR). Nenhuma regra de cobertura ativa — painel, linha
+  // "Cobertura" da grade e cartões do Dashboard ficam ocultos. TR/TM/MR
+  // continuam como turnos comuns. Para reativar, inclua o principal aqui
+  // (formato: { nameKey, displayName, coverageCode, aliases }).
+  const COVERAGE_PRINCIPALS = [];
 
   const DEFAULT_NOT_WORKED = new Set([
     "FOLGA",
@@ -203,6 +192,8 @@
   }
 
   function getCoveragePrincipalStatus(state) {
+    // Mantém a migração não-destrutiva das chaves de vínculo mesmo sem regras ativas.
+    ensureBindings(state);
     return COVERAGE_PRINCIPALS.map((principal) => {
       const found = findPrincipalAcrossCompanies(principal, state);
       return {
@@ -443,12 +434,27 @@
     };
   }
 
+  /**
+   * Alerta gravado ainda vale? Só os de principais vigentes (alertas antigos de
+   * Catherina/TR e André/TM já salvos na base são ignorados na leitura — nada é
+   * apagado; o próximo recálculo do mês já não os gera).
+   */
+  function hasCoverageRules() {
+    return COVERAGE_PRINCIPALS.length > 0;
+  }
+
+  function isActiveCoverageAlert(alert) {
+    return COVERAGE_PRINCIPALS.some((principal) => principal.coverageCode === alert?.coverageCode);
+  }
+
   function getCoverageAlertsForMonth(yearMonth) {
-    return (AppData.state.coverageAlerts || []).filter((alert) => alert.yearMonth === yearMonth);
+    return (AppData.state.coverageAlerts || []).filter(
+      (alert) => alert.yearMonth === yearMonth && isActiveCoverageAlert(alert)
+    );
   }
 
   function getCoverageAlertCount() {
-    return (AppData.state.coverageAlerts || []).length;
+    return (AppData.state.coverageAlerts || []).filter(isActiveCoverageAlert).length;
   }
 
   function countAutoPendingHolidays(company) {
@@ -538,6 +544,8 @@
     recomputeScaleIntegrations,
     getCoverageAlertsForMonth,
     getCoverageAlertCount,
+    isActiveCoverageAlert,
+    hasCoverageRules,
     countAutoPendingHolidays,
     countAutoPendingHolidaysAllCompanies,
     getHolidayDatesForCompany,

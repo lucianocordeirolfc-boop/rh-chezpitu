@@ -84,13 +84,13 @@
     { code: "FÉRIAS", label: "Férias" },
     { code: "CO", label: "Compensação de feriado" },
     { code: "MM", label: "Manhã Manutenção" },
-    { code: "TM", label: "Tarde Manutenção (cobertura)" },
+    { code: "TM", label: "Tarde Manutenção" },
     { code: "NM", label: "Noite Manutenção" },
     { code: "MN", label: "Manhã" },
     { code: "TN", label: "Tarde" },
     { code: "NO", label: "Noite" },
     { code: "MR", label: "Manhã Recepção (cobertura)" },
-    { code: "TR", label: "Tarde Recepção (cobertura)" },
+    { code: "TR", label: "Tarde Recepção" },
     { code: "NR", label: "Noite Recepção" },
     { code: "ATESTADO", label: "Atestado" },
     { code: "FALTA", label: "Falta" },
@@ -1036,6 +1036,42 @@
     if (!bucket) return;
     delete bucket[workedLinkTombstoneKey(date, name, employeeId)];
     delete bucket[legacyWorkedLinkTombstoneKey(date, name, employeeId)];
+  }
+
+  /**
+   * Copia as marcas de vínculo excluído de um feriado (data + nome antigos)
+   * para a identidade nova. Aditivo: nunca remove a marca antiga.
+   *
+   * NÃO copia a marca de funcionário que está VINCULADO hoje ao feriado (no
+   * nome antigo ou no novo): applyWorkedLinkTombstones apagaria esse vínculo
+   * em silêncio, sem Lixeira. Vínculo que voltou depois da exclusão é decisão
+   * do usuário ("Excluir vínculo", que arquiva).
+   * Retorna quantas marcas foram copiadas.
+   */
+  function carryWorkedLinkTombstones(company, oldDate, oldName, nextDate, nextName, targetState = state) {
+    const bucket = targetState.workedLinkTombstones?.[company];
+    if (!bucket) return 0;
+    const identities = new Set([holidayTombstoneKey(oldDate, oldName), holidayTombstoneKey(nextDate, nextName)]);
+    const linkedNow = new Set();
+    (targetState.companies?.[company]?.holidays || []).forEach((holiday) => {
+      if (!identities.has(holidayTombstoneKey(holiday?.date, holiday?.name))) return;
+      (holiday.workedEmployees || []).forEach((item) => item?.employeeId && linkedNow.add(item.employeeId));
+    });
+    const prefixes = [
+      ImportUtils.escapeRtdbKey(`${String(oldDate || "").trim()}|${normalizeSearchText(oldName)}|`),
+      `${String(oldDate || "").trim()}|${normalizeSearchText(oldName)}|`
+    ];
+    let copied = 0;
+    Object.entries({ ...bucket }).forEach(([key, when]) => {
+      const prefix = prefixes.find((item) => key.startsWith(item));
+      if (!prefix) return;
+      const employeeId = key.slice(prefix.length);
+      if (!employeeId || linkedNow.has(employeeId)) return;
+      if (isWorkedLinkTombstoned(company, nextDate, nextName, employeeId, targetState)) return;
+      recordWorkedLinkTombstone(company, nextDate, nextName, employeeId, Number(when) || now(), targetState);
+      copied += 1;
+    });
+    return copied;
   }
 
   function mergeWorkedLinkTombstoneStores(localStore = {}, remoteStore = {}) {
@@ -4129,6 +4165,48 @@
     });
     state.calendarHolidays = nextCalendar;
 
+    // ── Tipo: feriado que só existe no bloco da empresa (sem calendário) ──
+    // O tipo mora no calendário. Sem entrada de calendário a edição do tipo
+    // se perdia; cria a entrada (só para as empresas do escopo que têm o
+    // feriado). Não muda o auto-vínculo: ele já lê o bloco da empresa.
+    if (nextType) {
+      const calendarCovers = (company) =>
+        state.calendarHolidays.some(
+          (holiday) =>
+            holidayTombstoneKey(holiday?.date, holiday?.name) === nextKey &&
+            calendarHolidayTargetsCompany(holiday, company)
+        );
+      const missingType = scope.filter(
+        (company) =>
+          !calendarCovers(company) &&
+          (getCompanyData(company).holidays || []).some(
+            (holiday) => holidayTombstoneKey(holiday?.date, holiday?.name) === oldKey
+          )
+      );
+      if (missingType.length && !isHolidayTombstoned(HOLIDAY_TOMBSTONE_CALENDAR_SCOPE, nextDate, nextName)) {
+        state.calendarHolidays.push({
+          id: uid("cal"),
+          date: nextDate,
+          name: nextName,
+          type: nextType,
+          companies: missingType,
+          updatedAt: now()
+        });
+        changed = true;
+      }
+    }
+
+    // ── Vínculos excluídos acompanham o feriado renomeado/redatado ────────
+    // (2026-11-17) O tombstone de vínculo usa data|nome|funcionário. Sem
+    // copiá-lo, renomear o feriado liberava o auto-vínculo a recriar vínculos
+    // que o usuário excluiu (aconteceu com "01 de Mario"/"Ninados" 2027).
+    // Somente aditivo: as marcas antigas são mantidas.
+    if (nextKey !== oldKey) {
+      scope.forEach((company) => {
+        if (carryWorkedLinkTombstones(company, oldDate, oldName, nextDate, nextName)) changed = true;
+      });
+    }
+
     // ── Feriados das empresas do escopo ───────────────────────────────────
     scope.forEach((company) => {
       const data = getCompanyData(company);
@@ -5017,7 +5095,12 @@
     }
   }
 
-  function setManualScale(employeeId, date, code, linkedHolidayId, company) {
+  /**
+   * Aplica UM lançamento manual da escala na memória (sem recalcular nem
+   * salvar). Fonte única usada por setManualScale (gravação imediata) e por
+   * applyManualScaleBatch (botão Salvar da Escala). Retorna { coWarning }.
+   */
+  function applyManualScaleEntry(employeeId, date, code, linkedHolidayId, company) {
     const resolvedCompany = resolveCompanyForEmployeeWrite(employeeId, company, "escala");
     const data = getCompanyData(resolvedCompany);
     if (!data.manualScaleMeta) data.manualScaleMeta = {};
@@ -5042,7 +5125,6 @@
         coWarning = "Selecione o feriado pendente deste funcionário.";
         delete data.manualScale[key];
         stampMapMeta(data.manualScaleMeta, data.manualScale, key);
-        saveState();
         return { coWarning };
       }
 
@@ -5060,9 +5142,38 @@
     }
 
     stampMapMeta(data.manualScaleMeta, data.manualScale, key);
-    runScaleIntegrations([date.slice(0, 7)]);
-    saveState();
     return { coWarning };
+  }
+
+  function setManualScale(employeeId, date, code, linkedHolidayId, company) {
+    const result = applyManualScaleEntry(employeeId, date, code, linkedHolidayId, company);
+    runScaleIntegrations([String(date).slice(0, 7)]);
+    saveState();
+    return result;
+  }
+
+  /**
+   * Grava de uma vez os lançamentos do rascunho da Escala (botão Salvar).
+   * entries: [{ employeeId, date, code, linkedHolidayId }]. Mesma regra de
+   * setManualScale por item; recalcula as integrações dos meses tocados e salva
+   * UMA vez. Retorna { applied, warnings: [texto] }.
+   */
+  function applyManualScaleBatch(entries, company) {
+    const months = new Set();
+    const warnings = [];
+    let applied = 0;
+    (entries || []).forEach((entry) => {
+      if (!entry?.employeeId || !entry?.date) return;
+      const result = applyManualScaleEntry(entry.employeeId, entry.date, entry.code, entry.linkedHolidayId || null, company);
+      if (result?.coWarning) warnings.push(`${formatDateBR(entry.date)}: ${result.coWarning}`);
+      months.add(String(entry.date).slice(0, 7));
+      applied += 1;
+    });
+    if (applied) {
+      runScaleIntegrations([...months]);
+      saveState();
+    }
+    return { applied, warnings };
   }
 
   function setVtDeduction(employeeId, yearMonth, days, options = {}) {
@@ -5168,14 +5279,26 @@
     return !isWorkedScaleCode(code);
   }
 
-  function getScaleCode(employee, date, data = getCompanyData()) {
+  /**
+   * Código final da escala no dia. `manualOverride` (opcional) simula um
+   * lançamento manual ainda NÃO gravado — rascunho da edição da Escala:
+   * undefined = usa o gravado; "__AUTO__" = como se não houvesse manual;
+   * outro valor = como se esse código estivesse lançado. Férias e ausências
+   * continuam prevalecendo, igual ao gravado.
+   */
+  function getScaleCode(employee, date, data = getCompanyData(), manualOverride) {
     const vacation = findVacationForDate(employee.id, date, data);
     if (vacation) return "FÉRIAS";
 
     const absence = findAbsenceForDate(employee.id, date, data);
     if (absence) return getAbsenceScaleCode(absence.type);
 
-    const manual = getManualScaleCodeValue(employee.id, date, data);
+    const manual =
+      manualOverride === undefined
+        ? getManualScaleCodeValue(employee.id, date, data)
+        : manualOverride === "__AUTO__"
+          ? undefined
+          : manualOverride;
     if (manual !== undefined) return manual;
 
     const compensation = data.holidays.some((holiday) =>
@@ -5622,6 +5745,8 @@
     measureStorageUsage,
     STORAGE_KEY,
     getManualScaleEntry,
+    applyManualScaleBatch,
+    carryWorkedLinkTombstones,
     setVtDeduction,
     getVtDeduction,
     getVtDeductionDisplay,

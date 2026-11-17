@@ -7,6 +7,56 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-17 (2) — Escala 5x2 (EC 141/2026): Editar/Salvar com validação + visual + coberturas
+
+Pedido do usuário: adaptar a Escala de Folga à 5x2 a partir de 16/12/2026;
+botão Salvar que só grava se todos cumprirem a regra (pop-up "funcionário X —
+falta uma folga semanal"); botão Editar; remover as observações de cobertura de
+André Justo e Catherina; grade maior e cores mais nítidas.
+
+- **Arquitetura:** antes cada mudança na grade gravava na hora
+  (`setManualScale`). Agora a grade é somente-leitura até "Editar escala"; as
+  mudanças ficam no rascunho (`scaleState.draft`) e só "Salvar escala" grava
+  (`AppData.applyManualScaleBatch`, que reutiliza a mesma lógica por item via
+  `applyManualScaleEntry` — `setManualScale` virou casca dela, sem mudança de
+  comportamento). `getScaleCode` ganhou `manualOverride` opcional (simula o
+  rascunho). Copiar anterior / Limpar mês passam a operar no rascunho (CO não é
+  copiado). Aviso ao trocar mês/ano/empresa/módulo ou fechar a página com
+  rascunho pendente (`js/app.js`).
+- **Regra 5x2:** novo `js/scale-5x2.js` (fonte única): semana seg→dom; cobrada
+  a partir de 21/12/2026 (1ª semana completa após 16/12); ≥ 2 F/D; CO não
+  conta; dispensa por férias/atestado/licença/suspensão ou admissão/desligamento
+  na semana; semana avaliada no mês do domingo. Faixa-resumo e marca "⚠ falta
+  folga (5x2)" no nome; pop-up de bloqueio no Salvar.
+- **Coberturas:** Catherina (TR) e André (TM) saem de `COVERAGE_PRINCIPALS`;
+  alertas TR/TM já gravados são ignorados na leitura
+  (`ScaleRules.isActiveCoverageAlert`, Escala e Dashboard) — nada apagado.
+  Legenda TR/TM sem "(cobertura)". Na sequência o usuário pediu retirar também
+  a observação da Rosana (MR): `COVERAGE_PRINCIPALS` vazio; painel, linha
+  "Cobertura" e cartões do Dashboard ocultos (`hasCoverageRules`); migração de
+  chaves de vínculo mantida.
+- **Visual (só tela, `@media screen`, `.scale-table-v2`):** células 28×26 →
+  ~43×41px, código ~9px → ~13px, abreviações FÉR/AT/LIC/SUS na tela; cores
+  sólidas (F navy, D laranja, Férias verde, CO amarelo, Atestado roxo, Falta
+  vermelho), cabeçalho navy com linha pêssego, setores em pêssego, domingo e
+  feriado em faixa no topo da célula. Impressão inalterada (suíte de impressão
+  aprovada).
+- **Feriados — defeito encontrado (ALTO):** renomear/redatar feriado não
+  levava as marcas de vínculo excluído; na base real 29 vínculos excluídos em
+  11/08/2026 voltaram pelo auto-vínculo (15 em "01 de Maio - Trabalho - 2027",
+  14 em "Finados - 2027", Chez Pitu — nomes antigos "01 de Mario"/"Ninados").
+  Correção: `carryWorkedLinkTombstones` na edição (aditivo; não copia para quem
+  está vinculado hoje, para não haver exclusão silenciosa sem Lixeira). Tipo
+  passa a persistir em feriado sem entrada de calendário.
+- Testes: novas `scripts/verify-escala-5x2.mjs` (37) e
+  `scripts/verify-escala-editar-salvar.mjs` (27, Chrome real);
+  `verify-feriados-empresas.mjs` 46; `npm test` 47/47; `npm run validate` 29/29.
+- **Dados de produção:** nenhum alterado nesta etapa (só leitura).
+- **Decisões do usuário (2026-11-17):** commit/deploy/push autorizados; lista
+  de padronização de feriados aprovada; os 29 vínculos que voltaram serão
+  excluídos via "Excluir vínculo" (Lixeira); 2ª folga fixa a implementar após
+  análise.
+
 ## 2026-11-17 — Feriados: cadastro na Chez Pitu não chegava à Pengold
 
 Relato do usuário: no Controle de Feriados da Chez Pitu aparecem todos os

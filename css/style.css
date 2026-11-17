@@ -3916,3 +3916,276 @@ body {
 .ribbon-item { color:#C4D2E8; }
 .ribbon-item:hover { color:#FFBC7D; background:rgba(255,188,125,.10); }
 .ribbon-item.active { color:#FFBC7D; border-bottom-color:#FFBC7D; background:linear-gradient(180deg,rgba(255,188,125,.14),transparent); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ESCALA DE FOLGA — visual v2 (2026-11-17)
+   Grade maior e cores nítidas, SOMENTE NA TELA (@media screen). A folha
+   impressa (css/escala-print.css, classes .scale-print-*) não é afetada.
+   Paleta da marca: navy + pêssego (PROJECT_RULES → Padrão visual).
+   ══════════════════════════════════════════════════════════════════════ */
+@media screen {
+  .scale-table-v2 {
+    min-width: 1200px;
+  }
+
+  .scale-table-v2 th,
+  .scale-table-v2 td {
+    min-width: 40px;
+    width: 40px;
+    height: 40px;
+    padding: 2px;
+    font-size: 0.82rem;
+    border-right: 1px solid #c9d6ea;
+    border-bottom: 1px solid #c9d6ea;
+  }
+
+  .scale-table-v2 .employee-sticky {
+    min-width: 210px;
+    width: 210px;
+    max-width: 210px;
+    padding: 4px 8px;
+  }
+
+  .scale-table-v2 .employee-name-only .emp-name-text {
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #0e2148;
+    max-width: 194px;
+  }
+
+  .scale-table-v2 .employee-name-only .emp-shift-label {
+    font-size: 0.7rem;
+    color: #3b4a66;
+    max-width: 194px;
+  }
+
+  .scale-table-v2 thead th {
+    background: #133169 !important;
+    color: #ffffff !important;
+    border-bottom: 3px solid #ffbc7d !important;
+  }
+
+  .scale-table-v2 thead .employee-sticky .col-head-sub {
+    color: #ffbc7d;
+  }
+
+  .scale-table-v2 .scale-day-head .day-num {
+    font-size: 0.95rem;
+    font-weight: 900;
+  }
+
+  .scale-table-v2 .scale-day-head .day-week {
+    font-size: 0.7rem;
+    font-weight: 700;
+    opacity: 0.9;
+  }
+
+  .scale-table-v2 thead th.sunday {
+    background: #9b1c1c !important;
+    box-shadow: none !important;
+    color: #ffffff !important;
+  }
+
+  .scale-table-v2 thead th.holiday {
+    background: #b45309 !important;
+    box-shadow: none !important;
+    color: #ffffff !important;
+  }
+
+  .scale-table-v2 .scale-coverage-indicator-row th {
+    background: #fff4e8 !important;
+    color: #9a3412 !important;
+    border-bottom: 1px solid #ffbc7d !important;
+    top: 44px;
+  }
+
+  .scale-table-v2 .sector-divider {
+    padding: 7px 12px !important;
+    background: linear-gradient(90deg, #ffbc7d 0%, #ffe3c7 55%, #fff7ef 100%) !important;
+    color: #0e2148 !important;
+    font-size: 0.82rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.08em;
+  }
+
+  .scale-table-v2 .scale-cell-code {
+    font-size: 0.8rem;
+    font-weight: 900;
+    line-height: 36px;
+    min-height: 36px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Domingo / feriado: faixa no topo da célula (não apaga a cor do código). */
+  .scale-table-v2 td.sunday,
+  .scale-table-v2 td.holiday {
+    box-shadow: none !important;
+  }
+  .scale-table-v2 td.code-work.sunday {
+    background: #fde8e8;
+  }
+  .scale-table-v2 td.code-work.holiday {
+    background: #fdecc8;
+  }
+  .scale-table-v2 td.sunday::after,
+  .scale-table-v2 td.holiday::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: #c81e1e;
+    pointer-events: none;
+  }
+  .scale-table-v2 td.holiday::after {
+    background: #d97706;
+  }
+
+  /* Cores dos códigos — nítidas, texto com contraste alto. */
+  .scale-table-v2 td.code-work { background: #ffffff; }
+  .scale-table-v2 td.code-work .scale-cell-code { color: #0e2148; }
+  .scale-table-v2 td.code-folga { background: #133169; }
+  .scale-table-v2 td.code-folga .scale-cell-code { color: #ffffff; }
+  .scale-table-v2 td.code-dom { background: #ea580c; }
+  .scale-table-v2 td.code-dom .scale-cell-code { color: #ffffff; }
+  .scale-table-v2 td.code-ferias { background: #15803d; }
+  .scale-table-v2 td.code-ferias .scale-cell-code { color: #ffffff; font-size: 0.66rem; }
+  .scale-table-v2 td.code-co { background: #facc15; }
+  .scale-table-v2 td.code-co .scale-cell-code { color: #422006; }
+  .scale-table-v2 td.code-atestado { background: #7c3aed; }
+  .scale-table-v2 td.code-atestado .scale-cell-code { color: #ffffff; font-size: 0.6rem; }
+  .scale-table-v2 td.code-licenca { background: #a78bfa; }
+  .scale-table-v2 td.code-licenca .scale-cell-code { color: #2e1065; font-size: 0.6rem; }
+  .scale-table-v2 td.code-falta { background: #dc2626; }
+  .scale-table-v2 td.code-falta .scale-cell-code { color: #ffffff; font-size: 0.66rem; }
+  .scale-table-v2 td.code-suspensao { background: #7f1d1d; }
+  .scale-table-v2 td.code-suspensao .scale-cell-code { color: #ffffff; font-size: 0.56rem; }
+  .scale-table-v2 td.code-mm { background: #dbe4ff; }
+  .scale-table-v2 td.code-tm { background: #b7c8fb; }
+  .scale-table-v2 td.code-nm { background: #8fa8f3; }
+  .scale-table-v2 td.code-mm .scale-cell-code,
+  .scale-table-v2 td.code-tm .scale-cell-code,
+  .scale-table-v2 td.code-nm .scale-cell-code { color: #1e1b4b; }
+  .scale-table-v2 td.code-mr { background: #ccfbf1; }
+  .scale-table-v2 td.code-tr { background: #8eeedc; }
+  .scale-table-v2 td.code-nr { background: #45d6bd; }
+  .scale-table-v2 td.code-mr .scale-cell-code,
+  .scale-table-v2 td.code-tr .scale-cell-code,
+  .scale-table-v2 td.code-nr .scale-cell-code { color: #053b33; }
+  .scale-table-v2 td.code-mn { background: #f1f5f9; }
+  .scale-table-v2 td.code-tn { background: #e2e8f0; }
+  .scale-table-v2 td.code-no { background: #cbd5e1; }
+  .scale-table-v2 td.code-mn .scale-cell-code,
+  .scale-table-v2 td.code-tn .scale-cell-code,
+  .scale-table-v2 td.code-no .scale-cell-code { color: #0f172a; }
+
+  .scale-table-v2 .co-holiday-tag {
+    display: none;
+  }
+
+  /* Marcação manual: ponto pêssego no canto. */
+  .scale-table-v2 .manual-cell::before {
+    top: 3px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    background: #ffbc7d !important;
+    box-shadow: 0 0 0 1px #0e2148;
+  }
+
+  /* Modo leitura x edição. */
+  .scale-table-v2.is-readonly .scale-cell {
+    cursor: default;
+  }
+  .scale-table-v2.is-readonly .scale-cell:hover {
+    transform: none;
+  }
+  .scale-table-v2.is-editing .scale-cell:hover {
+    box-shadow: inset 0 0 0 3px #ffbc7d !important;
+  }
+  .scale-table-v2 .scale-cell.draft-cell {
+    outline: 3px dashed #ffbc7d;
+    outline-offset: -3px;
+  }
+
+  /* Linha que não cumpre a 5x2. */
+  .scale-table-v2 tr.scale-row-5x2-violation .employee-sticky {
+    background: #fff1f1;
+    border-left: 4px solid #dc2626;
+  }
+  .scale-5x2-flag {
+    display: block;
+    margin-top: 2px;
+    color: #b91c1c;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  /* Barra de ações da edição. */
+  .scale-actions-editing {
+    padding: 8px 10px;
+    border: 2px solid #ffbc7d;
+    border-radius: 12px;
+    background: #fff7ef;
+    align-items: center;
+  }
+  .scale-edit-badge {
+    margin-right: auto;
+    color: #0e2148;
+    font-size: 0.85rem;
+    font-weight: 800;
+  }
+  .scale-save-btn {
+    background: #133169 !important;
+    color: #ffffff !important;
+    border: 2px solid #ffbc7d !important;
+    font-weight: 800;
+  }
+  .scale-edit-btn {
+    font-weight: 800;
+  }
+
+  /* Faixa informativa da regra 5x2. */
+  .scale-5x2-banner {
+    margin: 8px 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    line-height: 1.35;
+  }
+  .scale-5x2-info { background: #eef2f8; border: 1px solid #c9d6ea; color: #133169; }
+  .scale-5x2-ok { background: #ecfdf3; border: 1px solid #86efac; color: #14532d; }
+  .scale-5x2-bad { background: #fef2f2; border: 2px solid #dc2626; color: #7f1d1d; }
+
+  /* Pop-up de bloqueio do Salvar. */
+  .scale-5x2-popup {
+    max-width: 620px;
+  }
+  .scale-5x2-list {
+    max-height: 50vh;
+    overflow: auto;
+    margin: 10px 0;
+    padding-left: 18px;
+  }
+  .scale-5x2-list > li {
+    margin-bottom: 8px;
+    color: #7f1d1d;
+  }
+  .scale-5x2-list ul {
+    margin: 2px 0 0;
+    padding-left: 18px;
+    color: #3b4a66;
+  }
+
+  /* Legenda com as mesmas cores da grade. */
+  .legend-compact .legend-item.code-folga { background: #133169; color: #ffffff; }
+  .legend-compact .legend-item.code-dom { background: #ea580c; color: #ffffff; }
+  .legend-compact .legend-item.code-ferias { background: #15803d; color: #ffffff; }
+  .legend-compact .legend-item.code-co { background: #facc15; color: #422006; }
+  .legend-compact .legend-item.code-atestado { background: #7c3aed; color: #ffffff; }
+  .legend-compact .legend-item.code-falta { background: #dc2626; color: #ffffff; }
+  .legend-compact .legend-item.code-suspensao { background: #7f1d1d; color: #ffffff; }
+  .legend-compact .legend-item.code-licenca { background: #a78bfa; color: #2e1065; }
+}
