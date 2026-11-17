@@ -52,6 +52,7 @@
       <li><strong>Salvar</strong>.</li>
     </ol>
     <p>O funcionário é cadastrado na empresa da aba ativa. O cadastro é a fonte oficial de empresa, setor e cargo.</p>
+    <p><strong>Alterar folga não mexe no passado:</strong> mudanças na folga fixa, nos domingos de folga ou na 2ª folga valem a partir da data em que você salva; os dias anteriores ficam como estavam.</p>
     <p>O <strong>Cargo</strong> é escolhido em lista suspensa, com os cargos já cadastrados. Se o cargo ainda não existir, use <strong>➕ Cadastrar novo cargo</strong>; se ele já existir com outra grafia (maiúsculas ou acentos), o sistema usa o da lista.</p>
     <p><strong>Exportar Excel:</strong> na Lista de funcionários, baixa uma planilha <code>.xlsx</code> com todos os funcionários da empresa da aba ativa (ativos e inativos, sem os filtros da tela) — uma linha por funcionário, uma coluna por campo do cadastro. CPF e CTPS saem como texto; datas e VT como data e valor reais. Só lê os dados, nada é alterado.</p>
 

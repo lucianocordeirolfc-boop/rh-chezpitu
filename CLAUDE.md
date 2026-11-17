@@ -57,6 +57,13 @@ vale-transporte, ausências/férias, lançamentos do Contador e cadastro.
 
 Detalhamento completo: PROJECT_RULES.md → "Imutabilidade dos dados já registrados".
 
+## Folga alterada no cadastro não é retroativa (REGRA FIXA)
+
+Folga fixa, domingos de folga e 2ª folga alterados no cadastro valem só a
+partir da data da alteração; nada para trás muda (histórico com data de
+início). Detalhamento: PROJECT_RULES.md → "Alteração de folga no cadastro não
+é retroativa".
+
 ## Lixeira — nada some do sistema (REGRA FIXA)
 
 Toda exclusão definitiva (vínculo, feriado, funcionário, férias, ausência)

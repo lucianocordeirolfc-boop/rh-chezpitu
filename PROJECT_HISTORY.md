@@ -7,6 +7,28 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-17 (6) — REGRA FIXA: alteração de folga no cadastro não é retroativa
+
+Pedido do usuário: alterar a folga (ex.: domingo do Hudson) deve valer só a
+partir da data da alteração; nada para trás. Decisões: folga fixa e domingos
+valem a partir da DATA DA ALTERAÇÃO (folga fixa antes valia no 1º dia do mês
+seguinte).
+
+- **Defeito corrigido (ALTO):** `sundayOffWeeks` não tinha histórico — mudar
+  os domingos de folga recalculava todos os domingos passados (escala, VT,
+  auto-vínculo de feriado).
+- `js/data.js`: `sundayOffWeeksHistory` + `scheduleSundayOffWeeks` +
+  `cadastroSundayWeeksForDate` (usado por `getScaleCode` e pela 5x2);
+  `scheduleFixedDayChange` passa a valer a partir de hoje (troca agendada com a
+  regra antiga é respeitada; `getFixedDayChangeInfo` lê a data gravada).
+- `js/funcionarios.js`: textos "vale a partir de hoje — nada para trás é
+  alterado" (folga fixa e domingos).
+- Regra fixa em `PROJECT_RULES.md` e `CLAUDE.md`; manual atualizado.
+- Testes: nova `scripts/verify-folga-sem-retroativo.mjs` (19), cadastrada no
+  validate. Dados de produção: nenhum alterado (o histórico é criado na
+  próxima alteração de cada funcionário; registros sem histórico seguem o
+  valor atual, igual a antes).
+
 ## 2026-11-17 (5) — 2ª folga também no domingo (fim de semana)
 
 Pedido do usuário: permitir sugerir a 2ª folga no domingo, pois há quem possa

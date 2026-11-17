@@ -43,6 +43,30 @@ o que será alterado descrito antes da execução.
 
 Em caso de dúvida: **não gravar** e perguntar.
 
+## Alteração de folga no cadastro não é retroativa (REGRA FIXA)
+
+Vigente desde 2026-11-17, a pedido do usuário ("ao alterar a folga de um
+funcionário em cadastro, como o domingo do Hudson, deve refletir apenas a
+partir da data da alteração, nada para trás deve ser alterado").
+
+- **Folga fixa**, **domingos de folga** e **2ª folga (5x2)** guardam
+  histórico com data de início. Mudar no cadastro vale **a partir da data da
+  alteração** (2ª folga: a partir da próxima segunda, nunca antes de
+  21/12/2026). O dia anterior para trás continua exatamente como estava.
+- Folga fixa: `scheduleFixedDayChange` (`fixedDayHistory`, desde 2026-11-17
+  a partir de hoje — antes era o 1º dia do mês seguinte; trocas já agendadas
+  com a regra antiga continuam valendo na data gravada).
+- Domingos: `scheduleSundayOffWeeks` / `cadastroSundayWeeksForDate`
+  (`sundayOffWeeksHistory`). Registro sem histórico usa `sundayOffWeeks`.
+- 2ª folga: `secondFixedDayHistory` (ver "2ª folga semanal (5x2)").
+- `getScaleCode` sempre resolve pela data do dia — escala, VT, auto-vínculo
+  de feriado e regra 5x2 enxergam o passado como era.
+- Nova troca no mesmo dia substitui a anterior (não acumula).
+- Proibido criar campo de folga sem histórico ou ler o valor "atual" do
+  cadastro para calcular um dia passado.
+
+Cobertura: `scripts/verify-folga-sem-retroativo.mjs`.
+
 ## Lixeira — nada some do sistema (REGRA FIXA)
 
 Vigente desde 2026-10-30. Origem: vínculos de feriado do Carlos Andrey (e

@@ -271,9 +271,44 @@
     return resolveSecondFolgaEntry(employee, date)?.day || "";
   }
 
+  // REGRA FIXA (2026-11-17): domingos de folga alterados no cadastro valem A
+  // PARTIR DA DATA DA ALTERAÇÃO. Histórico [{weeks, from}] — "from" vazio =
+  // desde sempre. Sem histórico, vale o campo sundayOffWeeks (registro legado).
+  function normalizeSundayOffHistory(employee) {
+    if (!employee || !Array.isArray(employee.sundayOffWeeksHistory)) return [];
+    return employee.sundayOffWeeksHistory
+      .map((entry) => ({ weeks: normalizeSundayList(entry?.weeks).join(","), from: String(entry?.from || "").trim() }))
+      .sort((a, b) => a.from.localeCompare(b.from));
+  }
+
+  /** Domingos de folga do CADASTRO vigentes na data (sem os adicionais da 5x2). */
+  function cadastroSundayWeeksForDate(employee, date) {
+    const history = normalizeSundayOffHistory(employee);
+    if (!history.length) return normalizeSundayList(employee?.sundayOffWeeks);
+    let weeks = "";
+    history.forEach((entry) => {
+      if (!entry.from || entry.from <= date) weeks = entry.weeks;
+    });
+    return normalizeSundayList(weeks);
+  }
+
+  /** Aplica a troca de domingos ao histórico — só da data da alteração em diante. */
+  function scheduleSundayOffWeeks(existing, requested) {
+    const next = normalizeSundayList(requested).join(",");
+    if (!existing) return { sundayOffWeeks: next, sundayOffWeeksHistory: [] };
+    const current = normalizeSundayList(existing.sundayOffWeeks).join(",");
+    const history = normalizeSundayOffHistory(existing);
+    if (next === current) return { sundayOffWeeks: next, sundayOffWeeksHistory: history };
+    const from = todayISO();
+    const kept = history.length ? history.filter((entry) => !entry.from || entry.from < from) : [{ weeks: current, from: "" }];
+    if (!kept.length) kept.push({ weeks: current, from: "" });
+    if (kept[kept.length - 1].weeks !== next) kept.push({ weeks: next, from });
+    return { sundayOffWeeks: next, sundayOffWeeksHistory: kept };
+  }
+
   /** Domingos de folga do mês vigentes na data: cadastro + adicionais da 5x2. */
   function sundayOffWeeksForDate(employee, date) {
-    const base = normalizeSundayList(employee?.sundayOffWeeks);
+    const base = cadastroSundayWeeksForDate(employee, date);
     const extra = resolveSecondFolgaEntry(employee, date)?.extraSundays || [];
     return normalizeSundayList([...base, ...extra]);
   }
@@ -332,7 +367,9 @@
         from: String(entry.from || "").trim(),
         to: String(entry.to || "").trim()
       }))
-      .filter((entry) => entry.fixedDay);
+      // Entrada "sem folga" só é mantida quando delimita um período (regra
+      // de 2026-11-17); registros antigos vazios continuam descartados.
+      .filter((entry) => entry.fixedDay || entry.to || entry.from);
   }
 
   function resolveFixedDayForDate(employee, date) {
@@ -363,15 +400,21 @@
       };
     }
 
-    const effectiveFrom = getNextMonthFirstDay();
+    // REGRA FIXA (2026-11-17): a nova folga fixa vale A PARTIR DA DATA DA
+    // ALTERAÇÃO; nada anterior muda (o dia de ontem para trás segue a folga
+    // antiga). Antes valia só no 1º dia do mês seguinte. Trocas agendadas que
+    // ainda não começaram são substituídas pela nova.
+    const effectiveFrom = todayISO();
     const lastDayBefore = addDays(effectiveFrom, -1);
-    let history = normalizeFixedDayHistory(existing);
+    let history = normalizeFixedDayHistory(existing).filter((entry) => !entry.from || entry.from < effectiveFrom);
 
     if (!history.length && oldDay) {
       history.push({ fixedDay: oldDay, from: "", to: lastDayBefore });
+    } else if (!history.length && !oldDay) {
+      history.push({ fixedDay: "", from: "", to: lastDayBefore });
     } else {
       history = history.map((entry) => {
-        if (!entry.to && (!entry.from || entry.from < effectiveFrom)) {
+        if (!entry.to || entry.to >= effectiveFrom) {
           return { ...entry, to: lastDayBefore };
         }
         return entry;
@@ -385,11 +428,13 @@
 
   function getFixedDayChangeInfo(employee) {
     if (!employee) return null;
-    const effectiveFrom = getNextMonthFirstDay();
     const today = todayISO();
     const currentDay = resolveFixedDayForDate(employee, today);
     const nextDay = String(employee.fixedDay || "").trim();
     if (currentDay === nextDay) return null;
+    // Troca agendada antes da regra de 2026-11-17 (ex.: para 01/12): usa a data gravada.
+    const pending = normalizeFixedDayHistory(employee).find((entry) => entry.from && entry.from > today);
+    const effectiveFrom = pending?.from || getNextMonthFirstDay();
     return {
       currentDay,
       nextDay,
@@ -3489,6 +3534,7 @@
           : ImportUtils.repairVtDailyValue(ImportUtils.parseVtDaily(employee.vtDaily)),
       defaultShift: String(employee.defaultShift ?? existing?.defaultShift ?? "").trim(),
       sundayOffWeeks: String(employee.sundayOffWeeks ?? existing?.sundayOffWeeks ?? "").trim(),
+      sundayOffWeeksHistory: normalizeSundayOffHistory(existing),
       doubleSundayOff: String(employee.doubleSundayOff ?? existing?.doubleSundayOff ?? "false"),
       secondFixedDayHistory:
         Object.prototype.hasOwnProperty.call(employee, "secondFixedDay") ||
@@ -3507,6 +3553,12 @@
       createdAt: existing?.createdAt || employee.createdAt || now(),
       fixedDayHistory: normalizeFixedDayHistory(existing)
     };
+
+    if (existing && Object.prototype.hasOwnProperty.call(employee, "sundayOffWeeks")) {
+      const sundays = scheduleSundayOffWeeks(existing, employee.sundayOffWeeks);
+      normalized.sundayOffWeeks = sundays.sundayOffWeeks;
+      normalized.sundayOffWeeksHistory = sundays.sundayOffWeeksHistory;
+    }
 
     if (existing && hasFixedDay) {
       const scheduled = scheduleFixedDayChange(existing, normalized.fixedDay);
@@ -5410,9 +5462,10 @@
     );
     if (compensation) return "CO";
 
-    // Sunday off weeks: mark specific Sundays as "DOM" based on cadastro
-    if (weekdayName(date) === "Domingo" && employee.sundayOffWeeks) {
-      const weeks = String(employee.sundayOffWeeks).split(",").map((s) => s.trim()).filter(Boolean);
+    // Sunday off weeks: mark specific Sundays as "DOM" based on cadastro —
+    // vigentes NA DATA (histórico: troca só vale da data da alteração em diante).
+    if (weekdayName(date) === "Domingo") {
+      const weeks = cadastroSundayWeeksForDate(employee, date);
       if (weeks.length > 0 && weeks.includes(String(getNthSundayOfMonth(date)))) {
         return "DOM";
       }
@@ -5877,6 +5930,7 @@
       return history.length ? history[history.length - 1].extraSundays : [];
     },
     sundayOffWeeksForDate,
+    cadastroSundayWeeksForDate,
     nextSecondFolgaStart,
     carryWorkedLinkTombstones,
     setVtDeduction,

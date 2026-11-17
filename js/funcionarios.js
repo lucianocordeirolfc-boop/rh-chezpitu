@@ -558,7 +558,7 @@
       .join("");
     return `
       <div class="sunday-field-wrapper">
-        <span class="sunday-field-label">Domingos de folga no mês</span>
+        <span class="sunday-field-label">Domingos de folga no mês <small class="help-text">(alteração vale a partir da data em que for salva)</small></span>
         <div class="sunday-selector">${pills}</div>
         <label class="double-sunday-label">
           <input type="checkbox" class="double-sunday-check" ${isDouble ? "checked" : ""}>
@@ -743,11 +743,11 @@
         const current = AppData.resolveFixedDayForDate(employee, AppData.todayISO());
         const selected = fixedDaySelect.value || "";
         if (selected && selected !== current) {
-          const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
+          const fromLabel = AppData.formatDateBR(AppData.todayISO());
           fixedDayHint.style.display = "";
           fixedDayHint.textContent =
-            `Alteração agendada: mantém ${current || "sem folga"} até o mês atual. ` +
-            `Nova folga (${selected}) vale a partir de ${fromLabel}.`;
+            `A nova folga (${selected}) vale a partir de hoje, ${fromLabel}. ` +
+            `Os dias anteriores continuam com ${current || "sem folga"} — nada para trás é alterado.`;
         } else if (fixedDayHint) {
           fixedDayHint.style.display = pendingInfo ? "" : "none";
           fixedDayHint.textContent = pendingInfo
@@ -938,10 +938,14 @@
 
       try {
         AppData.upsertEmployee(payload, targetCompany);
-        if (existing && String(previousFixedDay).trim() !== String(payload.fixedDay || "").trim()) {
-          const fromLabel = AppData.formatDateBR(AppData.getNextMonthFirstDay());
+        const previousSundays = String(existing?.sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean).sort().join(",");
+        const nextSundays = String(payload.sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean).sort().join(",");
+        const fixedChanged = existing && String(previousFixedDay).trim() !== String(payload.fixedDay || "").trim();
+        const sundaysChanged = existing && previousSundays !== nextSundays;
+        if (fixedChanged || sundaysChanged) {
+          const fromLabel = AppData.formatDateBR(AppData.todayISO());
           window.App?.toast?.(
-            `Folga fixa atualizada. A nova regra vale a partir de ${fromLabel} (mês seguinte).`,
+            `${fixedChanged ? "Folga fixa" : ""}${fixedChanged && sundaysChanged ? " e " : ""}${sundaysChanged ? "domingos de folga" : ""} atualizado(s): vale(m) a partir de hoje, ${fromLabel}. Nada para trás foi alterado.`,
             "info",
             6000
           );
