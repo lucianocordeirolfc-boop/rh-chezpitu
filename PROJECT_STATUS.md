@@ -9,11 +9,30 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261104.01 (Cadastro: Cargo em lista suspensa)
-**Data:** 2026-11-04
-**Status:** ✅ ESTÁVEL - Publicado em Produção (Firebase Hosting)
+**Versão:** 20261117.08 (Escala 5x2, 2ª folga, folga não retroativa)
+**Data:** 2026-11-17
+**Status:** ✅ Publicado em Produção (Firebase Hosting) — aguardando teste do usuário na escala de dezembro
 
 ## Último Deploy
+
+Data: 17/11/2026
+Versões: 20261117.01 → 20261117.08 (Firebase Hosting — chez-pitu-rh), commits
+`5c8b885` … `c9ce1c2`, push em `origin/main`.
+
+- Feriados valem para as duas empresas (17 incluídos na Pengold, autorizado).
+- CRÍTICO corrigido: `AppData.state` desatualizado após sincronização.
+- Escala 5x2 (EC 141/2026): Editar/Salvar com bloqueio por falta de folga;
+  grade maior e cores nítidas; observações de cobertura retiradas.
+- 2ª folga semanal com sugestão por setor (inclui domingo/fim de semana).
+- REGRA FIXA: alteração de folga no cadastro não é retroativa.
+- Dados de produção alterados só com autorização: 17 feriados na Pengold,
+  29 vínculos excluídos pela Lixeira, 20 feriados padronizados. 2ª folga
+  aplicada pelo usuário no quadro de sugestão; conferência (só leitura):
+  dez/2026 e jan/2027 com 5x2 cumprida (36/36).
+
+Detalhes em `PROJECT_HISTORY.md` → 2026-11-17 (1) a (6).
+
+## Deploy 20261104.01
 
 Data: 04/11/2026
 Versão: 20261104.01 (Firebase Hosting — chez-pitu-rh) — **aprovada pelo usuário**

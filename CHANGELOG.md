@@ -1,3 +1,14 @@
+2026-11-17 - Feriados nas 2 empresas, Escala 5x2 (EC 141/2026), 2a folga e folga nao retroativa (20261117.01 a .08)
+- [CORRECAO] ALTO: feriado cadastrado na aba Chez Pitu nao chegava a Pengold (29/07, 2027/2028). Feriado novo vale para as 2 empresas; "Vale para", tipo "Categoria (CCT)", botao "+ outra empresa"; 17 feriados incluidos na Pengold (autorizado)
+- [CORRECAO] CRITICO: AppData.state ficava desatualizado apos sincronizar - gravacoes por ele se perdiam (cadastro de feriado no calendario, alertas)
+- [CORRECAO] ALTO: renomear feriado liberava vinculos excluidos (29 voltaram: 01/05 e Finados 2027) - marcas acompanham a edicao; os 29 foram excluidos de novo pela Lixeira (autorizado); 20 feriados padronizados (nomes/tipos)
+- [NOVO] Escala 5x2: grade somente-leitura ate "Editar escala"; rascunho; "Salvar escala" so grava com 2 folgas (F/D) por semana para todos (a partir de 21/12/2026), senao pop-up "Funcionario X - falta 1 folga semanal"
+- [NOVO] 2a folga semanal (cadastro + "Sugerir 2a folga (5x2)" por setor: max. 2 de folga/dia, evita sex/sab, regime feminino com domingos quinzenais, domingo = todos os domingos); alerta de setor com mais de 2 de folga
+- [MELHORIA] Grade da escala maior e com cores nitidas (so tela); observacoes de cobertura (Catherina, Andre, Rosana) retiradas
+- [REGRA FIXA] Alteracao de folga fixa, domingos e 2a folga no cadastro vale so a partir da data da alteracao - nada para tras muda
+- Arquivos: js/data.js, js/escala.js, js/scale-5x2.js (novo), js/scale-rules.js, js/feriados.js, js/funcionarios.js, js/dashboard.js, js/app.js, js/manual.js, css/style.css, index.html, 7 suites novas
+- npm test 47/47; npm run validate 32/32
+
 2026-11-04 - Cadastro: Cargo em lista suspensa (20261104.01)
 - [MELHORIA] Campo Cargo do pop-up de funcionario virou lista suspensa com os cargos ja cadastrados, mais "Cadastrar novo cargo". Cargo novo com a grafia de um existente (maiusculas, acentos, espacos) assume o da lista
 - [NOTA] Nenhum dado gravado foi alterado; grafias erradas ja salvas aparecem na lista ate serem corrigidas pela edicao. Importacao CSV/JSON inalterada

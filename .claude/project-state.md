@@ -8,12 +8,26 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261104.01` (exibida como `v2026.11.04.01`) — fonte: `js/version.js`
-- **Branch atual:** `main` — sincronizado com `origin/main` em `a8176ba`
-- **Último commit:** `a8176ba` — chore: carimbo de build 20261104.01 (Cargo em lista suspensa)
-- **Status geral:** 🟢 EM PRODUÇÃO — versão `20261104.01` (Cargo em lista
-  suspensa) **testada e aprovada pelo usuário em 2026-11-04**. Pendente (frente
-  2026-09-16): validação no computador que estava com erro de sincronização.
+- **Versão atual:** `20261117.08` (exibida como `v2026.11.17.08`) — fonte: `js/version.js`
+- **Branch atual:** `main` — sincronizado com `origin/main` em `c9ce1c2`
+  (docs de encerramento ainda não commitados)
+- **Último commit de código:** `c9ce1c2` — chore: carimbo de build 20261117.08 (folga nao retroativa)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261117.08` (Escala 5x2, 2ª folga,
+  folga não retroativa). 2ª folga já aplicada pelo usuário; 5x2 de dez/2026 e
+  jan/2027 cumprida (36/36, leitura de 2026-11-17). Aguardando o usuário salvar
+  a escala de dezembro e aprovar.
+
+## ⚠️ REGRAS FIXAS NOVAS (2026-11-17)
+
+- **Alteração de folga no cadastro não é retroativa:** folga fixa e domingos
+  de folga valem a partir da data da alteração; 2ª folga a partir da próxima
+  segunda. Tudo com histórico; `getScaleCode` resolve pela data do dia.
+- **Escala:** grade só grava no "Salvar escala" e só com a 5x2 cumprida
+  (`js/scale-5x2.js`, fonte única; semana seg→dom a partir de 21/12/2026).
+- **Feriado vale para as duas empresas** (lei/CCT; "Interno" só a aba).
+- **Coberturas:** nenhuma regra ativa (`COVERAGE_PRINCIPALS` vazio).
+- **`AppData.state` é getter** do estado vigente — nunca guardar referência.
+Fonte: `PROJECT_RULES.md` / `CLAUDE.md`.
 
 ## ⚠️ REGRA FIXA VIGENTE — ler antes de qualquer alteração
 
@@ -33,6 +47,25 @@ cadastrado não se exclui** — só o vínculo de um funcionário específico; a
 funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Funcionalidades concluídas (nesta frente de trabalho)
+
+### Frente 2026-11-17 — Feriados 2 empresas, Escala 5x2, 2ª folga, folga não retroativa (em produção)
+
+- ✅ **Feriados nas duas empresas** (`20261117.01`–`.03`): "Vale para",
+  "Categoria (CCT)", "+ outra empresa", `extendHolidayToCompanies` (aditiva,
+  `restoredAt` ao recriar sobre tombstone). Base: 17 feriados incluídos na
+  Pengold (16 + 29/07 recriado, autorizado).
+- ✅ **Escala 5x2** (`.04`): Editar/rascunho/Salvar com pop-up; grade v2
+  (tela); coberturas retiradas; renomear feriado leva marcas de vínculo; tipo
+  persiste sem calendário. Base (autorizado): 29 vínculos que voltaram
+  excluídos pela Lixeira (8 → 37); 20 feriados padronizados.
+- ✅ **CRÍTICO** (`.05`): `AppData.state` getter.
+- ✅ **2ª folga semanal** (`.06`, `.07` domingo): cadastro com histórico,
+  sugestão por setor, alerta de setor. Aplicada pelo usuário; Claudiana
+  ajustada para seg + sex; Hudson trocado para 1º domingo pelo usuário.
+- ✅ **REGRA FIXA folga não retroativa** (`.08`).
+- Testes: `npm test` 47/47; `npm run validate` 32/32 (suítes novas:
+  verify-feriados-empresas, verify-escala-5x2, verify-escala-editar-salvar,
+  verify-segunda-folga, verify-segunda-folga-ui, verify-folga-sem-retroativo).
 
 ### Frente 2026-11-04 — Cadastro: Cargo em lista suspensa (em produção, APROVADO)
 
@@ -436,7 +469,9 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Funcionalidades em andamento
 
-- (nenhuma — frente 2026-11-04 concluída e aprovada)
+- Frente 2026-11-17 publicada; aguardando o usuário salvar a escala de
+  dezembro (Editar → Salvar) nas duas empresas e aprovar.
+- (frente 2026-11-04 concluída e aprovada)
 - Aguardando validação do usuário no computador que estava com o erro de
   sincronização.
 
@@ -447,6 +482,18 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
   a sincronização do computador" e "relógio do computador fora de hora".
 
 ## Próximas tarefas
+
+- **Prazo:** feriado 29/07/2026 na Pengold (recriado sem vínculos) vence em
+  **2026-11-26** — vínculos entram ao salvar a escala de julho da Pengold ou
+  por "+ Funcionário".
+- Avisos de setor que restam (só alerta, limite matemático): domingos com 3 de
+  folga em Governança (2º/4º), Café da Manhã (1º/3º); Cozinha resolvida se o
+  Hudson ficou no 1º domingo.
+- 5x2: limite de 42h semanais não é validado (escala não registra horas).
+- Opcional: 8 marcas de vínculo órfãs com data 2026-08-09 ("01 de mario"),
+  sem efeito (não há feriado nessa data).
+- Opcional: Bar Pengold leva ~3 folgas/semana a sex/sáb — reduzir só revendo
+  folgas fixas.
 
 - Cadastro (opcional, se o usuário pedir): levantamento **somente leitura** de
   cargos com grafias parecidas na base. Grafias erradas já salvas aparecem na
@@ -502,6 +549,10 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Pendências de validação
 
+- ⏳ **Usuário:** salvar a escala de dez/2026 (Editar → Salvar) nas duas
+  empresas e conferir visual/2ª folga. Leitura de 2026-11-17: 5x2 cumprida
+  36/36 em dez e jan.
+
 - ✅ **Validado pelo usuário em produção (2026-11-04):** `20261104.01` — Cargo em
   lista suspensa ("testado e aprovado").
 
@@ -546,6 +597,10 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
   carregando do Storage, impressão Escala + Vale-transporte OK.
 
 ## Pendências de deploy
+
+- ✅ **`20261117.01` a `20261117.08` — commitados, pushados e deployados**
+  (autorizados pelo usuário a cada etapa). Conferido por `curl`: `index.html`
+  serve `?v=20261117.08` e `data.js` publicado contém `scheduleSundayOffWeeks`.
 
 - ✅ **`20261104.01` — commitado, pushado e deployado** (autorizações separadas
   do usuário). Conferido por `curl`: web.app e firebaseapp.com na versão nova;
@@ -620,10 +675,15 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 ## Arquivos modificados não commitados (snapshot)
 
 ```
-(working tree limpo após o commit de encerramento)
+ M .claude/project-state.md
+ M ARCHITECTURE.md
+ M BUGS_CONHECIDOS.md
+ M CHANGELOG.md
+ M PROJECT_STATUS.md
 ```
-> Registros de encerramento da sessão 2026-11-04 commitados e pushados. Código e
-> deploy em produção (`20261104.01`).
+> Código em produção `20261117.08` (commitado e pushado em `c9ce1c2`). Os
+> registros de encerramento acima (só documentação) aguardam autorização do
+> usuário para commit/push — o commit automático foi bloqueado. Não exigem deploy.
 
 ---
 
@@ -1082,3 +1142,29 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
   Seguem abertos: levantamento opcional de cargos parecidos, conferência dos
   alertas "Escala indica folga" e validação da sincronização no outro computador
   (frente 2026-09-16).
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-11-17 12:55
+- **Versão:** 20261117.08 (em produção)
+- **Branch:** main (sincronizado com `origin/main`)
+- **Commits:** `5c8b885`, `de4fef5`, `af443d3`, `f64ae8c`, `4065496`,
+  `c4413a4`, `e438dbc`, `1d2245c`, `d1c31f7`, `a60ad7a`, `3cef0da`, `e0cb49c`,
+  `fef7887`, `49d7c02`, `0182b24`, `c561f78`, `c9ce1c2` (docs de
+  encerramento pendentes de commit — autorização do usuário)
+- **Arquivos alterados:** `js/data.js`, `js/escala.js`, `js/scale-5x2.js`
+  (novo), `js/scale-rules.js`, `js/feriados.js`, `js/funcionarios.js`,
+  `js/dashboard.js`, `js/app.js`, `js/manual.js`, `js/version.js`,
+  `css/style.css`, `index.html`, 6 suítes novas + `run-validate`,
+  `run-functional-validation`, `verify-exportar-excel`, `PROJECT_RULES.md`,
+  `PROJECT_HISTORY.md`, `CLAUDE.md`, `MANUAL_USUARIO.md`, `ARCHITECTURE.md`,
+  `CHANGELOG.md`, `PROJECT_STATUS.md`, `BUGS_CONHECIDOS.md`,
+  `.claude/project-state.md`
+- **Resumo:** Análise da EC 141/2026 (5x2 a partir de 16/12/2026). Feriados
+  passam a valer nas duas empresas (17 incluídos na Pengold). Escala com
+  Editar/Salvar bloqueado pela 5x2, visual novo, sem coberturas. Correções:
+  AppData.state (crítico), marcas de vínculo ao renomear feriado (29 vínculos
+  que voltaram excluídos pela Lixeira), tipo de feriado. 2ª folga semanal com
+  sugestão por setor (inclui domingo). REGRA FIXA: folga alterada não é
+  retroativa. Dados de produção alterados só com autorização.
+- **Próximo passo:** Usuário salvar a escala de dezembro e aprovar; atenção ao
+  prazo do 29/07 da Pengold (26/11/2026).

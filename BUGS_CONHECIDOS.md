@@ -2,6 +2,32 @@
 
 Este arquivo lista bugs conhecidos, riscos e pontos de atenção.
 
+## Bug: AppData.state desatualizado após sincronização (2026-11-17)
+
+Status: Corrigido (`20261117.05`) — monitorar.
+
+Descrição: `AppData.state` guardava o objeto do carregamento; `setRemoteState`
+troca o estado ao sincronizar e as gravações via `AppData.state` se perdiam
+(ex.: cadastro de feriado no calendário). Agora é getter do estado vigente.
+Teste: `verify-feriados-empresas.mjs` (7e). Nunca guardar referência ao estado.
+
+## Bug: renomear feriado liberava vínculo excluído (2026-11-17)
+
+Status: Corrigido (`20261117.04`) — monitorar.
+
+Descrição: marca de vínculo excluído usa data|nome|funcionário; renomear não a
+levava junto e o auto-vínculo recriou 29 vínculos (01/05 e Finados 2027).
+`carryWorkedLinkTombstones` na edição (não copia para quem está vinculado hoje,
+para não haver exclusão silenciosa sem Lixeira).
+
+## Bug: troca de domingo de folga mudava o passado (2026-11-17)
+
+Status: Corrigido (`20261117.08`) — REGRA FIXA.
+
+Descrição: `sundayOffWeeks` não tinha histórico. Agora toda alteração de folga
+(fixa, domingos, 2ª folga) vale só da data em diante.
+Teste: `verify-folga-sem-retroativo.mjs`.
+
 ## Bug: Padroeira de Búzios em 21/05
 
 Status:

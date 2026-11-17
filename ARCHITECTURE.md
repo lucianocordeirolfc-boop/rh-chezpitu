@@ -3,9 +3,28 @@ Fonte oficial dos dados
 Também: relógio de referência da sincronização — AppData.now() = hora local +
 desvio do servidor (ver js/firebase-sync.js). Todo carimbo de versão
 (updatedAt, deletedAt, metas) usa now(), nunca Date.now() direto.
+- AppData.state é GETTER do estado vigente (setRemoteState reatribui o estado
+  ao sincronizar; nunca guardar referência a ele entre chamadas).
+- getScaleCode(employee, date, data, manualOverride?) resolve o código do dia
+  pelo HISTÓRICO do cadastro (folga fixa, domingos, 2ª folga) — alteração de
+  folga nunca é retroativa. manualOverride simula o rascunho da Escala.
+- applyManualScaleBatch: gravação do "Salvar escala" (mesma regra de
+  setManualScale por item; recalcula e salva uma vez).
 
 js/escala.js
 Escala de Folga
+- Somente-leitura até "Editar escala"; alterações em rascunho (scaleState.draft)
+  e gravação só no "Salvar escala", se a regra 5x2 estiver cumprida.
+
+js/scale-5x2.js
+Regra 5x2 (EC 141/2026) — fonte única, sem DOM: validateMonth (2 folgas F/D por
+semana seg→dom a partir de 21/12/2026), suggestSecondFolgas (2ª folga por setor,
+≤ 2 de folga/dia, evita sex/sáb, domingos quinzenais do regime feminino) e
+sectorDayOverload (alerta de setor).
+
+js/scale-rules.js
+Integrações da escala (auto-vínculo de feriado, regras de cobertura — hoje sem
+principais ativos, COVERAGE_PRINCIPALS vazio).
 
 js/vale-transporte.js
 Vale Transporte
