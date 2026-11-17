@@ -151,7 +151,211 @@
     return `${name}: ${falta} na semana de ${formatBR(monday)} a ${formatBR(sunday)} (tem ${result.restDays} de ${REQUIRED_REST_DAYS}).`;
   }
 
+  // ── Sugestão da 2ª folga semanal (por setor) ────────────────────────────
+  // Regras pedidas pelo usuário (2026-11-17):
+  //  - no máximo MAX_OFF_PER_DAY funcionários do MESMO SETOR de folga no dia;
+  //  - sexta e sábado com o mínimo possível de folga;
+  //  - regime feminino: 2 domingos de folga no mês (CLT art. 386) — o 2º
+  //    domingo cobre a 5x2 daquela semana; sugere o domingo "par" (1↔3, 2↔4);
+  //  - quem não tem nenhum domingo de folga (e não folga fixa no domingo)
+  //    recebe 1 domingo por mês (Lei 10.101/2000, art. 6º);
+  //  - a 2ª folga vale só nas semanas sem domingo de folga.
+  // Avalia semana a semana num horizonte de 52 semanas a partir de 21/12/2026.
+  const MAX_OFF_PER_DAY = 2;
+  const WEEKDAY_NAMES = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  const SECOND_CANDIDATES = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  const FRI_SAT = new Set(["Sexta-feira", "Sábado"]);
+
+  function nthSunday(iso) {
+    return Math.ceil(Number(String(iso).slice(8, 10)) / 7);
+  }
+
+  function horizonWeeks(start, count) {
+    const first = mondayOf(start || firstEnforcedMonday());
+    return Array.from({ length: count || 52 }, (_, index) => {
+      const monday = addDays(first, index * 7);
+      return { monday, nth: nthSunday(addDays(monday, 6)) };
+    });
+  }
+
+  function hasDom(row, week) {
+    return row.fixedDay !== "Domingo" && row.sundayWeeks.includes(String(week.nth));
+  }
+
+  function sundayLoadByNth(rows) {
+    const load = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    rows.forEach((row) => {
+      if (row.fixedDay === "Domingo") {
+        Object.keys(load).forEach((n) => (load[n] += 1));
+        return;
+      }
+      row.sundayWeeks.forEach((n) => {
+        if (load[n] !== undefined) load[n] += 1;
+      });
+    });
+    return load;
+  }
+
+  function suggestSundays(rows) {
+    const load = sundayLoadByNth(rows);
+    const cost = (ns) => ns.reduce((max, n) => Math.max(max, load[n] + 1), 0);
+    rows.forEach((row) => {
+      if (row.fixedDay === "Domingo") return;
+      const current = row.sundayWeeks.filter((n) => ["1", "2", "3", "4", "5"].includes(n));
+      const add = (n) => {
+        current.push(n);
+        load[n] += 1;
+        row.sundayAdded.push(n);
+      };
+      if (row.double) {
+        // CLT art. 386: domingos QUINZENAIS (1º+3º ou 2º+4º) — o par é obrigatório.
+        const regular = current.filter((n) => n !== "5");
+        if (regular.length === 1) {
+          const base = Number(regular[0]);
+          const partner = String(base <= 2 ? base + 2 : base - 2);
+          if (!current.includes(partner)) add(partner);
+        } else if (regular.length === 0) {
+          const pairs = [["1", "3"], ["2", "4"]].sort((a, b) => cost(a) - cost(b) || Number(a[0]) - Number(b[0]));
+          pairs[0].forEach(add);
+        }
+      } else if (current.length === 0) {
+        // Lei 10.101/2000, art. 6º: ao menos um domingo de folga no período.
+        const n = ["1", "2", "3", "4"].sort((a, b) => load[a] - load[b] || Number(a) - Number(b))[0];
+        add(n);
+      }
+      row.sundayWeeks = [...new Set(current)].sort();
+    });
+  }
+
+  function weekdayLoads(rows, week) {
+    const load = {};
+    WEEKDAY_NAMES.forEach((day) => (load[day] = 0));
+    rows.forEach((row) => {
+      if (row.fixedDay && load[row.fixedDay] !== undefined) load[row.fixedDay] += 1;
+      if (row.fixedDay !== "Domingo" && hasDom(row, week)) load.Domingo += 1;
+      if (row.secondDay && !hasDom(row, week)) load[row.secondDay] += 1;
+    });
+    return load;
+  }
+
+  /**
+   * options: { employees: [{ id, name, sector, fixedDay, sundayWeeks, double, lockedSecond }],
+   *            start?, weeks? }
+   * Retorna { rows: [{ id, secondDay, sundayWeeks, sundayAdded, overLimit, activeWeeks }],
+   *           sectors: { [setor]: { maxPerDay, friSatPerWeek, overLimitDays } } }.
+   */
+  function suggestSecondFolgas(options = {}) {
+    const weeks = horizonWeeks(options.start, options.weeks);
+    const rows = (options.employees || []).map((employee) => ({
+      id: employee.id,
+      name: employee.name || employee.id,
+      sector: String(employee.sector || "Sem setor").trim() || "Sem setor",
+      fixedDay: String(employee.fixedDay || "").trim(),
+      sundayWeeks: String(Array.isArray(employee.sundayWeeks) ? employee.sundayWeeks.join(",") : employee.sundayWeeks || "")
+        .split(",")
+        .map((n) => n.trim())
+        .filter(Boolean),
+      double: Boolean(employee.double),
+      secondDay: String(employee.lockedSecond || "").trim(),
+      locked: Boolean(employee.lockedSecond),
+      sundayAdded: [],
+      overLimit: false,
+      activeWeeks: 0
+    }));
+
+    const bySector = new Map();
+    rows.forEach((row) => {
+      if (!bySector.has(row.sector)) bySector.set(row.sector, []);
+      bySector.get(row.sector).push(row);
+    });
+
+    const sectors = {};
+    bySector.forEach((list, sector) => {
+      suggestSundays(list);
+      list.forEach((row) => {
+        row.activeWeeks = weeks.filter((week) => !hasDom(row, week)).length;
+      });
+      const pending = list
+        .filter((row) => !row.locked)
+        .sort((a, b) => b.activeWeeks - a.activeWeeks || a.name.localeCompare(b.name, "pt-BR"));
+      pending.forEach((row) => {
+        const scored = SECOND_CANDIDATES.filter((day) => day !== row.fixedDay).map((day) => {
+          row.secondDay = day;
+          let max = 0;
+          let total = 0;
+          weeks.forEach((week) => {
+            const value = weekdayLoads(list, week)[day];
+            max = Math.max(max, value);
+            total += value;
+          });
+          return { day, cost: [max > MAX_OFF_PER_DAY ? 1 : 0, FRI_SAT.has(day) ? 1 : 0, max, total, SECOND_CANDIDATES.indexOf(day)] };
+        });
+        scored.sort((a, b) => {
+          for (let i = 0; i < a.cost.length; i += 1) if (a.cost[i] !== b.cost[i]) return a.cost[i] - b.cost[i];
+          return 0;
+        });
+        row.secondDay = scored[0].day;
+        row.overLimit = scored[0].cost[0] === 1;
+      });
+
+      let maxPerDay = 0;
+      let friSat = 0;
+      const overLimitDays = new Set();
+      weeks.forEach((week) => {
+        const load = weekdayLoads(list, week);
+        Object.entries(load).forEach(([day, value]) => {
+          maxPerDay = Math.max(maxPerDay, value);
+          if (value > MAX_OFF_PER_DAY) overLimitDays.add(day);
+        });
+        friSat += load["Sexta-feira"] + load["Sábado"];
+      });
+      sectors[sector] = {
+        maxPerDay,
+        friSatPerWeek: Math.round((friSat / weeks.length) * 10) / 10,
+        overLimitDays: [...overLimitDays]
+      };
+    });
+
+    return {
+      rows: rows.map((row) => ({
+        id: row.id,
+        secondDay: row.secondDay,
+        sundayWeeks: row.sundayWeeks,
+        sundayAdded: row.sundayAdded,
+        overLimit: row.overLimit,
+        activeWeeks: row.activeWeeks
+      })),
+      sectors
+    };
+  }
+
+  /**
+   * Alerta (não bloqueia): dias em que mais de MAX_OFF_PER_DAY funcionários do
+   * mesmo setor estão de folga (F, D ou CO).
+   * options: { days: [iso], employees, sectorOf(employee), getCode(employee, date) }
+   */
+  function sectorDayOverload(options = {}) {
+    const OFF = new Set(["FOLGA", "DOM", "CO"]);
+    const result = [];
+    (options.days || []).forEach((date) => {
+      const bySector = new Map();
+      (options.employees || []).forEach((employee) => {
+        if (!OFF.has(String(options.getCode(employee, date) || "").trim())) return;
+        const sector = String(options.sectorOf(employee) || "Sem setor").trim() || "Sem setor";
+        if (!bySector.has(sector)) bySector.set(sector, []);
+        bySector.get(sector).push(employee.name || employee.id);
+      });
+      bySector.forEach((names, sector) => {
+        if (names.length > MAX_OFF_PER_DAY) result.push({ date, sector, count: names.length, names });
+      });
+    });
+    return result;
+  }
+
   const api = {
+    MAX_OFF_PER_DAY,
+    suggestSecondFolgas,
+    sectorDayOverload,
     RULE_START,
     REQUIRED_REST_DAYS,
     REST_CODES,

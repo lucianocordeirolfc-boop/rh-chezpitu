@@ -1023,6 +1023,27 @@
       : `<div class="scale-5x2-banner scale-5x2-ok"><strong>Escala 5x2:</strong> todos os funcionários com 2 folgas semanais nas semanas cobradas deste mês.</div>`;
   }
 
+  /** Alerta (não bloqueia): mais de 2 do mesmo setor de folga no mesmo dia. */
+  function renderSectorOverloadBanner(data, days) {
+    if (!window.Scale5x2?.sectorDayOverload) return "";
+    const list = window.Scale5x2.sectorDayOverload({
+      days,
+      employees: employeesFor5x2(data).filter((employee) => isActiveEmployee(employee)),
+      sectorOf: (employee) => employee.department,
+      getCode: (employee, date) => effectiveScaleCode(employee, date, data)
+    });
+    if (!list.length) return "";
+    const items = list
+      .slice(0, 12)
+      .map(
+        (item) =>
+          `<li><strong>${esc(item.sector)}</strong> — ${esc(AppData.formatDateBR(item.date))}: ${item.count} de folga (${esc(item.names.map((name) => displayName(name)).join(", "))})</li>`
+      )
+      .join("");
+    const more = list.length > 12 ? `<li>… e mais ${list.length - 12} dia(s).</li>` : "";
+    return `<div class="scale-5x2-banner scale-overload-warn"><strong>Atenção:</strong> mais de 2 funcionários do mesmo setor de folga no mesmo dia (só aviso — não impede salvar).<ul>${items}${more}</ul></div>`;
+  }
+
   function show5x2ViolationsPopup(result) {
     document.getElementById("scale5x2Popup")?.remove();
     const byEmployee = new Map();
@@ -1855,6 +1876,7 @@
           </div>
           ${renderToolbar(data)}
           ${render5x2Banner(rule5x2)}
+          ${renderSectorOverloadBanner(data, days)}
           ${renderStats(employees, days, data, coverageAlerts.length)}
           <details class="scale-legend-details">
             <summary>Legenda de códigos</summary>

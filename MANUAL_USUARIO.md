@@ -97,6 +97,21 @@ escala continuam sendo gravadas na hora (são cadastros de Férias/Ausências).
   desligamento, não é cobrada.
 - A semana que atravessa dois meses é cobrada no mês em que termina (domingo).
 
+### 2ª folga semanal (5x2)
+- No **Cadastro de Funcionários**, clique em **Sugerir 2ª folga (5x2)**. O
+  sistema sugere, por setor, a 2ª folga de cada um: no máximo 2 do mesmo setor
+  de folga no dia, evitando sexta e sábado, nunca no dia da folga fixa.
+- Marque **Regime feminino** para as funcionárias: elas folgam 2 domingos por
+  mês, quinzenais (1º e 3º ou 2º e 4º — CLT art. 386); nessas semanas o
+  domingo já é a 2ª folga. Quem não tinha domingo de folga recebe um.
+- Ajuste a 2ª folga de alguém se quiser e clique em **Aplicar ao cadastro**.
+- A escala passa a lançar a 2ª folga sozinha **nas semanas sem domingo de
+  folga**, a partir de 21/12/2026 (ou da próxima segunda-feira). **Meses
+  passados não mudam.**
+- A 2ª folga também pode ser escolhida no formulário de cada funcionário.
+- A Escala avisa (sem impedir salvar) quando mais de 2 do mesmo setor estão de
+  folga no mesmo dia.
+
 ### Compensar feriado trabalhado (CO)
 1. No dia em que o funcionário vai compensar, lance o código **CO**.
 2. Abre um quadro para escolher **qual feriado** está sendo compensado.

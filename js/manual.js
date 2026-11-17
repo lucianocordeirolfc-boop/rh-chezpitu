@@ -66,6 +66,10 @@
        cumprirem — senão abre um aviso com o nome do funcionário e a semana em que falta folga. Semanas com férias,
        atestado, licença, suspensão, admissão ou desligamento não são cobradas.</p>
     <p><strong>Alertas de cobertura:</strong> retirados (Catherina, André e Rosana). TR, TM e MR são turnos comuns.</p>
+    <p><strong>2ª folga semanal (5x2):</strong> no Cadastro, clique em <strong>Sugerir 2ª folga (5x2)</strong>. A sugestão é por setor
+       (no máximo 2 de folga no dia, evitando sexta e sábado). Marque <strong>Regime feminino</strong> para as funcionárias
+       (2 domingos quinzenais, CLT art. 386) e clique em <strong>Aplicar ao cadastro</strong>. A escala lança a 2ª folga sozinha nas
+       semanas sem domingo de folga, a partir de 21/12/2026 — meses passados não mudam.</p>
     <p><strong>Compensar feriado trabalhado (CO):</strong> lance o código <strong>CO</strong> no dia da compensação,
        escolha <strong>qual feriado</strong> está sendo compensado e confirme. Só aparecem os feriados em que
        aquele funcionário está vinculado como tendo trabalhado (ver seção 7). Após vincular, o feriado sai da lista.</p>

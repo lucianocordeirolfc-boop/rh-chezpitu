@@ -229,6 +229,101 @@
     return `${day}/${month}/${year}`;
   }
 
+  // ── 2ª folga semanal (escala 5x2, EC 141/2026) ──────────────────────────
+  // Dia da semana da 2ª folga. Vale só nas semanas (seg→dom) em que o
+  // funcionário NÃO tem domingo de folga — nessas semanas o domingo já é a 2ª
+  // folga. Guarda histórico {day, from, extraSundays}: mudar vale a partir da
+  // próxima segunda-feira e nunca altera semana passada. `extraSundays` são
+  // domingos de folga ADICIONAIS do mês (ex.: 2º domingo do regime feminino,
+  // CLT art. 386) também só daqui para frente — o campo sundayOffWeeks do
+  // cadastro não tem histórico, por isso não é alterado pela sugestão.
+  // Nunca antes da primeira semana cobrada pela 5x2.
+  const SECOND_FOLGA_START = "2026-12-21";
+
+  function normalizeSecondFixedDayHistory(employee) {
+    if (!employee || !Array.isArray(employee.secondFixedDayHistory)) return [];
+    return employee.secondFixedDayHistory
+      .map((entry) => ({
+        day: String(entry?.day || "").trim(),
+        from: String(entry?.from || "").trim(),
+        extraSundays: normalizeSundayList(entry?.extraSundays)
+      }))
+      .filter((entry) => entry.from)
+      .sort((a, b) => a.from.localeCompare(b.from));
+  }
+
+  function normalizeSundayList(value) {
+    const list = Array.isArray(value) ? value : String(value || "").split(",");
+    return [...new Set(list.map((n) => String(n).trim()).filter((n) => /^[1-5]$/.test(n)))].sort();
+  }
+
+  /** Entrada da 2ª folga vigente na data (ou null). */
+  function resolveSecondFolgaEntry(employee, date) {
+    if (!employee || !date || date < SECOND_FOLGA_START) return null;
+    let found = null;
+    normalizeSecondFixedDayHistory(employee).forEach((entry) => {
+      if (entry.from <= date) found = entry;
+    });
+    return found;
+  }
+
+  function resolveSecondFixedDayForDate(employee, date) {
+    return resolveSecondFolgaEntry(employee, date)?.day || "";
+  }
+
+  /** Domingos de folga do mês vigentes na data: cadastro + adicionais da 5x2. */
+  function sundayOffWeeksForDate(employee, date) {
+    const base = normalizeSundayList(employee?.sundayOffWeeks);
+    const extra = resolveSecondFolgaEntry(employee, date)?.extraSundays || [];
+    return normalizeSundayList([...base, ...extra]);
+  }
+
+  function addDaysISO(iso, days) {
+    const [y, m, d] = String(iso).split("-").map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  /** Domingo que fecha a semana (seg→dom) da data. */
+  function sundayOfWeek(iso) {
+    const [y, m, d] = String(iso).split("-").map(Number);
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    return addDaysISO(iso, weekday === 0 ? 0 : 7 - weekday);
+  }
+
+  /** A semana da data já tem domingo de folga pelo cadastro (DOM)? */
+  function weekHasCadastroSundayOff(employee, date) {
+    const sunday = sundayOfWeek(date);
+    if (resolveFixedDayForDate(employee, sunday) === "Domingo") return false; // domingo é a folga fixa
+    return sundayOffWeeksForDate(employee, sunday).includes(String(getNthSundayOfMonth(sunday)));
+  }
+
+  /** Próxima segunda-feira depois de hoje, nunca antes do início da 5x2. */
+  function nextSecondFolgaStart() {
+    const today = todayISO();
+    const [y, m, d] = today.split("-").map(Number);
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    const nextMonday = addDaysISO(today, weekday === 1 ? 7 : (8 - weekday) % 7 || 7);
+    return nextMonday > SECOND_FOLGA_START ? nextMonday : SECOND_FOLGA_START;
+  }
+
+  /** Aplica a 2ª folga (e domingos adicionais) ao histórico — somente para frente. */
+  function scheduleSecondFixedDay(existing, requested, requestedSundays) {
+    const history = normalizeSecondFixedDayHistory(existing);
+    const last = history.length ? history[history.length - 1] : { day: "", extraSundays: [] };
+    const next = String(requested ?? last.day ?? "").trim();
+    const nextSundays = requestedSundays === undefined ? last.extraSundays : normalizeSundayList(requestedSundays);
+    const same = (entry) => entry.day === next && entry.extraSundays.join(",") === nextSundays.join(",");
+    if (same(last)) return history;
+    const from = nextSecondFolgaStart();
+    const kept = history.filter((entry) => entry.from < from);
+    if (kept.length && same(kept[kept.length - 1])) return kept;
+    if (!kept.length && !next && !nextSundays.length) return kept;
+    kept.push({ day: next, from, extraSundays: nextSundays });
+    return kept;
+  }
+
   function normalizeFixedDayHistory(employee) {
     if (!employee || !Array.isArray(employee.fixedDayHistory)) return [];
     return employee.fixedDayHistory
@@ -3395,6 +3490,15 @@
       defaultShift: String(employee.defaultShift ?? existing?.defaultShift ?? "").trim(),
       sundayOffWeeks: String(employee.sundayOffWeeks ?? existing?.sundayOffWeeks ?? "").trim(),
       doubleSundayOff: String(employee.doubleSundayOff ?? existing?.doubleSundayOff ?? "false"),
+      secondFixedDayHistory:
+        Object.prototype.hasOwnProperty.call(employee, "secondFixedDay") ||
+        Object.prototype.hasOwnProperty.call(employee, "secondExtraSundays")
+          ? scheduleSecondFixedDay(
+              existing,
+              Object.prototype.hasOwnProperty.call(employee, "secondFixedDay") ? employee.secondFixedDay : undefined,
+              Object.prototype.hasOwnProperty.call(employee, "secondExtraSundays") ? employee.secondExtraSundays : undefined
+            )
+          : normalizeSecondFixedDayHistory(existing),
       notes: employee.notes ?? existing?.notes ?? "",
       source,
       // Carimbo de criação (imutável): define a janela de 24h em que o
@@ -5313,9 +5417,19 @@
         return "DOM";
       }
     }
+    // Domingo de folga ADICIONAL da 5x2 (ex.: 2º domingo do regime feminino),
+    // vigente só a partir da data registrada.
+    if (weekdayName(date) === "Domingo") {
+      const extra = resolveSecondFolgaEntry(employee, date)?.extraSundays || [];
+      if (extra.includes(String(getNthSundayOfMonth(date)))) return "DOM";
+    }
 
     const fixedDayForDate = resolveFixedDayForDate(employee, date);
     if (fixedDayForDate && fixedDayForDate === weekdayName(date)) return "FOLGA";
+
+    // 2ª folga semanal (5x2): só nas semanas sem domingo de folga no cadastro.
+    const secondDay = resolveSecondFixedDayForDate(employee, date);
+    if (secondDay && secondDay === weekdayName(date) && !weekHasCadastroSundayOff(employee, date)) return "FOLGA";
     return "";
   }
 
@@ -5746,6 +5860,22 @@
     STORAGE_KEY,
     getManualScaleEntry,
     applyManualScaleBatch,
+    SECOND_FOLGA_START,
+    resolveSecondFixedDayForDate,
+    getSecondFixedDay: (employee) => {
+      const history = normalizeSecondFixedDayHistory(employee);
+      return history.length ? history[history.length - 1].day : "";
+    },
+    getSecondFixedDayFrom: (employee) => {
+      const history = normalizeSecondFixedDayHistory(employee);
+      return history.length ? history[history.length - 1].from : "";
+    },
+    getSecondExtraSundays: (employee) => {
+      const history = normalizeSecondFixedDayHistory(employee);
+      return history.length ? history[history.length - 1].extraSundays : [];
+    },
+    sundayOffWeeksForDate,
+    nextSecondFolgaStart,
     carryWorkedLinkTombstones,
     setVtDeduction,
     getVtDeduction,

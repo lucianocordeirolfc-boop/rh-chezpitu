@@ -4189,3 +4189,18 @@ body {
   .legend-compact .legend-item.code-suspensao { background: #7f1d1d; color: #ffffff; }
   .legend-compact .legend-item.code-licenca { background: #a78bfa; color: #2e1065; }
 }
+
+
+/* 2ª folga (5x2) — quadro de sugestão no Cadastro e aviso de setor na Escala */
+.second-folga-popup { max-width: 1040px; width: min(1040px, 96vw); }
+.second-folga-popup .sf-table-wrap { max-height: 56vh; overflow: auto; }
+.second-folga-popup .sf-center { text-align: center; }
+.second-folga-popup .sf-warn { color: #b91c1c; font-weight: 800; }
+.second-folga-popup .sf-info { color: #9a3412; font-weight: 700; }
+.second-folga-popup .sf-add { color: #133169; }
+.second-folga-popup .sf-summary { margin: 8px 16px; padding-left: 18px; font-size: 0.85rem; }
+.second-folga-popup > .help-text { margin: 8px 16px; }
+.second-folga-popup .sf-table-wrap { margin: 0 16px; }
+.func-second-day { color: #133169; font-weight: 700; }
+.scale-overload-warn { background: #fff7ed; border: 2px solid #f59e0b; color: #7c2d12; }
+.scale-overload-warn ul { margin: 4px 0 0; padding-left: 18px; }

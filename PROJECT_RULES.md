@@ -207,6 +207,35 @@ Vigente desde 2026-11-17, a pedido do usuário (EC 141/2026, art. 7º, XV).
 
 Cobertura: `scripts/verify-escala-5x2.mjs`, `scripts/verify-escala-editar-salvar.mjs`.
 
+### 2ª folga semanal (5x2) (REGRA FIXA)
+
+Vigente desde 2026-11-17, a pedido do usuário.
+
+- Cadastro: campo **"2ª folga semanal (5x2)"** (seg a sáb). A escala lança
+  FOLGA nesse dia **só nas semanas (seg→dom) sem domingo de folga** — nas
+  semanas com domingo de folga, o domingo já é a 2ª folga.
+- **Nunca retroativo:** guardado em `secondFixedDayHistory` [{day, from,
+  extraSundays}], vale a partir da próxima segunda-feira (nunca antes de
+  21/12/2026). `extraSundays` = domingos de folga ADICIONAIS (2º domingo do
+  regime feminino, ou o domingo de quem não tinha nenhum), também só para
+  frente. O campo `sundayOffWeeks` (sem histórico) NÃO é alterado pela
+  sugestão — alterá-lo mudaria meses passados.
+- **Sugestão** (botão "Sugerir 2ª folga (5x2)" na Lista de funcionários,
+  `Scale5x2.suggestSecondFolgas`): por **setor**, ≤ 2 de folga no mesmo dia
+  (por empresa é impossível: 2 folgas × 18 pessoas > 2 × 7 dias); sexta/sábado
+  só quando seg–qui não comportam; nunca no dia da folga fixa; regime feminino
+  = domingos **quinzenais** 1º+3º ou 2º+4º (CLT art. 386); quem não tem
+  domingo de folga recebe 1 (Lei 10.101/2000, art. 6º). O usuário marca o
+  regime feminino no próprio quadro (o cadastro não tem campo de sexo) e pode
+  travar a 2ª folga de alguém; nada é gravado até "Aplicar ao cadastro".
+- **Escala:** alerta (não bloqueia) quando mais de 2 do mesmo setor estão de
+  folga (F, D ou CO) no mesmo dia (`Scale5x2.sectorDayOverload`).
+- Limites matemáticos: setor de 6 com folgas fixas ocupando seg–qui leva parte
+  das 2ª folgas para sex/sáb; 5 mulheres no regime feminino no mesmo setor
+  levam algum domingo a 3 de folga (10 domingos para 4 vagas × 2).
+
+Cobertura: `scripts/verify-segunda-folga.mjs`, `scripts/verify-segunda-folga-ui.mjs`.
+
 ## Impressão da Escala — geometria da folha (REGRA FIXA)
 
 Vigente desde 2026-09-07 (`20260907.01`). Ver `PROJECT_HISTORY.md` →

@@ -7,6 +7,35 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-17 (4) — 2ª folga semanal (5x2): cadastro, sugestão por setor e alerta na escala
+
+Pedido do usuário: 2ª folga fixa para cumprir a 5x2, com análise prévia —
+máx. 2 de folga no mesmo dia, sexta/sábado no mínimo, 2º domingo do regime
+feminino como folga (restam ~2 folgas/mês a lançar); decisões: limite por
+setor, regime feminino para todas as mulheres (marcado pelo usuário no quadro —
+sem campo de sexo no cadastro), excesso só alerta, domingo para o Charles.
+
+- **Análise (leitura da base):** todos com 1 folga fixa + 1 domingo/mês (só
+  Rosana no regime de 2 domingos). Limite por empresa impossível (36 folgas ×
+  14 vagas/semana); por setor cabe. Bar Pengold (6) leva ~3 folgas/semana a
+  sex/sáb; Charles sem domingo de folga (Lei 10.101/2000, art. 6º).
+- **Dados (`js/data.js`):** `secondFixedDayHistory` [{day, from,
+  extraSundays}] via `upsertEmployee` (`secondFixedDay`, `secondExtraSundays`),
+  a partir da próxima segunda (≥ 21/12/2026). `getScaleCode` lança FOLGA na 2ª
+  folga só em semana sem domingo de folga e DOM nos domingos adicionais —
+  nada retroativo; `sundayOffWeeks` não é alterado.
+- **Sugestão (`js/scale-5x2.js`):** `suggestSecondFolgas` (por setor, 52
+  semanas, domingos quinzenais obrigatórios no regime feminino) e
+  `sectorDayOverload` (alerta).
+- **Tela:** Cadastro — campo no formulário, "+ 2ª" na lista, coluna X no Excel,
+  quadro "Sugerir 2ª folga (5x2)" (marcar regime feminino, travar dia, aplicar
+  com confirmação). Escala — faixa de alerta de setor com mais de 2 de folga.
+- Testes: `verify-segunda-folga.mjs` (35), `verify-segunda-folga-ui.mjs` (18,
+  Chrome real), `verify-exportar-excel.mjs` atualizado (coluna X);
+  `npm test` 47/47; `npm run validate` 31/31.
+- **Dados de produção:** nenhum alterado — a aplicação é feita pelo usuário no
+  quadro de sugestão.
+
 ## 2026-11-17 (3) — CRÍTICO: AppData.state desatualizado após sincronização + correções de dados
 
 - **Defeito (CRÍTICO):** `window.AppData.state` era uma propriedade fixa com o

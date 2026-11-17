@@ -82,6 +82,19 @@
     return window.App?.escapeHTML(value) || String(value ?? "");
   }
 
+  // 2ª folga semanal (5x2): segunda a sábado (domingo é coberto pelos domingos de folga).
+  const SECOND_DAY_OPTIONS = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+
+  function secondDayOptions(selected) {
+    return [`<option value="" ${!selected ? "selected" : ""}>— Sem 2ª folga —</option>`]
+      .concat(SECOND_DAY_OPTIONS.map((day) => `<option value="${day}" ${day === selected ? "selected" : ""}>${day}</option>`))
+      .join("");
+  }
+
+  function shortDay(day) {
+    return String(day || "").slice(0, 3);
+  }
+
   function dayOptions(selected) {
     return [`<option value="" ${!selected ? "selected" : ""}>—</option>`]
       .concat(
@@ -631,6 +644,12 @@
       <div class="func-form-row">
         ${sundaySelectorHTML("", "false")}
       </div>
+      <div class="func-form-row cols-3">
+        <label>2ª folga semanal (5x2)
+          <select name="secondFixedDay" id="secondFixedDaySelect">${secondDayOptions("")}</select>
+          <small class="help-text compact-help" id="secondFixedDayHint">Lançada pela escala nas semanas sem domingo de folga, a partir de ${esc(AppData.formatDateBR(AppData.nextSecondFolgaStart ? AppData.nextSecondFolgaStart() : "2026-12-21"))}. Use "Sugerir 2ª folga (5x2)" na lista.</small>
+        </label>
+      </div>
       <div class="func-form-row cols-vt">
         <label>Valor diário VT<input name="vtDaily" inputmode="decimal" placeholder="17,30" autocomplete="off"></label>
         <label>Origem<span id="employeeOriginDisplay" class="func-origin-readonly">Manual</span></label>
@@ -681,6 +700,8 @@
 
     const fixedDayHint = form.querySelector("#fixedDayScheduleHint");
     if (fixedDayHint) { fixedDayHint.style.display = "none"; fixedDayHint.textContent = ""; }
+    const secondSelect = form.querySelector("#secondFixedDaySelect");
+    if (secondSelect) secondSelect.value = "";
   }
 
   function fillEmployeeForm(form, employee, company) {
@@ -797,6 +818,9 @@
 
     const originEl = form.querySelector("#employeeOriginDisplay");
     if (originEl) originEl.textContent = employee.source === "imported" ? "Importado" : "Manual";
+
+    const secondSelect = form.querySelector("#secondFixedDaySelect");
+    if (secondSelect) secondSelect.value = AppData.getSecondFixedDay ? AppData.getSecondFixedDay(employee) : "";
   }
 
   function bindEmployeeForm(form, pageContainer) {
@@ -851,6 +875,10 @@
       const formData = new FormData(form);
       const payload = Object.fromEntries(formData.entries());
       if (!payload.fixedDay) payload.fixedDay = "";
+      if (payload.secondFixedDay && payload.secondFixedDay === payload.fixedDay) {
+        alert("A 2ª folga semanal não pode ser no mesmo dia da folga fixa.");
+        return;
+      }
 
       if (payload.role === NEW_ROLE_VALUE) {
         const newRole = resolveNewRole(roleSelect, newRoleInput?.value);
@@ -979,7 +1007,9 @@
         <td>${esc(employee.department)}</td>
         <td><span class="pill ${employee.status === "Ativo" ? "success" : "muted"}">${esc(employee.status)}</span></td>
         <td>${esc(AppData.formatDateBR(employee.admissionDate))}</td>
-        <td>${esc(employee.fixedDay || "—")}</td>
+        <td>${esc(employee.fixedDay || "—")}${
+          AppData.getSecondFixedDay?.(employee) ? `<small class="func-second-day"> + 2ª: ${esc(shortDay(AppData.getSecondFixedDay(employee)))}</small>` : ""
+        }</td>
         <td>${esc(employee.defaultShift || "—")}</td>
         <td>${esc(AppData.formatVtCurrency(employee.vtDaily))}</td>
         <td class="actions">
@@ -1119,7 +1149,8 @@
     { header: "Origem", width: 11 },
     { header: "Observações", width: 40 },
     { header: "Cadastrado em", width: 17 },
-    { header: "Atualizado em", width: 17 }
+    { header: "Atualizado em", width: 17 },
+    { header: "2ª folga (5x2)", width: 16 }
   ];
 
   function exportSundayWeeks(value) {
@@ -1173,11 +1204,202 @@
         employee.source === "imported" ? "Importado" : "Manual",
         employee.notes || "",
         { type: "datetime", value: employee.createdAt },
-        { type: "datetime", value: employee.updatedAt }
+        { type: "datetime", value: employee.updatedAt },
+        AppData.getSecondFixedDay?.(employee) || ""
       ];
     });
 
     return { name: `Funcionários ${company}`, columns: EXPORT_COLUMNS, rows };
+  }
+
+  // ── Sugestão da 2ª folga (escala 5x2) ──────────────────────────────────
+  // Abre uma tabela com a sugestão por setor (js/scale-5x2.js). Nada é gravado
+  // até "Aplicar ao cadastro". A 2ª folga e os domingos adicionais valem só a
+  // partir da próxima segunda-feira (nunca alteram semanas passadas).
+  function openSecondFolgaSuggestion() {
+    if (!window.Scale5x2?.suggestSecondFolgas) {
+      alert("Regra 5x2 indisponível. Atualize a página (Ctrl+F5).");
+      return;
+    }
+    document.getElementById("secondFolgaPopup")?.remove();
+    const company = AppData.getPrimaryPageCompany("funcionarios");
+    const start = AppData.nextSecondFolgaStart ? AppData.nextSecondFolgaStart() : "2026-12-21";
+    const employees = AppData.sortEmployeesByName(
+      (AppData.getCompanyData(company)?.employees || []).filter((employee) => AppData.isEmployeeActive(employee))
+    );
+    if (!employees.length) {
+      alert(`Nenhum funcionário ativo em ${company}.`);
+      return;
+    }
+    const doubles = new Map(
+      employees.map((employee) => [employee.id, employee.doubleSundayOff === true || employee.doubleSundayOff === "true"])
+    );
+    const overrides = new Map();
+    let current = null;
+
+    const baseSundays = (employee) =>
+      String(employee.sundayOffWeeks || "").split(",").map((n) => n.trim()).filter(Boolean);
+    const currentExtra = (employee) => (AppData.getSecondExtraSundays ? AppData.getSecondExtraSundays(employee) : []);
+
+    function compute() {
+      current = window.Scale5x2.suggestSecondFolgas({
+        start,
+        employees: employees.map((employee) => ({
+          id: employee.id,
+          name: employee.name,
+          sector: employee.department,
+          fixedDay: AppData.resolveFixedDayForDate(employee, start),
+          sundayWeeks: [...new Set([...baseSundays(employee), ...currentExtra(employee)])],
+          double: doubles.get(employee.id),
+          lockedSecond: overrides.get(employee.id) || ""
+        }))
+      });
+      return current;
+    }
+
+    function rowsHTML(result) {
+      const byId = new Map(result.rows.map((row) => [row.id, row]));
+      return employees
+        .slice()
+        .sort((a, b) => String(a.department).localeCompare(String(b.department), "pt-BR") || a.name.localeCompare(b.name, "pt-BR"))
+        .map((employee) => {
+          const row = byId.get(employee.id);
+          const fixed = AppData.resolveFixedDayForDate(employee, start) || "—";
+          const base = baseSundays(employee);
+          const extra = row.sundayWeeks.filter((n) => !base.includes(n));
+          const notes = [];
+          if (row.overLimit) notes.push(`<span class="sf-warn">acima de 2 no setor</span>`);
+          if (["Sexta-feira", "Sábado"].includes(row.secondDay)) notes.push(`<span class="sf-info">sexta/sábado</span>`);
+          if (row.sundayAdded.length && !doubles.get(employee.id)) notes.push(`<span class="sf-info">domingo incluído (Lei 10.101)</span>`);
+          if (row.sundayAdded.length && doubles.get(employee.id)) notes.push(`<span class="sf-info">2º domingo quinzenal (CLT 386)</span>`);
+          return `
+            <tr data-sf-row="${esc(employee.id)}">
+              <td>${esc(employee.name)}</td>
+              <td>${esc(employee.department || "—")}</td>
+              <td>${esc(shortDay(fixed))}</td>
+              <td class="sf-center"><input type="checkbox" data-sf-double="${esc(employee.id)}" ${doubles.get(employee.id) ? "checked" : ""} aria-label="Regime feminino (2 domingos) — ${esc(employee.name)}"></td>
+              <td>${base.length ? base.map((n) => `${n}º`).join(", ") : "—"}${extra.length ? ` <strong class="sf-add">+ ${extra.map((n) => `${n}º`).join(", ")}</strong>` : ""}</td>
+              <td><select data-sf-second="${esc(employee.id)}" class="field-select">${secondDayOptions(row.secondDay)}</select></td>
+              <td>${notes.join(" ") || "ok"}</td>
+            </tr>`;
+        })
+        .join("");
+    }
+
+    function summaryHTML(result) {
+      return Object.entries(result.sectors)
+        .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
+        .map(
+          ([sector, info]) =>
+            `<li><strong>${esc(sector)}</strong>: máx. ${info.maxPerDay} de folga no mesmo dia; ${String(info.friSatPerWeek).replace(".", ",")} folga(s) em sexta/sábado por semana${
+              info.overLimitDays.length ? ` — <span class="sf-warn">acima de 2 em: ${esc(info.overLimitDays.join(", "))}</span>` : ""
+            }</li>`
+        )
+        .join("");
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "popup-overlay";
+    overlay.id = "secondFolgaPopup";
+    overlay.innerHTML = `
+      <div class="popup-card second-folga-popup" role="dialog" aria-labelledby="sfTitle">
+        <div class="popup-header">
+          <h3 id="sfTitle">Sugerir 2ª folga semanal (5x2) — ${esc(company)}</h3>
+          <button class="popup-close" type="button" data-sf-close>✕</button>
+        </div>
+        <p class="help-text compact-help">
+          Regras: no máximo 2 do mesmo setor de folga no dia; sexta e sábado só quando não houver outro jeito;
+          a 2ª folga vale nas semanas <strong>sem</strong> domingo de folga. Regime feminino = 2 domingos quinzenais
+          (1º+3º ou 2º+4º, CLT art. 386). Quem não tem domingo de folga recebe 1 (Lei 10.101/2000, art. 6º).
+          Tudo vale a partir de <strong>${esc(AppData.formatDateBR(start))}</strong> — semanas passadas não mudam.
+          Marque o regime feminino e ajuste a 2ª folga se quiser; a sugestão se recalcula.
+        </p>
+        <div class="table-wrap table-compact sf-table-wrap">
+          <table>
+            <thead><tr><th>Funcionário</th><th>Setor</th><th>Folga fixa</th><th>Regime feminino</th><th>Domingos de folga</th><th>2ª folga</th><th>Situação</th></tr></thead>
+            <tbody data-sf-body></tbody>
+          </table>
+        </div>
+        <ul class="sf-summary" data-sf-summary></ul>
+        <div class="popup-actions">
+          <button class="secondary btn-sm" type="button" data-sf-close>Cancelar</button>
+          <button class="primary btn-sm" type="button" data-sf-apply>Aplicar ao cadastro</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    function refresh() {
+      const result = compute();
+      overlay.querySelector("[data-sf-body]").innerHTML = rowsHTML(result);
+      overlay.querySelector("[data-sf-summary]").innerHTML = summaryHTML(result);
+    }
+
+    overlay.addEventListener("change", (event) => {
+      const target = event.target;
+      if (target.matches("[data-sf-double]")) {
+        doubles.set(target.dataset.sfDouble, target.checked);
+        refresh();
+      } else if (target.matches("[data-sf-second]")) {
+        const employee = employees.find((item) => item.id === target.dataset.sfSecond);
+        const fixed = employee ? AppData.resolveFixedDayForDate(employee, start) : "";
+        if (target.value && target.value === fixed) {
+          alert("A 2ª folga não pode ser no mesmo dia da folga fixa.");
+          refresh();
+          return;
+        }
+        if (target.value) overrides.set(target.dataset.sfSecond, target.value);
+        else overrides.delete(target.dataset.sfSecond);
+        refresh();
+      }
+    });
+    overlay.querySelectorAll("[data-sf-close]").forEach((button) => button.addEventListener("click", () => overlay.remove()));
+
+    overlay.querySelector("[data-sf-apply]").addEventListener("click", () => {
+      const byId = new Map(current.rows.map((row) => [row.id, row]));
+      const changes = employees
+        .map((employee) => {
+          const row = byId.get(employee.id);
+          const base = baseSundays(employee);
+          const extra = row.sundayWeeks.filter((n) => !base.includes(n));
+          const double = doubles.get(employee.id);
+          const sameSecond = (AppData.getSecondFixedDay(employee) || "") === (row.secondDay || "");
+          const sameExtra = currentExtra(employee).join(",") === extra.join(",");
+          const sameDouble = (employee.doubleSundayOff === true || employee.doubleSundayOff === "true") === double;
+          if (sameSecond && sameExtra && sameDouble) return null;
+          return { employee, secondFixedDay: row.secondDay || "", secondExtraSundays: extra.join(","), double };
+        })
+        .filter(Boolean);
+      if (!changes.length) {
+        alert("Nada a aplicar: o cadastro já está igual à sugestão.");
+        return;
+      }
+      if (
+        !confirm(
+          `Gravar a 2ª folga semanal de ${changes.length} funcionário(s) de ${company}, a partir de ${AppData.formatDateBR(start)}?\n\n` +
+            "Semanas passadas não mudam. Depois, confira a escala de dezembro e clique em Salvar escala."
+        )
+      ) {
+        return;
+      }
+      changes.forEach((change) => {
+        AppData.upsertEmployee(
+          {
+            ...change.employee,
+            secondFixedDay: change.secondFixedDay,
+            secondExtraSundays: change.secondExtraSundays,
+            doubleSundayOff: change.double ? "true" : "false"
+          },
+          company,
+          { save: false }
+        );
+      });
+      AppData.saveState();
+      overlay.remove();
+      window.App?.toast?.(`2ª folga gravada para ${changes.length} funcionário(s).`, "success");
+      window.App?.renderCurrent?.();
+    });
+
+    refresh();
   }
 
   function exportEmployeesToExcel() {
@@ -1411,6 +1633,10 @@
       exportEmployeesToExcel();
     });
 
+    container.querySelector("#btnSuggestSecondFolga")?.addEventListener("click", () => {
+      openSecondFolgaSuggestion();
+    });
+
     container.querySelector("#btnShowInactiveEmployees")?.addEventListener("click", () => {
       openInactiveEmployeesPicker(container);
     });
@@ -1606,6 +1832,7 @@
             </div>
             <div class="func-table-card-actions">
               ${renderInactiveToggle(allEmployees)}
+              <button type="button" class="secondary btn-sm" id="btnSuggestSecondFolga" title="Sugere a 2ª folga semanal de cada funcionário (escala 5x2) por setor">Sugerir 2ª folga (5x2)</button>
               <button type="button" class="secondary btn-sm" id="btnExportEmployeesExcel" title="Baixa planilha .xlsx com todos os funcionários da empresa (ativos e inativos)">Exportar Excel</button>
               <button type="button" class="primary btn-sm" id="btnNewEmployee">+ Novo funcionário</button>
             </div>
