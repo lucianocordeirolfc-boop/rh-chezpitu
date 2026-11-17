@@ -350,6 +350,22 @@ console.log("\n=== TESTE: feriado de uma empresa estendido à outra (Chez Pitu �
   );
 }
 
+// ── 7e. AppData.state acompanha o estado após sincronização (CRÍTICO) ────────
+{
+  const antes = AppData.state;
+  const remoto = JSON.parse(JSON.stringify(AppData.state));
+  remoto.calendarHolidays = [];
+  AppData.setRemoteState(remoto);
+  assert(AppData.state !== antes, "Após setRemoteState, AppData.state aponta para o estado NOVO");
+  // Simula ScaleRules.addCalendarHoliday (grava via AppData.state).
+  AppData.state.calendarHolidays.push({ id: "cal-pos-sync", name: "Feriado Pós Sync", date: "2027-08-01", companies: [CO] });
+  assert(
+    AppData.listRegisteredHolidays(CO).some((item) => item.date === "2027-08-01"),
+    "Gravação via AppData.state depois da sincronização não se perde"
+  );
+  assert(AppData.getCompanyData(CO) === AppData.state.companies[CO], "getCompanyData e AppData.state enxergam o mesmo objeto");
+}
+
 // ── 8. Checagem de fonte do formulário ──────────────────────────────────────
 {
   const src = fs.readFileSync(path.join(root, "js/feriados.js"), "utf8");

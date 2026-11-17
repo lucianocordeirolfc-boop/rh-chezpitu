@@ -5780,4 +5780,21 @@
     formatVtInput: ImportUtils.formatVtInput,
     parseVtDaily: ImportUtils.parseVtDaily
   };
+
+  // CORREÇÃO CRÍTICA (2026-11-17): `state` é REATRIBUÍDO quando chega dado do
+  // Firebase (setRemoteState). A propriedade `state` acima guardava só o objeto
+  // do carregamento da página, então tudo que lia/gravava via AppData.state
+  // depois de uma sincronização (ScaleRules.addCalendarHoliday/updateCalendar-
+  // Holiday, alertas, firebase-sync ao reconectar) usava um objeto ANTIGO — e a
+  // gravação se perdia. Agora AppData.state sempre devolve o estado vigente.
+  Object.defineProperty(window.AppData, "state", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return state;
+    },
+    set(next) {
+      if (next && typeof next === "object") state = next;
+    }
+  });
 })();

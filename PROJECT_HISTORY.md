@@ -7,6 +7,33 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-17 (3) — CRÍTICO: AppData.state desatualizado após sincronização + correções de dados
+
+- **Defeito (CRÍTICO):** `window.AppData.state` era uma propriedade fixa com o
+  objeto do carregamento da página. `setRemoteState` (dado vindo do Firebase)
+  REATRIBUI o estado interno, então tudo que lia/gravava via `AppData.state`
+  depois de uma sincronização usava um objeto antigo e a gravação se perdia:
+  `ScaleRules.addCalendarHoliday`/`updateCalendarHoliday` (cadastro de feriado
+  no calendário — explica feriados existentes só no bloco da empresa),
+  recálculo de alertas, `firebase-sync` ao reconectar. Encontrado ao conferir a
+  Lixeira (8 entradas pelo objeto antigo; `listDeletedArchive()` = 37).
+- **Correção (local, aguardando autorização de commit/deploy):** `AppData.state`
+  passa a ser getter/setter do estado vigente (`js/data.js`). Teste 7e em
+  `verify-feriados-empresas.mjs` reproduz o defeito (3 falhas sem a correção,
+  0 com ela; suíte 49). `npm test` 47/47; `npm run validate` 29/29.
+- **Dados de produção (autorizados pelo usuário, feitos em `20261117.04`):**
+  (a) 29 vínculos que voltaram pelo auto-vínculo (Chez Pitu: 15 em
+  01/05/2027, 14 em Finados 2027; todos Pendentes, automáticos, sem
+  compensação — conferidos antes) excluídos pelo mesmo caminho do "Excluir
+  vínculo": cópias na Lixeira (8 → 37) e marcas de exclusão com os nomes novos;
+  vínculos Chez Pitu 510 → 481, Pengold 271 → 271. (b) Padronização aprovada
+  de 20 feriados nas duas empresas (nomes sem ano/sem erro de digitação; Búzios
+  = municipal; Comércio Hoteleiro = categoria/CCT; São Jorge 2027 = estadual),
+  sem recálculo de escala; 34/34 feriados mantidos.
+- **2ª folga fixa:** análise feita (ver resposta ao usuário); implementação
+  aguardando confirmação das premissas (limite por setor, regime feminino,
+  bloqueio ou alerta).
+
 ## 2026-11-17 (2) — Escala 5x2 (EC 141/2026): Editar/Salvar com validação + visual + coberturas
 
 Pedido do usuário: adaptar a Escala de Folga à 5x2 a partir de 16/12/2026;
