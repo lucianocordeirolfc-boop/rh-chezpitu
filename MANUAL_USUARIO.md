@@ -104,6 +104,8 @@ escala continuam sendo gravadas na hora (são cadastros de Férias/Ausências).
 - Marque **Regime feminino** para as funcionárias: elas folgam 2 domingos por
   mês, quinzenais (1º e 3º ou 2º e 4º — CLT art. 386); nessas semanas o
   domingo já é a 2ª folga. Quem não tinha domingo de folga recebe um.
+- A 2ª folga pode ser no **domingo** — vale **todos os domingos**. Para quem
+  tem folga fixa no sábado o sistema sugere o domingo (fim de semana inteiro).
 - Ajuste a 2ª folga de alguém se quiser e clique em **Aplicar ao cadastro**.
 - A escala passa a lançar a 2ª folga sozinha **nas semanas sem domingo de
   folga**, a partir de 21/12/2026 (ou da próxima segunda-feira). **Meses

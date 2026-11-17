@@ -7,6 +7,22 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-17 (5) — 2ª folga também no domingo (fim de semana)
+
+Pedido do usuário: permitir sugerir a 2ª folga no domingo, pois há quem possa
+folgar todo sábado e domingo (caso Jéssica).
+
+- `js/data.js`: 2ª folga "Domingo" lança DOM em todos os domingos (a partir do
+  início da 2ª folga; passado não muda).
+- `js/scale-5x2.js`: domingo entra como candidato (sem penalidade de sex/sáb,
+  limite ≤ 2 por setor); preferido para folga fixa no sábado; com domingo como
+  2ª folga, o domingo "adicional" deixa de ser sugerido.
+- `js/funcionarios.js`: opção "Domingo (todos)" no formulário e no quadro;
+  aviso "fim de semana (sáb + dom)".
+- Simulação com a base: Manutenção Chez Pitu passa de 1,5 para 0,8 folga/semana
+  em sex/sáb; Bar Pengold sem ganho (domingos do setor já com 2).
+- Testes: `verify-segunda-folga.mjs` 43; `verify-segunda-folga-ui.mjs` 19.
+
 ## 2026-11-17 (4) — 2ª folga semanal (5x2): cadastro, sugestão por setor e alerta na escala
 
 Pedido do usuário: 2ª folga fixa para cumprir a 5x2, com análise prévia —

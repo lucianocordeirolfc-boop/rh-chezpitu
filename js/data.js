@@ -232,7 +232,7 @@
   // ── 2ª folga semanal (escala 5x2, EC 141/2026) ──────────────────────────
   // Dia da semana da 2ª folga. Vale só nas semanas (seg→dom) em que o
   // funcionário NÃO tem domingo de folga — nessas semanas o domingo já é a 2ª
-  // folga. Guarda histórico {day, from, extraSundays}: mudar vale a partir da
+  // folga. Exceção: 2ª folga "Domingo" vale todo domingo (código DOM). Guarda histórico {day, from, extraSundays}: mudar vale a partir da
   // próxima segunda-feira e nunca altera semana passada. `extraSundays` são
   // domingos de folga ADICIONAIS do mês (ex.: 2º domingo do regime feminino,
   // CLT art. 386) também só daqui para frente — o campo sundayOffWeeks do
@@ -5420,8 +5420,10 @@
     // Domingo de folga ADICIONAL da 5x2 (ex.: 2º domingo do regime feminino),
     // vigente só a partir da data registrada.
     if (weekdayName(date) === "Domingo") {
-      const extra = resolveSecondFolgaEntry(employee, date)?.extraSundays || [];
-      if (extra.includes(String(getNthSundayOfMonth(date)))) return "DOM";
+      const entry = resolveSecondFolgaEntry(employee, date);
+      // 2ª folga no domingo vale TODO domingo (ex.: sábado fixo + domingo).
+      if (entry?.day === "Domingo") return "DOM";
+      if ((entry?.extraSundays || []).includes(String(getNthSundayOfMonth(date)))) return "DOM";
     }
 
     const fixedDayForDate = resolveFixedDayForDate(employee, date);

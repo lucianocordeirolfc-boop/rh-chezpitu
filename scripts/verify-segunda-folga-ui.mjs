@@ -177,6 +177,8 @@ try {
   await page.evaluate(() => document.querySelector('[data-edit="g2"]').click());
   const formValue = await page.evaluate(() => document.getElementById("secondFixedDaySelect")?.value);
   assert(formValue === s.g2.second, `Campo '2ª folga semanal' preenchido (${formValue})`);
+  const hasSunday = await page.evaluate(() => [...document.getElementById("secondFixedDaySelect").options].some((o) => o.value === "Domingo" && /todos/.test(o.textContent)));
+  assert(hasSunday, "Opção 'Domingo (todos)' disponível na 2ª folga");
   const listText = await page.evaluate(() => document.querySelector(".func-employees-table")?.textContent || "");
   assert(/\+ 2ª:/.test(listText), "Lista mostra '+ 2ª' ao lado da folga fixa");
 

@@ -139,7 +139,34 @@ assert(ruleDec.violations.length === 0, "Dez/2026 cumpre a 5x2 só com o cadastr
     ]
   });
   assert(bar.sectors.BAR.maxPerDay <= 2, `BAR (6 pessoas): ainda no máximo 2 por dia (obtido ${bar.sectors.BAR.maxPerDay})`);
-  assert(bar.rows.filter((r) => ["Sexta-feira", "Sábado"].includes(r.secondDay)).length === 4, "BAR: só as 4 que não cabem de seg a qui vão para sex/sáb");
+  assert(bar.rows.filter((r) => ["Sexta-feira", "Sábado"].includes(r.secondDay)).length <= 4, "BAR: no máximo as 4 que não cabem de seg a qui (domingo usado quando cabe) vão para sex/sáb");
+}
+
+// ── 4b. 2ª folga no domingo (fim de semana — caso Jéssica) ────────────────
+{
+  const mk = (id, sector, fixedDay, sundayWeeks) => ({ id, name: id, sector, fixedDay, sundayWeeks, double: false });
+  const adm = Scale5x2.suggestSecondFolgas({ employees: [mk("jessica", "ADMINISTRATIVO", "Sábado", "2")] });
+  const j = adm.rows[0];
+  assert(j.secondDay === "Domingo", `Folga fixa no sábado → 2ª folga sugerida no domingo (obtido ${j.secondDay})`);
+  assert(j.sundayAdded.length === 0 && j.activeWeeks === 52, "Domingo como 2ª folga vale todas as semanas (sem domingo 'adicional')");
+
+  // Domingo respeita o limite de 2 do setor.
+  const cheio = Scale5x2.suggestSecondFolgas({
+    employees: [mk("s1", "REC", "Sábado", "1"), mk("s2", "REC", "Segunda-feira", "2"), mk("s3", "REC", "Terça-feira", "3"), mk("s4", "REC", "Sábado", "4")]
+  });
+  const domingos = cheio.rows.filter((row) => row.secondDay === "Domingo").length;
+  assert(domingos <= 2 && cheio.sectors.REC.maxPerDay <= 2, `Domingo também limitado a 2 por setor (${domingos} no domingo; máx. ${cheio.sectors.REC.maxPerDay})`);
+
+  // Escala: 2ª folga "Domingo" = todo domingo, só daqui para frente.
+  let jess = AppData.upsertEmployee({ ...base, id: "emp-j", name: "Jessica Fixture", department: "ADMINISTRATIVO", fixedDay: "Sábado", sundayOffWeeks: "2" }, CO);
+  jess = AppData.upsertEmployee({ ...jess, secondFixedDay: "Domingo" }, CO);
+  const jc = (date) => AppData.getScaleCode(jess, date, data);
+  assert(jc("2026-12-26") === "FOLGA" && jc("2026-12-27") === "DOM", "Sábado 26/12 FOLGA + domingo 27/12 DOM");
+  assert(jc("2027-01-03") === "DOM" && jc("2027-01-17") === "DOM" && jc("2027-01-31") === "DOM", "Todos os domingos de jan/2027 são DOM");
+  assert(jc("2027-01-06") === "", "Nenhuma folga extra no meio da semana");
+  assert(jc("2026-11-15") === "", "Domingo passado (15/11/2026) não muda");
+  const r = Scale5x2.validateMonth({ yearMonth: "2027-01", employees: [jess], getCode: (e, d) => AppData.getScaleCode(e, d, data) });
+  assert(r.violations.length === 0, "Sábado + domingo cumpre a 5x2 todas as semanas");
 }
 
 // ── 5. Alerta de setor ──────────────────────────────────────────────────────

@@ -211,9 +211,13 @@ Cobertura: `scripts/verify-escala-5x2.mjs`, `scripts/verify-escala-editar-salvar
 
 Vigente desde 2026-11-17, a pedido do usuário.
 
-- Cadastro: campo **"2ª folga semanal (5x2)"** (seg a sáb). A escala lança
+- Cadastro: campo **"2ª folga semanal (5x2)"** (seg a dom). A escala lança
   FOLGA nesse dia **só nas semanas (seg→dom) sem domingo de folga** — nas
-  semanas com domingo de folga, o domingo já é a 2ª folga.
+  semanas com domingo de folga, o domingo já é a 2ª folga. **2ª folga
+  "Domingo" = todos os domingos (DOM)**; com folga fixa no sábado forma o fim
+  de semana (caso Jéssica) e é a preferida pela sugestão; para os demais o
+  domingo é candidato comum (sem a penalidade de sexta/sábado), sempre ≤ 2 por
+  setor.
 - **Nunca retroativo:** guardado em `secondFixedDayHistory` [{day, from,
   extraSundays}], vale a partir da próxima segunda-feira (nunca antes de
   21/12/2026). `extraSundays` = domingos de folga ADICIONAIS (2º domingo do

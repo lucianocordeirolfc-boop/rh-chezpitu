@@ -159,11 +159,15 @@
   //    domingo cobre a 5x2 daquela semana; sugere o domingo "par" (1↔3, 2↔4);
   //  - quem não tem nenhum domingo de folga (e não folga fixa no domingo)
   //    recebe 1 domingo por mês (Lei 10.101/2000, art. 6º);
-  //  - a 2ª folga vale só nas semanas sem domingo de folga.
+  //  - a 2ª folga vale só nas semanas sem domingo de folga — exceto 2ª folga
+  //    no DOMINGO, que vale todo domingo (ex.: folga fixa no sábado + domingo =
+  //    fim de semana inteiro, caso da Jéssica). Para folga fixa no sábado o
+  //    domingo é o preferido (fim de semana); para os demais o domingo é
+  //    candidato comum, sem a penalidade de sexta/sábado.
   // Avalia semana a semana num horizonte de 52 semanas a partir de 21/12/2026.
   const MAX_OFF_PER_DAY = 2;
   const WEEKDAY_NAMES = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-  const SECOND_CANDIDATES = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  const SECOND_CANDIDATES = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
   const FRI_SAT = new Set(["Sexta-feira", "Sábado"]);
 
   function nthSunday(iso) {
@@ -231,9 +235,10 @@
     const load = {};
     WEEKDAY_NAMES.forEach((day) => (load[day] = 0));
     rows.forEach((row) => {
-      if (row.fixedDay && load[row.fixedDay] !== undefined) load[row.fixedDay] += 1;
-      if (row.fixedDay !== "Domingo" && hasDom(row, week)) load.Domingo += 1;
-      if (row.secondDay && !hasDom(row, week)) load[row.secondDay] += 1;
+      const sundayOff = row.fixedDay === "Domingo" || hasDom(row, week) || row.secondDay === "Domingo";
+      if (row.fixedDay && row.fixedDay !== "Domingo" && load[row.fixedDay] !== undefined) load[row.fixedDay] += 1;
+      if (sundayOff) load.Domingo += 1;
+      if (row.secondDay && row.secondDay !== "Domingo" && !hasDom(row, week)) load[row.secondDay] += 1;
     });
     return load;
   }
@@ -259,6 +264,7 @@
       secondDay: String(employee.lockedSecond || "").trim(),
       locked: Boolean(employee.lockedSecond),
       sundayAdded: [],
+      originalSundays: null,
       overLimit: false,
       activeWeeks: 0
     }));
@@ -271,6 +277,9 @@
 
     const sectors = {};
     bySector.forEach((list, sector) => {
+      list.forEach((row) => {
+        row.originalSundays = [...row.sundayWeeks];
+      });
       suggestSundays(list);
       list.forEach((row) => {
         row.activeWeeks = weeks.filter((week) => !hasDom(row, week)).length;
@@ -288,7 +297,11 @@
             max = Math.max(max, value);
             total += value;
           });
-          return { day, cost: [max > MAX_OFF_PER_DAY ? 1 : 0, FRI_SAT.has(day) ? 1 : 0, max, total, SECOND_CANDIDATES.indexOf(day)] };
+          const weekendPair = row.fixedDay === "Sábado" && day === "Domingo" ? 0 : 1;
+          return {
+            day,
+            cost: [max > MAX_OFF_PER_DAY ? 1 : 0, FRI_SAT.has(day) ? 1 : 0, max, weekendPair, total, SECOND_CANDIDATES.indexOf(day)]
+          };
         });
         scored.sort((a, b) => {
           for (let i = 0; i < a.cost.length; i += 1) if (a.cost[i] !== b.cost[i]) return a.cost[i] - b.cost[i];
@@ -296,6 +309,16 @@
         });
         row.secondDay = scored[0].day;
         row.overLimit = scored[0].cost[0] === 1;
+      });
+      // 2ª folga no domingo = todo domingo: domingo "adicional" fica redundante.
+      list.forEach((row) => {
+        if (row.secondDay === "Domingo") {
+          row.sundayWeeks = [...row.originalSundays];
+          row.sundayAdded = [];
+          row.activeWeeks = weeks.length;
+        } else {
+          row.activeWeeks = weeks.filter((week) => !hasDom(row, week)).length;
+        }
       });
 
       let maxPerDay = 0;

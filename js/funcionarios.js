@@ -82,12 +82,17 @@
     return window.App?.escapeHTML(value) || String(value ?? "");
   }
 
-  // 2ª folga semanal (5x2): segunda a sábado (domingo é coberto pelos domingos de folga).
-  const SECOND_DAY_OPTIONS = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  // 2ª folga semanal (5x2). "Domingo" = folga em TODOS os domingos (ex.: folga
+  // fixa no sábado + domingo = fim de semana inteiro).
+  const SECOND_DAY_OPTIONS = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
 
   function secondDayOptions(selected) {
     return [`<option value="" ${!selected ? "selected" : ""}>— Sem 2ª folga —</option>`]
-      .concat(SECOND_DAY_OPTIONS.map((day) => `<option value="${day}" ${day === selected ? "selected" : ""}>${day}</option>`))
+      .concat(
+        SECOND_DAY_OPTIONS.map(
+          (day) => `<option value="${day}" ${day === selected ? "selected" : ""}>${day === "Domingo" ? "Domingo (todos)" : day}</option>`
+        )
+      )
       .join("");
   }
 
@@ -647,7 +652,7 @@
       <div class="func-form-row cols-3">
         <label>2ª folga semanal (5x2)
           <select name="secondFixedDay" id="secondFixedDaySelect">${secondDayOptions("")}</select>
-          <small class="help-text compact-help" id="secondFixedDayHint">Lançada pela escala nas semanas sem domingo de folga, a partir de ${esc(AppData.formatDateBR(AppData.nextSecondFolgaStart ? AppData.nextSecondFolgaStart() : "2026-12-21"))}. Use "Sugerir 2ª folga (5x2)" na lista.</small>
+          <small class="help-text compact-help" id="secondFixedDayHint">Lançada pela escala nas semanas sem domingo de folga ("Domingo" = todos os domingos), a partir de ${esc(AppData.formatDateBR(AppData.nextSecondFolgaStart ? AppData.nextSecondFolgaStart() : "2026-12-21"))}. Use "Sugerir 2ª folga (5x2)" na lista.</small>
         </label>
       </div>
       <div class="func-form-row cols-vt">
@@ -1270,6 +1275,8 @@
           const notes = [];
           if (row.overLimit) notes.push(`<span class="sf-warn">acima de 2 no setor</span>`);
           if (["Sexta-feira", "Sábado"].includes(row.secondDay)) notes.push(`<span class="sf-info">sexta/sábado</span>`);
+          if (row.secondDay === "Domingo" && fixed === "Sábado") notes.push(`<span class="sf-info">fim de semana (sáb + dom)</span>`);
+          else if (row.secondDay === "Domingo") notes.push(`<span class="sf-info">todos os domingos</span>`);
           if (row.sundayAdded.length && !doubles.get(employee.id)) notes.push(`<span class="sf-info">domingo incluído (Lei 10.101)</span>`);
           if (row.sundayAdded.length && doubles.get(employee.id)) notes.push(`<span class="sf-info">2º domingo quinzenal (CLT 386)</span>`);
           return `
@@ -1278,7 +1285,11 @@
               <td>${esc(employee.department || "—")}</td>
               <td>${esc(shortDay(fixed))}</td>
               <td class="sf-center"><input type="checkbox" data-sf-double="${esc(employee.id)}" ${doubles.get(employee.id) ? "checked" : ""} aria-label="Regime feminino (2 domingos) — ${esc(employee.name)}"></td>
-              <td>${base.length ? base.map((n) => `${n}º`).join(", ") : "—"}${extra.length ? ` <strong class="sf-add">+ ${extra.map((n) => `${n}º`).join(", ")}</strong>` : ""}</td>
+              <td>${
+                row.secondDay === "Domingo"
+                  ? `<strong class="sf-add">todos</strong>`
+                  : `${base.length ? base.map((n) => `${n}º`).join(", ") : "—"}${extra.length ? ` <strong class="sf-add">+ ${extra.map((n) => `${n}º`).join(", ")}</strong>` : ""}`
+              }</td>
               <td><select data-sf-second="${esc(employee.id)}" class="field-select">${secondDayOptions(row.secondDay)}</select></td>
               <td>${notes.join(" ") || "ok"}</td>
             </tr>`;
@@ -1309,7 +1320,8 @@
         </div>
         <p class="help-text compact-help">
           Regras: no máximo 2 do mesmo setor de folga no dia; sexta e sábado só quando não houver outro jeito;
-          a 2ª folga vale nas semanas <strong>sem</strong> domingo de folga. Regime feminino = 2 domingos quinzenais
+          a 2ª folga vale nas semanas <strong>sem</strong> domingo de folga — 2ª folga no <strong>domingo</strong> vale todos os
+          domingos (com folga fixa no sábado, forma o fim de semana). Regime feminino = 2 domingos quinzenais
           (1º+3º ou 2º+4º, CLT art. 386). Quem não tem domingo de folga recebe 1 (Lei 10.101/2000, art. 6º).
           Tudo vale a partir de <strong>${esc(AppData.formatDateBR(start))}</strong> — semanas passadas não mudam.
           Marque o regime feminino e ajuste a 2ª folga se quiser; a sugestão se recalcula.
