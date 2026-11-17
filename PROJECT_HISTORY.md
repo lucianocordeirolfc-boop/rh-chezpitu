@@ -35,6 +35,9 @@ sem campo de sexo no cadastro), excesso só alerta, domingo para o Charles.
   `npm test` 47/47; `npm run validate` 31/31.
 - **Dados de produção:** nenhum alterado — a aplicação é feita pelo usuário no
   quadro de sugestão.
+- **Publicação:** versão `20261117.06`, commit `e0cb49c` (feat) + carimbo;
+  deploy no Firebase Hosting e push para `origin/main` autorizados pelo usuário
+  em 2026-11-17. Aguardando aplicação pelo usuário (quadro de sugestão) e teste.
 
 ## 2026-11-17 (3) — CRÍTICO: AppData.state desatualizado após sincronização + correções de dados
 
