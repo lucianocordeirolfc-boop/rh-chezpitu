@@ -17,7 +17,8 @@ quando não há inativos. Dica ao passar o mouse mantida.
 - `js/cargos.js`: `inactiveNoteHTML`.
 - `scripts/verify-cargos-vagas-ui.mjs` [10]: +4 testes — 90/90.
 - `npm test` 47/47, `npm run validate` 36/36. Captura conferida.
-- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. **Publicação:** versão `20261122.12`,
+  commit `cb96254` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (17) — Cargos e Salários sem botão Lixeira
 

@@ -8,12 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261122.11` (exibida como `v2026.11.22.11`) — fonte: `js/version.js`
+- **Versão atual:** `20261122.12` (exibida como `v2026.11.22.12`) — fonte: `js/version.js`
 - **Branch atual:** `main` — sincronizado com `origin/main`
-- **Último commit de código:** `4e8ab16` — feat(cargos): tela sem botão Lixeira;
-  função excluída sai da lista (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.11`. `.01` a `.10` aprovadas;
-  `.11` (Cargos sem botão Lixeira) aguardando conferência do usuário.
+- **Último commit de código:** `cb96254` — feat(cargos): coluna de ativos com
+  "+N inativo(s)" (+ carimbo)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.12`. `.01` a `.10` aprovadas;
+  `.11` (sem botão Lixeira) e `.12` (+N inativos) aguardando conferência.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.09`)
 
@@ -35,6 +35,7 @@
   Frigobar; explicações de Bar/Ocupação/PL Anual copiadas para a Pengold.
 - `20261122.11` (4e8ab16): tela de Cargos sem botão Lixeira; função excluída
   sai da lista (cópia segue arquivada internamente).
+- `20261122.12` (cb96254): coluna de ativos mostra "+N inativo(s)".
 - validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22 (1)–(5).
 - **Pendente do usuário (dados, pela tela):** em cada empresa, Cargos e
   Salários → "Padronizar e importar do cadastro" → conferir grafias → preencher

@@ -9,15 +9,15 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261122.11 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
+**Versão:** 20261122.12 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
 **Data:** 2026-11-22
-**Status:** ✅ Publicado em Produção (Firebase Hosting) — `.01`–`.10` aprovadas; `.11` aguardando conferência do usuário
+**Status:** ✅ Publicado em Produção (Firebase Hosting) — `.01`–`.10` aprovadas; `.11` e `.12` aguardando conferência do usuário
 
 ## Último Deploy
 
 Data: 22/11/2026
-Versões: 20261122.01 → 20261122.11 (Firebase Hosting — chez-pitu-rh), commits
-`e130610`, `66ad6d2`, `4c53b99`, `1835bde`, `b778722`, `9b8b227`, `e32222f`, `174d51f`, `304c12b`, `519785a`, `4e8ab16` (+ carimbos),
+Versões: 20261122.01 → 20261122.12 (Firebase Hosting — chez-pitu-rh), commits
+`e130610`, `66ad6d2`, `4c53b99`, `1835bde`, `b778722`, `9b8b227`, `e32222f`, `174d51f`, `304c12b`, `519785a`, `4e8ab16`, `cb96254` (+ carimbos),
 push em `origin/main`.
 
 - Nova aba **Cargos e Salários** (por empresa): função, CBO, salário,

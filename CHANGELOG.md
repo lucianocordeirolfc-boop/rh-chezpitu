@@ -1,3 +1,8 @@
+2026-11-22 (10) - Cargos: coluna de ativos com +N inativo(s) (20261122.12)
+- [AJUSTE] Abaixo do numero de ativos aparece "+1 inativo" / "+N inativos" (antes "N no total"); nada quando nao ha inativos
+- Arquivos: js/cargos.js, scripts/verify-cargos-vagas-ui.mjs
+- verify-cargos-vagas-ui 90/90; npm test 47/47; npm run validate 36/36
+
 2026-11-22 (9) - Cargos e Salarios sem botao Lixeira (20261122.11)
 - [AJUSTE] Tela de Cargos sem o botao Lixeira; funcao excluida sai da lista na hora, confirmacao e aviso sem mencionar Lixeira. Copia continua guardada internamente (regra fixa)
 - Arquivos: js/cargos.js, js/manual.js, scripts/verify-cargos-vagas-ui.mjs
