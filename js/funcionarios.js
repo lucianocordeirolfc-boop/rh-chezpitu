@@ -520,7 +520,27 @@
     );
   }
 
+  /**
+   * Funções de Cargos e Salários da empresa da aba ativa (2026-11-22). Com o
+   * catálogo preenchido, o Cargo do funcionário só sai dele e herda salário e
+   * CBO (somente leitura aqui). Catálogo vazio = comportamento anterior.
+   */
+  function catalogCargos() {
+    try {
+      return window.RhCatalog ? window.RhCatalog.listCargos(AppData.getActiveCompany()) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   function roleSelectOptions(allEmployees) {
+    const cargos = catalogCargos();
+    if (cargos.length) {
+      return (
+        `<option value="">— Selecionar função —</option>` +
+        cargos.map((c) => `<option value="${esc(c.name)}" data-cargo-id="${esc(c.id)}">${esc(c.name)}</option>`).join("")
+      );
+    }
     const roles = uniqueSorted(allEmployees.map((e) => String(e.role || "").trim()));
     return (
       `<option value="">— Selecionar cargo —</option>` +
@@ -624,6 +644,8 @@
             ${roleSelectOptions(allEmployees)}
           </select>
           <input id="newRoleInput" class="func-dept-new-input" placeholder="Nome do novo cargo" style="display:none" autocomplete="off">
+          <input type="hidden" name="roleId" id="roleIdHidden">
+          ${catalogCargos().length ? "" : `<small class="help-text compact-help">Cadastre as funções em Cargos e Salários para vincular salário e CBO.</small>`}
         </label>
         <label class="func-dept-label">Setor
           <select id="departmentSelect" name="department" required>
@@ -633,6 +655,12 @@
         </label>
         <label>Status<select name="status">${statusOptions("Ativo")}</select></label>
       </div>
+      ${catalogCargos().length ? `
+      <div class="func-form-row cols-3 role-catalog-row" id="roleCatalogRow">
+        <label>CBO<input id="roleCboDisplay" readonly tabindex="-1" class="func-readonly-input" placeholder="—" title="Definido em Cargos e Salários"></label>
+        <label>Salário<input id="roleSalaryDisplay" readonly tabindex="-1" class="func-readonly-input" placeholder="—" title="Definido em Cargos e Salários"></label>
+        <small id="roleCatalogHint" class="help-text compact-help role-catalog-hint">Salário e CBO vêm da função em Cargos e Salários e não podem ser alterados aqui.</small>
+      </div>` : ""}
       <div class="func-form-row cols-3">
         <label>Admissão<input type="date" name="admissionDate" required value="${AppData.todayISO()}"></label>
         <label>Folga fixa
@@ -692,8 +720,12 @@
 
     const roleSelect = form.querySelector("#roleSelect");
     const newRoleInput = form.querySelector("#newRoleInput");
-    if (roleSelect) roleSelect.value = "";
+    if (roleSelect) {
+      roleSelect.querySelectorAll("option[data-legacy-role]").forEach((o) => o.remove());
+      roleSelect.value = "";
+    }
     if (newRoleInput) { newRoleInput.style.display = "none"; newRoleInput.value = ""; }
+    syncRoleCatalogInfo(form);
 
     form.querySelectorAll(".sunday-off-check").forEach((cb) => { cb.checked = false; });
     const doubleCheck = form.querySelector(".double-sunday-check");
@@ -714,7 +746,7 @@
     if (companyField) companyField.value = company;
 
     Object.entries(employee).forEach(([key, value]) => {
-      if (["role", "department", "sundayOffWeeks", "doubleSundayOff", "fixedDayHistory"].includes(key)) return;
+      if (["role", "roleId", "department", "sundayOffWeeks", "doubleSundayOff", "fixedDayHistory"].includes(key)) return;
       const field = form.elements[key];
       if (!field) return;
       field.value = key === "vtDaily" ? AppData.formatVtInput(value) : value ?? "";
@@ -797,7 +829,26 @@
     // Cargo fora da lista nunca se perde: abre em "novo cargo" com o valor salvo.
     const roleSelect = form.querySelector("#roleSelect");
     const newRoleInput = form.querySelector("#newRoleInput");
-    if (roleSelect) {
+    if (roleSelect && catalogCargos().length) {
+      // Catálogo: seleciona a função vinculada (roleId) ou, no legado, pelo nome.
+      roleSelect.querySelectorAll("option[data-legacy-role]").forEach((o) => o.remove());
+      const cargo = window.RhCatalog.resolveEmployeeCargo(employee, company || AppData.getActiveCompany());
+      const role = String(employee.role || "").trim();
+      if (cargo) {
+        roleSelect.value = cargo.name;
+      } else if (role) {
+        // Cargo fora do catálogo nunca se perde: fica selecionado, sinalizado.
+        const legacy = document.createElement("option");
+        legacy.value = role;
+        legacy.dataset.legacyRole = "1";
+        legacy.textContent = `${role} (não cadastrada em Cargos e Salários)`;
+        roleSelect.appendChild(legacy);
+        roleSelect.value = role;
+      } else {
+        roleSelect.value = "";
+      }
+      syncRoleCatalogInfo(form);
+    } else if (roleSelect) {
       const role = String(employee.role || "").trim();
       const optionExists = [...roleSelect.options].some((o) => o.value === role && o.value !== NEW_ROLE_VALUE);
       roleSelect.value = !role || optionExists ? role : NEW_ROLE_VALUE;
@@ -828,6 +879,29 @@
     if (secondSelect) secondSelect.value = AppData.getSecondFixedDay ? AppData.getSecondFixedDay(employee) : "";
   }
 
+  /** Mostra CBO/salário da função escolhida (somente leitura) e grava o roleId. */
+  function syncRoleCatalogInfo(form) {
+    const roleSelect = form.querySelector("#roleSelect");
+    const hidden = form.querySelector("#roleIdHidden");
+    const option = roleSelect?.selectedOptions?.[0];
+    const cargoId = option?.dataset?.cargoId || "";
+    if (hidden) hidden.value = cargoId;
+    const cboEl = form.querySelector("#roleCboDisplay");
+    const salaryEl = form.querySelector("#roleSalaryDisplay");
+    const hint = form.querySelector("#roleCatalogHint");
+    if (!cboEl || !salaryEl || !window.RhCatalog) return;
+    const cargo = cargoId ? window.RhCatalog.getCargo(AppData.getActiveCompany(), cargoId) : null;
+    cboEl.value = cargo ? cargo.cbo || "a definir" : "";
+    salaryEl.value = cargo ? (cargo.salary != null ? window.RhCatalog.formatMoney(cargo.salary) : "a definir") : "";
+    if (hint) {
+      const legacy = option?.dataset?.legacyRole;
+      hint.classList.toggle("role-catalog-warn", Boolean(legacy));
+      hint.textContent = legacy
+        ? "Este cargo não está em Cargos e Salários: escolha uma função da lista para vincular salário e CBO."
+        : "Salário e CBO vêm da função em Cargos e Salários e não podem ser alterados aqui.";
+    }
+  }
+
   function bindEmployeeForm(form, pageContainer) {
     const shiftSelect = form.querySelector("#shiftSelect");
     const newShiftInput = form.querySelector("#newShiftInput");
@@ -856,6 +930,7 @@
     const roleSelect = form.querySelector("#roleSelect");
     const newRoleInput = form.querySelector("#newRoleInput");
     roleSelect?.addEventListener("change", () => {
+      syncRoleCatalogInfo(form);
       if (roleSelect.value === NEW_ROLE_VALUE) {
         newRoleInput.style.display = "";
         newRoleInput.focus();
@@ -885,6 +960,12 @@
         return;
       }
 
+      if (catalogCargos().length) {
+        // Vínculo pela função do catálogo; salário/CBO nunca vão no payload.
+        payload.roleId = roleSelect?.selectedOptions?.[0]?.dataset?.cargoId || "";
+      } else {
+        delete payload.roleId; // sem catálogo: preserva o vínculo existente
+      }
       if (payload.role === NEW_ROLE_VALUE) {
         const newRole = resolveNewRole(roleSelect, newRoleInput?.value);
         if (!newRole) {
@@ -1159,8 +1240,19 @@
     { header: "Observações", width: 40 },
     { header: "Cadastrado em", width: 17 },
     { header: "Atualizado em", width: 17 },
-    { header: "2ª folga (5x2)", width: 16 }
+    { header: "2ª folga (5x2)", width: 16 },
+    { header: "CBO", width: 10 },
+    { header: "Salário (Cargos e Salários)", width: 16 }
   ];
+
+  /** CBO e salário vêm SEMPRE da função em Cargos e Salários. */
+  function exportCargo(employee, company) {
+    try {
+      return window.RhCatalog?.resolveEmployeeCargo(employee, company) || null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   function exportSundayWeeks(value) {
     const weeks = String(value || "")
@@ -1214,7 +1306,11 @@
         employee.notes || "",
         { type: "datetime", value: employee.createdAt },
         { type: "datetime", value: employee.updatedAt },
-        AppData.getSecondFixedDay?.(employee) || ""
+        AppData.getSecondFixedDay?.(employee) || "",
+        exportCargo(employee, company)?.cbo ? { type: "text", value: exportCargo(employee, company).cbo } : null,
+        exportCargo(employee, company)?.salary != null
+          ? { type: "currency", value: exportCargo(employee, company).salary }
+          : null
       ];
     });
 

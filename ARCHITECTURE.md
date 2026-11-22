@@ -11,6 +11,20 @@ desvio do servidor (ver js/firebase-sync.js). Todo carimbo de versão
 - applyManualScaleBatch: gravação do "Salvar escala" (mesma regra de
   setManualScale por item; recalcula e salva uma vez).
 
+js/rh-catalog.js
+Regras de Cargos e Salários e Quadro de Vagas (sem DOM): funções (nome e CBO
+únicos por empresa, histórico de salário), comissões, padronização de grafia
+dos cargos do cadastro, vagas/candidatos/admissões e indicadores do Painel RH.
+
+js/cargos.js
+Tela Cargos e Salários (sub-abas Funções e Salários / Comissões).
+
+js/quadro-vagas.js
+Tela Quadro de Vagas (sub-abas Vagas em aberto / Painel RH / Recrutamento e
+Seleção / Admissões).
+- Dados por empresa em state.companies[empresa].{cargos, comissoes, vagas,
+  candidatos, admissoes}; no Firebase aninhados em ferias/{empresa}.__rh.
+
 js/escala.js
 Escala de Folga
 - Somente-leitura até "Editar escala"; alterações em rascunho (scaleState.draft)

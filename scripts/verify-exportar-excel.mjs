@@ -191,7 +191,7 @@ try {
   }
   const sheetXml = files["xl/worksheets/sheet1.xml"].text;
   assert(/<sheet name="Funcionários Chez Pitu"/.test(files["xl/workbook.xml"].text), "aba nomeada com a empresa");
-  assert(/state="frozen"/.test(sheetXml) && /<autoFilter ref="A1:X4"\/>/.test(sheetXml), "cabeçalho congelado e autofiltro A1:X4");
+  assert(/state="frozen"/.test(sheetXml) && /<autoFilter ref="A1:Z4"\/>/.test(sheetXml), "cabeçalho congelado e autofiltro A1:Z4 (com CBO e salário)");
 
   console.log("[3] Conteúdo linear: 1 cabeçalho + 1 linha por funcionário");
   const cells = parseCells(sheetXml);
@@ -199,6 +199,8 @@ try {
   assert(rowCount === 4, `4 linhas = cabeçalho + 3 funcionários, inclusive o inativo e apesar do filtro (${rowCount})`);
   assert(cells.A1.v === "Empresa" && cells.E1.v === "Nome" && cells.W1.v === "Atualizado em", "cabeçalhos A..W");
   assert(cells.X1.v === "2ª folga (5x2)", "coluna X: 2ª folga (5x2) — acrescentada no fim, sem mover as demais");
+  assert(cells.Y1.v === "CBO" && cells.Z1.v === "Salário (Cargos e Salários)", "colunas Y/Z: CBO e salário da função — no fim, sem mover as demais");
+  assert(!cells.Y2 && !cells.Z2, "sem Cargos e Salários carregado, CBO/salário ficam em branco (nada inventado)");
   assert(cells.E2.v === "Ana Fixture" && cells.E3.v === "Bia Fixture" && cells.E4.v === "Caio Fixture", "ordem alfabética por nome");
   assert(!Object.values(cells).some((c) => c.v === "Eva Pengold"), "não mistura funcionário de outra empresa");
 

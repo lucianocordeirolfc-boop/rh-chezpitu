@@ -1,0 +1,283 @@
+/* Cargos e Salários + Quadro de Vagas (2026-11-22) — padrão navy + pêssego. */
+
+.rh-page {
+  display: grid;
+  gap: 16px;
+}
+
+.rh-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.rh-table td,
+.rh-table th {
+  vertical-align: top;
+}
+
+.rh-table td small.help-text {
+  display: block;
+  margin-top: 2px;
+}
+
+.rh-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rh-notes {
+  max-width: 320px;
+  white-space: pre-line;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.rh-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.rh-pill {
+  padding: 3px 9px;
+  font-size: 11px;
+  margin: 1px 0;
+}
+
+.danger-link {
+  color: var(--danger) !important;
+}
+
+.stat-chip.warn strong {
+  color: #c2410c;
+}
+
+/* Pop-ups */
+.rh-popup {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.rh-popup-wide {
+  width: min(980px, calc(100vw - 32px));
+}
+
+.rh-std-wrap {
+  max-height: 55vh;
+  overflow: auto;
+}
+
+.rh-std-input {
+  width: 100%;
+  min-width: 220px;
+}
+
+.rh-std-input[readonly] {
+  background: var(--sea-100);
+}
+
+.rh-history {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--sea-100);
+}
+
+.rh-history ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+}
+
+/* Lista suspensa de comissões (múltipla escolha) */
+.rh-dropdown {
+  position: relative;
+  margin-top: 4px;
+}
+
+.rh-dropdown > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 600;
+}
+
+.rh-dropdown > summary::after {
+  content: "▾";
+  float: right;
+  color: var(--muted);
+}
+
+.rh-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rh-dropdown-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.rh-check,
+.rh-inline-check {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.rh-check input,
+.rh-inline-check input {
+  width: auto !important;
+  margin: 0;
+}
+
+.rh-form-check {
+  align-self: end;
+  padding-bottom: 10px;
+}
+
+/* Comissões */
+.rh-commission-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rh-commission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.rh-commission-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-top: 4px solid var(--gold);
+}
+
+.rh-commission-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rh-commission-head h3 {
+  margin: 0;
+  color: var(--sea-800);
+}
+
+.rh-commission-label {
+  display: grid;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.rh-commission-label textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.rh-commission-foot button {
+  white-space: nowrap;
+}
+
+.rh-commission-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Painel RH */
+.rh-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.rh-kpi {
+  padding: 14px 16px;
+  border: 1px solid rgba(208, 218, 242, 0.9);
+  border-left: 4px solid var(--gold);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.rh-kpi span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.rh-kpi strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--sea-800);
+  font-size: 28px;
+}
+
+.rh-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+/* Tabelas-resumo do painel cabem no card (a regra global de table usa 760px). */
+.rh-panel-grid table {
+  min-width: 0;
+  width: 100%;
+}
+
+.rh-instructions ol {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+/* Cadastro de Funcionários — CBO/salário herdados (somente leitura) */
+.func-readonly-input {
+  background: var(--sea-100) !important;
+  color: var(--sea-800);
+  font-weight: 700;
+  cursor: not-allowed;
+}
+
+.role-catalog-hint {
+  align-self: end;
+}
+
+.role-catalog-warn {
+  color: #c2410c !important;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .rh-dropdown-menu {
+    grid-template-columns: 1fr;
+  }
+  .rh-commission-toolbar,
+  .rh-commission-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

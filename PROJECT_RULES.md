@@ -152,6 +152,10 @@ employeeId é o vínculo principal do sistema.
 
 ### Cargo em lista suspensa
 
+> Desde 2026-11-22, com a empresa já tendo funções em **Cargos e Salários**, a
+> lista vem SÓ do catálogo da empresa — ver "Cargos e Salários (REGRA FIXA)".
+> O comportamento abaixo vale apenas para empresa com catálogo vazio.
+
 No pop-up de funcionário, Cargo é lista suspensa montada a partir dos cargos já
 cadastrados (todas as empresas, inclusive inativos), mais "➕ Cadastrar novo
 cargo". Cargo novo digitado com a grafia de um existente (caixa, acento, espaços)
@@ -159,6 +163,63 @@ assume o da lista (`resolveNewRole`, js/funcionarios.js). Não existe cadastro
 separado de cargos e nada é migrado: cargo já salvo continua como está, e só muda
 por edição do usuário. Importação CSV/JSON mantém o texto do arquivo. Cobertura:
 `scripts/verify-cargo-lista-suspensa.mjs`.
+
+### Cargos e Salários (REGRA FIXA)
+
+Vigente desde 2026-11-22, a pedido do usuário. Aba própria, separada por
+empresa (aba superior). Regras em `js/rh-catalog.js` (fonte única; a checagem
+de conflito é `AppData.findCargoConflict`, usada também pela Lixeira).
+
+1. **Uma função = um salário.** Nome da função único por empresa (caixa,
+   acento e espaços não contam). Não existe a mesma função com dois salários.
+2. **Um CBO = uma função.** CBO (6 dígitos, `0000-00`) não se repete entre
+   funções da mesma empresa. **Exceção (2026-11-22, pedido do usuário) —
+   função igualitária:** níveis da mesma função dividem o CBO — mesmo
+   nome-base com nível no fim (I…X, 1…99, Júnior/Jr, Pleno, Sênior/Sr), ex.:
+   Cozinheiro I e Cozinheiro II (`AppData.cargoFamilyKey`). Cada nível segue
+   com nome e salário próprios. Variação de gênero (Cozinheira × Cozinheiro)
+   NÃO é nível. CBO e salário podem ficar "a definir".
+3. **Salário e CBO nunca são gravados nem editados pelo Cadastro de
+   Funcionários.** O funcionário guarda `roleId` (vínculo) + `role` (nome);
+   salário/CBO são lidos da função (`RhCatalog.resolveEmployeeCargo`; legado
+   sem `roleId` resolve pelo nome normalizado). No pop-up aparecem somente
+   leitura, sem `name` (não vão no payload); `upsertEmployee` ignora
+   `salary`/`cbo`.
+4. **Cargo legado fora do catálogo não se perde:** fica selecionado com aviso;
+   salvar outros campos o preserva.
+5. **Padronização de grafia** ("Padronizar e importar do cadastro"): plano só
+   leitura (`buildRoleStandardizationPlan`), nomes editáveis, aplicação só após
+   confirmação que lista cada grafia alterada (`applyRoleStandardization`).
+   A grafia anterior vai para `employee.roleHistory` — nada é apagado. Renomear
+   função também atualiza os vinculados com `roleHistory`.
+6. **Salário tem histórico** (`cargo.salaryHistory`).
+7. **Excluir função** só sem funcionário vinculado (ativo ou inativo) e sem vaga
+   em andamento; arquiva na Lixeira (`cargo`) + tombstone. Restaurar recusa se
+   o nome/CBO já tiver sido usado por outra função.
+8. **Comissões:** 6 padrão por empresa (Taxa de Serviço Bar, Taxa de Serviço
+   Frigobar, Comissão Ocupação, Walk-in, Extensão de Diária, PL Anual — grafia
+   corrigida de "Fribogar"/"Extenção") + criadas pelo usuário; explicação
+   editável. Só o que o usuário edita é gravado (`comissoes`).
+
+Cobertura: `scripts/verify-cargos-salarios.mjs`, `scripts/verify-cargos-vagas-ui.mjs`.
+
+### Quadro de Vagas
+
+Vigente desde 2026-11-22. Aba própria por empresa, baseada na planilha
+"Controle de Vagas" do RH; guias viraram sub-abas: Vagas em aberto (função de
+Cargos e Salários), Painel RH (calculado, nunca grava), Recrutamento e Seleção
+(candidatos) e Admissões ("Iniciou" = admitido da vaga). Exclusões (vaga,
+candidato, admissão) vão para a Lixeira + tombstone. Dados pessoais de
+candidato: só o necessário (LGPD). Cobertura: `scripts/verify-quadro-vagas.mjs`,
+`scripts/verify-cargos-vagas-ui.mjs`.
+
+### Transporte de Cargos/Vagas no Firebase
+
+Coleções por empresa `cargos`, `comissoes`, `vagas`, `candidatos`,
+`admissoes` (merge por id, newer-wins; tombstones por id). No RTDB trafegam
+**aninhadas** em `ferias/{empresa}.__rh` — sem nó novo de topo (mesmo motivo
+de "Transporte dos tombstones"). Remoto sem `__rh` (versão antiga) não apaga
+o local: o merge é união.
 
 ### Exportar Excel
 

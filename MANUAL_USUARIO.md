@@ -44,6 +44,8 @@ Logo abaixo das abas, use o menu horizontal para navegar:
 |---|---|
 | **Dashboard** | Visão geral: total de funcionários, pendências e alertas. |
 | **Cadastro de Funcionários** | Incluir, editar e consultar funcionários. |
+| **Cargos e Salários** | Funções da empresa com salário, CBO e comissões. |
+| **Quadro de Vagas** | Vagas em aberto, painel, recrutamento e admissões. |
 | **Escala de Folga** | Montar a escala mensal de trabalho e folgas. |
 | **Ausências** | Registrar férias, atestados e faltas. |
 | **Recibo de Vale Transporte** | Gerar o recibo mensal de VT. |
@@ -63,9 +65,40 @@ O funcionário é cadastrado na **empresa da aba ativa**. O cadastro é a fonte 
 
 **Alterar folga não mexe no passado:** ao mudar a **folga fixa**, os **domingos de folga** ou a **2ª folga**, a mudança vale **a partir da data em que você salva**. Os dias anteriores (escala, VT e feriados) ficam exatamente como estavam.
 
-O **Cargo** é escolhido em lista suspensa, com os cargos já cadastrados. Se o cargo ainda não existir, use **➕ Cadastrar novo cargo**; se ele já existir com outra grafia (maiúsculas ou acentos), o sistema usa o da lista.
+O **Cargo** é escolhido em lista suspensa com as funções de **Cargos e Salários** da empresa. Ao escolher a função, o **CBO** e o **salário** aparecem preenchidos e **não podem ser alterados no cadastro** — mudam só em Cargos e Salários. Cargo antigo que ainda não está em Cargos e Salários continua salvo e aparece com o aviso "não cadastrada em Cargos e Salários". Enquanto a empresa não tiver nenhuma função cadastrada, vale a lista antiga com **➕ Cadastrar novo cargo**.
+
+A planilha do **Exportar Excel** ganhou no fim as colunas **CBO** e **Salário (Cargos e Salários)**.
 
 **Exportar Excel:** o botão **Exportar Excel**, na Lista de funcionários, baixa uma planilha `.xlsx` com **todos** os funcionários da empresa da aba ativa (ativos e inativos, sem considerar os filtros da tela). Cada linha é um funcionário e cada coluna um campo do cadastro: empresa, razão social, CNPJ, ID interno, nome, CPF, CTPS, cargo, setor, status, admissão, desligamento, folga fixa (vigente e agendada), horário, domingos de folga, VT diário, origem, observações e datas de cadastro/atualização. CPF e CTPS saem como texto (zeros à esquerda preservados); datas e VT saem como data e valor reais do Excel. A exportação apenas lê os dados — nada é alterado.
+
+---
+
+## 4.1 Cargos e Salários
+
+Cada empresa tem as suas funções. Duas sub-abas:
+
+- **Funções e Salários:** função, CBO (0000-00), salário e comissões.
+  - Uma função tem **um único salário**: não existem duas funções com o mesmo nome (maiúsculas, acentos e espaços não contam).
+  - Um **CBO** só pode estar em **uma** função da empresa — exceto **níveis da mesma função**, que podem dividir o CBO: Cozinheiro I e Cozinheiro II, Recepcionista Júnior e Recepcionista Sênior (nível no fim do nome: I, II, III…, 1, 2…, Júnior, Pleno, Sênior). Cada nível tem seu próprio salário.
+  - Toda mudança de salário fica no **histórico** da função.
+- **Comissões:** Taxa de Serviço Bar, Taxa de Serviço Frigobar, Comissão Ocupação, Walk-in, Extensão de Diária e PL Anual — cada uma com um campo para explicar como funciona. Em *Funções e Salários* você marca (lista suspensa) quais comissões cada função recebe. É possível criar comissões novas.
+
+**Padronizar e importar do cadastro:** traz os cargos já usados no Cadastro de Funcionários (ativos e inativos) com a grafia padrão sugerida — por exemplo "GARÇON" → "Garçom", "Enc. De Manutenção" → "Encarregado de Manutenção", "SUB GERENTE" → "Subgerente". Você pode ajustar cada nome (dois grupos com o mesmo nome viram uma só função). Nada é gravado antes da confirmação, que mostra cada grafia alterada. A grafia antiga fica guardada no histórico do funcionário. Depois, preencha CBO e salário em **Editar**.
+
+**Excluir função** só é possível sem funcionários vinculados (ativos ou inativos) e sem vaga em andamento; ela vai para a **Lixeira** e pode ser restaurada.
+
+## 4.2 Quadro de Vagas
+
+Separado por empresa (aba superior), baseado na planilha "Controle de Vagas" do RH. Quatro sub-abas:
+
+| Sub-aba | Conteúdo |
+|---|---|
+| **Vagas em aberto** | Função (de Cargos e Salários, com o CBO), setor, quantidade, contrato, motivo, data de abertura, prioridade e prazo, status, gestor solicitante e observações/próxima ação. Concluídas e canceladas ficam ocultas até marcar "Mostrar concluídas/canceladas". |
+| **Painel RH** | Indicadores calculados das tabelas: vagas cadastradas, em andamento, urgentes, concluídas, posições previstas e em aberto, candidatos em processo, admissões em andamento e admitidos; vagas por status e posições por setor. |
+| **Recrutamento e Seleção** | Candidatos por vaga: contato, situação, data, parecer, feedback enviado e observações. |
+| **Admissões** | Nome, função, prazo/data, situação (documentação, exame, ASO, contabilidade, iniciou) e observações. A admissão com situação **Iniciou** conta como admitido da vaga. |
+
+Exclusões vão para a **Lixeira** da tela e podem ser restauradas.
 
 ---
 

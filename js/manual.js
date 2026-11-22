@@ -37,6 +37,8 @@
       <tbody>
         <tr><td>Dashboard</td><td>Visão geral: total de funcionários, pendências e alertas.</td></tr>
         <tr><td>Cadastro de Funcionários</td><td>Incluir, editar e consultar funcionários.</td></tr>
+        <tr><td>Cargos e Salários</td><td>Funções da empresa com salário, CBO e comissões.</td></tr>
+        <tr><td>Quadro de Vagas</td><td>Vagas em aberto, painel, recrutamento e admissões.</td></tr>
         <tr><td>Escala de Folga</td><td>Montar a escala mensal de trabalho e folgas.</td></tr>
         <tr><td>Ausências</td><td>Registrar férias, atestados e faltas.</td></tr>
         <tr><td>Recibo de Vale Transporte</td><td>Gerar o recibo mensal de VT.</td></tr>
@@ -53,8 +55,20 @@
     </ol>
     <p>O funcionário é cadastrado na empresa da aba ativa. O cadastro é a fonte oficial de empresa, setor e cargo.</p>
     <p><strong>Alterar folga não mexe no passado:</strong> mudanças na folga fixa, nos domingos de folga ou na 2ª folga valem a partir da data em que você salva; os dias anteriores ficam como estavam.</p>
-    <p>O <strong>Cargo</strong> é escolhido em lista suspensa, com os cargos já cadastrados. Se o cargo ainda não existir, use <strong>➕ Cadastrar novo cargo</strong>; se ele já existir com outra grafia (maiúsculas ou acentos), o sistema usa o da lista.</p>
+    <p>O <strong>Cargo</strong> é escolhido em lista suspensa com as funções de <strong>Cargos e Salários</strong> da empresa. Ao escolher a função, o <strong>CBO</strong> e o <strong>salário</strong> aparecem preenchidos e não podem ser alterados no cadastro — mudam só em Cargos e Salários. Cargo antigo que ainda não está em Cargos e Salários continua salvo e aparece com o aviso "não cadastrada em Cargos e Salários". Enquanto a empresa não tiver nenhuma função cadastrada, vale a lista antiga com <strong>➕ Cadastrar novo cargo</strong>.</p>
     <p><strong>Exportar Excel:</strong> na Lista de funcionários, baixa uma planilha <code>.xlsx</code> com todos os funcionários da empresa da aba ativa (ativos e inativos, sem os filtros da tela) — uma linha por funcionário, uma coluna por campo do cadastro. CPF e CTPS saem como texto; datas e VT como data e valor reais. Só lê os dados, nada é alterado.</p>
+
+    <h3>4.1 Cargos e Salários</h3>
+    <p>Cada empresa tem as suas funções. Duas sub-abas:</p>
+    <ul>
+      <li><strong>Funções e Salários:</strong> função, CBO (0000-00), salário e comissões. Uma função tem um único salário (não existem duas funções com o mesmo nome, mesmo com maiúsculas/acentos diferentes) e um CBO só pode estar em uma função — exceto níveis da mesma função (ex.: Cozinheiro I e Cozinheiro II), que podem dividir o CBO, cada um com seu salário. Mudança de salário fica no histórico da função.</li>
+      <li><strong>Comissões:</strong> Taxa de Serviço Bar, Taxa de Serviço Frigobar, Comissão Ocupação, Walk-in, Extensão de Diária e PL Anual, cada uma com um campo para explicar como funciona. Em <em>Funções e Salários</em> você marca quais funções recebem cada comissão.</li>
+    </ul>
+    <p><strong>Padronizar e importar do cadastro:</strong> traz os cargos já usados no Cadastro de Funcionários com a grafia padrão sugerida (ex.: "GARÇON" → "Garçom", "Enc. De Manutenção" → "Encarregado de Manutenção"). Você pode ajustar cada nome; nada é gravado antes da confirmação. A grafia antiga fica guardada no histórico do funcionário. Depois, preencha CBO e salário em <strong>Editar</strong>.</p>
+    <p>Excluir função só é possível sem funcionários vinculados (ativos ou inativos) e sem vaga em andamento; a função vai para a <strong>Lixeira</strong>.</p>
+
+    <h3>4.2 Quadro de Vagas</h3>
+    <p>Separado por empresa, com quatro sub-abas: <strong>Vagas em aberto</strong> (função de Cargos e Salários, setor, quantidade, contrato, motivo, abertura, prioridade/prazo, status, gestor e observações), <strong>Painel RH</strong> (indicadores calculados), <strong>Recrutamento e Seleção</strong> (candidatos por vaga, situação, parecer e feedback) e <strong>Admissões</strong> (andamento de documentos, exame e início). A admissão com situação "Iniciou" conta como admitido da vaga. Exclusões vão para a <strong>Lixeira</strong>.</p>
 
     <h3>5. Escala de Folga</h3>
     <ol>

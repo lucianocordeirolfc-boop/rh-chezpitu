@@ -62,8 +62,17 @@
     ferias: "ausenciasEmpresaSelecionada",
     "vale-transporte": "vtEmpresaSelecionada",
     feriados: "feriadosEmpresaSelecionada",
-    contador: "contadorEmpresaSelecionada"
+    contador: "contadorEmpresaSelecionada",
+    cargos: "cargosEmpresaSelecionada",
+    "quadro-vagas": "quadroVagasEmpresaSelecionada"
   };
+
+  /**
+   * Cargos e Salários + Quadro de Vagas (2026-11-22). Coleções por empresa,
+   * registros com id/updatedAt: merge por id (newer-wins), exclusão com
+   * tombstone + Lixeira. Regras de negócio em js/rh-catalog.js.
+   */
+  const RH_COLLECTIONS = ["cargos", "comissoes", "vagas", "candidatos", "admissoes"];
 
   const PAGE_MODULE_IDS = Object.keys(PAGE_FILTER_KEYS);
 
@@ -633,7 +642,12 @@
       holidays: [],
       manualScale: {},
       manualScaleMeta: {},
-      contadorLancamentos: {}
+      contadorLancamentos: {},
+      cargos: [],
+      comissoes: [],
+      vagas: [],
+      candidatos: [],
+      admissoes: []
     };
   }
 
@@ -913,7 +927,7 @@
   // Cobre coleções por id (funcionários, férias, ausências). Feriados usam
   // soft-delete próprio (isDeleted) e propagam via newer-wins de mergeHolidayLists.
   // ─────────────────────────────────────────────────────────────────────────
-  const TOMBSTONE_COLLECTIONS = ["employees", "vacations", "absences"];
+  const TOMBSTONE_COLLECTIONS = ["employees", "vacations", "absences", ...RH_COLLECTIONS];
 
   function ensureTombstoneStore(targetState) {
     if (!targetState.tombstones || typeof targetState.tombstones !== "object") {
@@ -1272,7 +1286,19 @@
     feriado: "Feriado",
     funcionario: "Funcionário",
     ferias: "Férias",
-    ausencia: "Ausência"
+    ausencia: "Ausência",
+    cargo: "Função (Cargos e Salários)",
+    vaga: "Vaga (Quadro de Vagas)",
+    candidato: "Candidato (R&S)",
+    admissao: "Admissão"
+  };
+
+  /** Tipo da Lixeira → coleção do bloco da empresa (Cargos e Salários / Vagas). */
+  const RH_ARCHIVE_COLLECTION = {
+    cargo: "cargos",
+    vaga: "vagas",
+    candidato: "candidatos",
+    admissao: "admissoes"
   };
 
   function ensureDeletedArchive(targetState = state) {
@@ -1475,6 +1501,46 @@
     return { ok: true, months: [...months], date, name };
   }
 
+  /** Dígitos do CBO (6). Usado na regra "um CBO por função". */
+  function cboDigits(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  // Nível no fim do nome da função: I..X, 1..99, Júnior/Jr, Pleno, Sênior/Sr.
+  const CARGO_LEVEL_SUFFIX = /(\s+(?:x|ix|viii|vii|vi|v|iv|iii|ii|i|\d{1,2}|junior|jr\.?|pleno|senior|sr\.?))+$/;
+
+  /**
+   * Chave da "função igualitária": nome normalizado sem o nível final.
+   * "Cozinheiro I" e "Cozinheiro II" → "cozinheiro" (podem dividir o CBO).
+   */
+  function cargoFamilyKey(name) {
+    const key = normalizeSearchText(String(name || "").replace(/\s+/g, " ").trim());
+    return key.replace(CARGO_LEVEL_SUFFIX, "").trim() || key;
+  }
+
+  /**
+   * Mensagem de conflito se `record` repetir o nome (normalizado) de outra
+   * função, ou usar o CBO de outra função que NÃO seja um nível da mesma
+   * função (função igualitária: "Cozinheiro I" / "Cozinheiro II" podem dividir
+   * o CBO); "" quando está livre. Fonte única da regra — usada pela tela
+   * (js/rh-catalog.js) e pela restauração da Lixeira.
+   */
+  function findCargoConflict(list, record) {
+    if (!record) return "";
+    const nameKey = normalizeSearchText(String(record.name || "").replace(/\s+/g, " ").trim());
+    const cbo = cboDigits(record.cbo);
+    for (const other of list || []) {
+      if (!other || other.id === record.id) continue;
+      if (nameKey && normalizeSearchText(String(other.name || "").replace(/\s+/g, " ").trim()) === nameKey) {
+        return `Já existe a função "${other.name}" nesta empresa (uma função só pode ter um salário).`;
+      }
+      if (cbo && cboDigits(other.cbo) === cbo && cargoFamilyKey(other.name) !== cargoFamilyKey(record.name)) {
+        return `O CBO ${record.cbo} já está atribuído à função "${other.name}". Só níveis da mesma função (ex.: Cozinheiro I e Cozinheiro II) podem dividir o CBO.`;
+      }
+    }
+    return "";
+  }
+
   function restoreArchivedRecords(entry, restoredAt) {
     const data = getCompanyData(entry.company);
     const payload = entry.payload || {};
@@ -1490,6 +1556,12 @@
       monthsTouchedByRange(record.startDate, record.endDate).forEach((month) => months.add(month));
     };
 
+    if (RH_ARCHIVE_COLLECTION[entry.kind]) {
+      // Função restaurada não pode furar a regra de nome/CBO únicos da empresa.
+      const conflict = entry.kind === "cargo" ? findCargoConflict(data.cargos || [], payload.record) : "";
+      if (conflict) return { ok: false, error: conflict };
+      putBack(RH_ARCHIVE_COLLECTION[entry.kind], payload.record);
+    }
     if (entry.kind === "ferias") putBack("vacations", payload.record);
     if (entry.kind === "ausencia") putBack("absences", payload.record);
     if (entry.kind === "funcionario") {
@@ -1533,7 +1605,7 @@
     let result;
     if (entry.kind === "vinculo") result = restoreArchivedLink(entry, restoredAt);
     else if (entry.kind === "feriado") result = restoreArchivedHoliday(entry, restoredAt);
-    else if (["funcionario", "ferias", "ausencia"].includes(entry.kind)) {
+    else if (["funcionario", "ferias", "ausencia"].includes(entry.kind) || RH_ARCHIVE_COLLECTION[entry.kind]) {
       result = restoreArchivedRecords(entry, restoredAt);
     } else result = { ok: false, error: "Tipo de item desconhecido." };
     if (!result.ok) return result;
@@ -2211,6 +2283,10 @@
         contadorLancamentos: mergeLancamentosMaps(
           localCo.contadorLancamentos || {},
           remoteCo.contadorLancamentos || {}
+        ),
+        // Cargos e Salários / Quadro de Vagas: união por id, newer-wins.
+        ...Object.fromEntries(
+          RH_COLLECTIONS.map((col) => [col, mergeRecordsById(localCo[col] || [], remoteCo[col] || [])])
         )
       };
       delete merged.companies[company].vtDeductions;
@@ -2669,6 +2745,9 @@
       block.manualScaleMeta && typeof block.manualScaleMeta === "object" ? block.manualScaleMeta : {};
     block.contadorLancamentos =
       block.contadorLancamentos && typeof block.contadorLancamentos === "object" ? block.contadorLancamentos : {};
+    RH_COLLECTIONS.forEach((col) => {
+      block[col] = Array.isArray(block[col]) ? block[col].filter((row) => row && row.id) : [];
+    });
     delete block.vtDeductions;
     if (normalizeVacations(block)) block._vacationRepairPending = true;
     return block;
@@ -3524,6 +3603,8 @@
       cpf: cpfFormatted,
       ctps: formatCtps(employee.ctps || ""),
       role: String(employee.role ?? existing?.role ?? "").trim(),
+      // Vínculo com a função de Cargos e Salários (salário e CBO vêm dela).
+      roleId: String(employee.roleId ?? existing?.roleId ?? "").trim(),
       department: String(employee.department ?? existing?.department ?? "").trim(),
       status: employee.status || existing?.status || "Ativo",
       admissionDate: employee.admissionDate || existing?.admissionDate || todayISO(),
@@ -5890,6 +5971,14 @@
     restoreDeletedArchiveEntry,
     mergeDeletedArchives,
     DELETED_ARCHIVE_KIND_LABELS,
+    RH_COLLECTIONS,
+    archiveDeletion,
+    recordTombstone,
+    findCargoConflict,
+    cargoFamilyKey,
+    cboDigits,
+    newId: uid,
+    currentUserEmail,
     addManualWorkedEmployee,
     removeVacation,
     saveState,

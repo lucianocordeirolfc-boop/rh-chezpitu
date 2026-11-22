@@ -1,0 +1,334 @@
+/**
+ * Cargos e Salários + Quadro de Vagas + Cadastro de Funcionários, no Chrome real.
+ *
+ * Carrega os módulos VERDADEIROS numa página file:// com perfil temporário:
+ * o localStorage é do navegador de teste e não há Firebase — nenhum dado de
+ * produção é lido ou gravado.
+ *
+ * Cobre: padronização pela tela (com confirmação); edição de função com CBO e
+ * salário; CBO repetido recusado; sub-aba Comissões; Cadastro de Funcionários
+ * com Cargo em lista suspensa vinda do catálogo, CBO/salário somente leitura e
+ * vínculo roleId; cargo legado sinalizado e preservado; Quadro de Vagas
+ * (vaga, Painel RH, R&S, Admissões); separação por empresa.
+ *
+ * Uso: node scripts/verify-cargos-vagas-ui.mjs
+ */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import puppeteer from "puppeteer-core";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+let passed = 0;
+let failed = 0;
+function assert(cond, msg) {
+  if (cond) { passed += 1; console.log(`  ✓ ${msg}`); }
+  else { failed += 1; console.error(`  ✗ FALHOU: ${msg}`); }
+}
+
+const chrome = [
+  "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+  "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
+].find((p) => fs.existsSync(p));
+if (!chrome) {
+  console.error("Chrome/Edge não encontrado — instale o Chrome para rodar esta suíte.");
+  process.exit(1);
+}
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "rh-cargos-ui-"));
+const fileUrl = (rel) => pathToFileURL(path.join(root, rel)).href;
+const htmlPath = path.join(tmp, "cargos.html");
+const scripts = [
+  "js/import-utils.js", "js/data.js", "js/lixeira.js", "js/inactive-employees.js", "js/xlsx-export.js",
+  "js/rh-catalog.js", "js/funcionarios.js", "js/cargos.js", "js/quadro-vagas.js"
+];
+fs.writeFileSync(
+  htmlPath,
+  `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+${["css/style.css", "css/funcionarios.css", "css/ausencias.css", "css/rh-catalog.css"].map((c) => `<link rel="stylesheet" href="${fileUrl(c)}">`).join("\n")}
+</head><body>
+<div id="toastContainer"></div>
+<main class="app-content">
+<section id="cargos" class="module active"></section>
+<section id="funcionarios" class="module"></section>
+<section id="quadro-vagas" class="module"></section>
+</main>
+<script>
+  window.__toasts = [];
+  window.__alerts = [];
+  window.__confirms = [];
+  window.confirm = (m) => { window.__confirms.push(m); return true; };
+  window.alert = (m) => window.__alerts.push(m);
+  window.prompt = () => null;
+  window.App = {
+    renderCurrent: () => {},
+    toast: (m, t) => window.__toasts.push({ m, t }),
+    formatDisplayName: (n) => String(n || ""),
+    escapeHTML: (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
+  };
+</script>
+${scripts.map((s) => `<script src="${fileUrl(s)}"></script>`).join("\n")}
+</body></html>`
+);
+
+const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "rh-cargos-profile-"));
+const browser = await puppeteer.launch({
+  executablePath: chrome,
+  headless: "new",
+  userDataDir,
+  args: ["--no-sandbox", "--allow-file-access-from-files"]
+});
+
+try {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1500, height: 1000 });
+  const pageErrors = [];
+  page.on("pageerror", (err) => pageErrors.push(String(err)));
+  await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load" });
+
+  await page.evaluate(() => {
+    const A = window.AppData;
+    A.setActiveCompany("Chez Pitu");
+    const base = { cpf: "", ctps: "1", admissionDate: "2020-01-01", fixedDay: "", defaultShift: "", vtDaily: 0, source: "manual" };
+    const co = A.getCompanyData("Chez Pitu");
+    co.employees = [
+      { ...base, id: "e1", cpf: "529.982.247-25", name: "Ana Fixture", role: "GARÇON", department: "BAR", status: "Ativo" },
+      { ...base, id: "e2", cpf: "111.444.777-35", name: "Bia Fixture", role: "Enc. De Manutenção", department: "MANUTENÇÃO", status: "Ativo" },
+      { ...base, id: "e3", cpf: "123.456.789-09", name: "Caio Fixture", role: "Garçom", department: "BAR", status: "Inativo" }
+    ];
+    ["cargos", "comissoes", "vagas", "candidatos", "admissoes"].forEach((c) => { co[c] = []; A.getCompanyData("Pengold")[c] = []; });
+    A.getCompanyData("Pengold").employees = [{ ...base, id: "p1", name: "Eva Pengold", role: "BARMAN", department: "BAR", status: "Ativo" }];
+    window.__render = (id, mod) => {
+      document.querySelectorAll(".module").forEach((sec) => sec.classList.toggle("active", sec.id === id));
+      window[mod].render(document.getElementById(id));
+    };
+  });
+
+  const $eval = (fn, ...args) => page.evaluate(fn, ...args);
+
+  console.log("[1] Cargos e Salários — padronizar pela tela");
+  await $eval(() => window.__render("cargos", "CargosModule"));
+  let s = await $eval(() => ({
+    title: document.querySelector("#cargos .func-module-title")?.textContent,
+    std: document.getElementById("btnStandardizeRoles")?.textContent || "",
+    tabs: [...document.querySelectorAll("#cargos [data-rh-tab]")].map((b) => b.textContent.trim()),
+    empty: Boolean(document.querySelector("#cargos .rh-empty"))
+  }));
+  assert(s.title === "Cargos e Salários" && s.tabs.join("|") === "Funções e Salários|Comissões", "aba com sub-abas Funções e Salários / Comissões");
+  assert(/\(3\)/.test(s.std) && s.empty, "botão de padronização com 3 funcionários pendentes e tabela vazia");
+  await $eval(() => document.getElementById("btnStandardizeRoles").click());
+  s = await $eval(() => [...document.querySelectorAll("#rhPopup .rh-std-input")].map((i) => i.value));
+  assert(s.join("|") === "Encarregado de Manutenção|Garçom", `grafias sugeridas: ${s.join(", ")}`);
+  const untouched = await $eval(() => JSON.stringify(AppData.getCompanyData("Chez Pitu").employees));
+  assert(!untouched.includes("roleId"), "abrir o quadro não grava nada");
+  await $eval(() => document.getElementById("btnApplyStandardization").click());
+  s = await $eval(() => ({
+    confirm: window.__confirms.at(-1) || "",
+    rows: [...document.querySelectorAll("#cargos .rh-table tbody tr")].map((tr) => tr.querySelector("td strong")?.textContent),
+    emp: AppData.getCompanyData("Chez Pitu").employees.map((e) => `${e.role}|${Boolean(e.roleId)}`)
+  }));
+  assert(/GARÇON → Garçom/.test(s.confirm) && /2 função/.test(s.confirm), "confirmação lista as grafias alteradas e as funções novas");
+  assert(s.rows.join("|") === "Encarregado de Manutenção|Garçom", "funções criadas na tabela");
+  assert(s.emp.join(",") === "Garçom|true,Encarregado de Manutenção|true,Garçom|true", "funcionários padronizados e vinculados (inclusive inativo)");
+
+  console.log("[2] Editar função: CBO, salário, comissões; CBO repetido recusado");
+  const editCargo = async (name, cbo, salary, commissions = []) => {
+    await $eval((n) => {
+      const id = RhCatalog.findCargoByName("Chez Pitu", n).id;
+      document.querySelector(`[data-edit-cargo="${id}"]`).click();
+    }, name);
+    await $eval((c, sal, coms) => {
+      const f = document.getElementById("cargoForm");
+      f.elements.cbo.value = c;
+      f.elements.cbo.dispatchEvent(new Event("input"));
+      f.elements.salary.value = sal;
+      coms.forEach((id) => { f.querySelector(`input[name="commissions"][value="${id}"]`).checked = true; });
+      f.requestSubmit();
+    }, cbo, salary, commissions);
+  };
+  await editCargo("Garçom", "513405", "1.850,00", ["taxa-servico-bar"]);
+  s = await $eval(() => RhCatalog.findCargoByName("Chez Pitu", "Garçom"));
+  assert(s.cbo === "5134-05" && s.salary === 1850 && s.commissions[0] === "taxa-servico-bar", "função salva com CBO mascarado, salário e comissão");
+  s = await $eval(() => document.querySelector("#cargos .rh-table tbody").textContent);
+  assert(s.includes("5134-05") && s.includes("1.850,00") && s.includes("Taxa de Serviço Bar"), "tabela mostra CBO, salário e comissão");
+  await editCargo("Encarregado de Manutenção", "5134-05", "2500");
+  s = await $eval(() => ({ alert: window.__alerts.at(-1) || "", open: Boolean(document.getElementById("cargoForm")) }));
+  assert(/CBO 5134-05 já está atribuído/.test(s.alert) && s.open, "CBO de outra função: alerta e formulário continua aberto");
+  await $eval(() => {
+    const f = document.getElementById("cargoForm");
+    f.elements.cbo.value = "9101-05";
+    f.requestSubmit();
+  });
+  s = await $eval(() => RhCatalog.findCargoByName("Chez Pitu", "Encarregado de Manutenção"));
+  assert(s.cbo === "9101-05" && s.salary === 2500, "corrigido o CBO, a função é salva");
+  await page.screenshot({ path: path.join(tmp, "funcoes.png") });
+
+  console.log("[3] Sub-aba Comissões");
+  await $eval(() => document.querySelector('[data-rh-tab="comissoes"]').click());
+  s = await $eval(() => [...document.querySelectorAll(".rh-commission-card h3")].map((h) => h.textContent));
+  assert(s.length === 6 && s.includes("Taxa de Serviço Frigobar") && s.includes("Extensão de Diária"), "6 comissões com campo editável");
+  await $eval(() => {
+    document.querySelector('[data-comissao-desc="walk-in"]').value = "Comissão sobre venda de diária sem reserva.";
+    document.querySelector('[data-save-comissao="walk-in"]').click();
+  });
+  s = await $eval(() => RhCatalog.listComissoes("Chez Pitu").find((c) => c.id === "walk-in").description);
+  assert(s === "Comissão sobre venda de diária sem reserva.", "explicação da comissão salva");
+  s = await $eval(() => document.querySelector('[data-comissao-desc="taxa-servico-bar"]').closest(".rh-commission-card").textContent);
+  assert(s.includes("Funções: Garçom"), "comissão mostra as funções que a recebem");
+  await page.screenshot({ path: path.join(tmp, "comissoes.png") });
+
+  console.log("[4] Cadastro de Funcionários — Cargo do catálogo, salário/CBO somente leitura");
+  await $eval(() => window.__render("funcionarios", "FuncionariosModule"));
+  await $eval(() => document.querySelector('[data-edit="e1"]').click());
+  s = await $eval(() => {
+    const sel = document.getElementById("roleSelect");
+    return {
+      options: [...sel.options].map((o) => o.value),
+      value: sel.value,
+      cbo: document.getElementById("roleCboDisplay")?.value,
+      salary: document.getElementById("roleSalaryDisplay")?.value,
+      readonly: document.getElementById("roleCboDisplay")?.readOnly && document.getElementById("roleSalaryDisplay")?.readOnly,
+      named: Boolean(document.querySelector("#employeeForm [name='salary'], #employeeForm [name='cbo']"))
+    };
+  });
+  assert(s.options.join("|") === "|Encarregado de Manutenção|Garçom", "lista suspensa só com as funções de Cargos e Salários (sem 'Cadastrar novo cargo')");
+  assert(s.value === "Garçom" && s.cbo === "5134-05" && /1\.850,00/.test(s.salary), "função vinculada com CBO e salário exibidos");
+  assert(s.readonly && !s.named, "CBO e salário são somente leitura e não fazem parte do formulário");
+  await page.screenshot({ path: path.join(tmp, "cadastro.png") });
+  await $eval(() => {
+    const sel = document.getElementById("roleSelect");
+    sel.value = "Encarregado de Manutenção";
+    sel.dispatchEvent(new Event("change"));
+  });
+  s = await $eval(() => ({ cbo: document.getElementById("roleCboDisplay").value, salary: document.getElementById("roleSalaryDisplay").value }));
+  assert(s.cbo === "9101-05" && /2\.500,00/.test(s.salary), "trocar a função atualiza CBO e salário na hora");
+  await $eval(() => document.getElementById("employeeForm").requestSubmit());
+  s = await $eval(() => AppData.getCompanyData("Chez Pitu").employees.find((e) => e.id === "e1"));
+  const enc = await $eval(() => RhCatalog.findCargoByName("Chez Pitu", "Encarregado de Manutenção").id);
+  assert(s.role === "Encarregado de Manutenção" && s.roleId === enc, "salvar grava função e roleId");
+  assert(!("salary" in s) && !("cbo" in s), "nenhum salário/CBO gravado no funcionário");
+  s = await $eval(() => {
+    const sheet = window.FuncionariosModule.buildEmployeeExportSheet("Chez Pitu");
+    const row = sheet.rows.find((r) => r[3]?.value === "e1");
+    return { headers: sheet.columns.slice(-2).map((c) => c.header), cbo: row.at(-2), salary: row.at(-1) };
+  });
+  assert(s.headers.join("|") === "CBO|Salário (Cargos e Salários)" && s.cbo?.value === "9101-05" && s.salary?.type === "currency" && s.salary.value === 2500, "Exportar Excel traz CBO e salário da função");
+
+  console.log("[5] Cargo legado fora do catálogo é preservado e sinalizado");
+  await $eval(() => {
+    const co = AppData.getCompanyData("Chez Pitu");
+    co.employees.push({ id: "e9", name: "Davi Legado", role: "Lavanderia", department: "LAV", status: "Ativo", cpf: "935.411.347-80", ctps: "1", admissionDate: "2020-01-01" });
+    window.__render("funcionarios", "FuncionariosModule");
+    document.querySelector('[data-edit="e9"]').click();
+  });
+  s = await $eval(() => ({
+    value: document.getElementById("roleSelect").value,
+    hint: document.getElementById("roleCatalogHint").textContent,
+    warn: document.getElementById("roleCatalogHint").classList.contains("role-catalog-warn")
+  }));
+  assert(s.value === "Lavanderia" && s.warn && /não está em Cargos e Salários/.test(s.hint), "cargo legado selecionado com aviso");
+  await $eval(() => document.getElementById("employeeForm").requestSubmit());
+  s = await $eval(() => AppData.getCompanyData("Chez Pitu").employees.find((e) => e.id === "e9"));
+  assert(s.role === "Lavanderia" && !s.roleId, "salvar outros campos não perde o cargo legado");
+
+  console.log("[6] Novo funcionário na Pengold (catálogo vazio = comportamento anterior)");
+  await $eval(() => {
+    AppData.setActiveCompany("Pengold");
+    window.__render("funcionarios", "FuncionariosModule");
+    document.getElementById("btnNewEmployee").click();
+  });
+  s = await $eval(() => ({
+    options: [...document.getElementById("roleSelect").options].map((o) => o.value),
+    row: Boolean(document.getElementById("roleCatalogRow"))
+  }));
+  assert(s.options.includes("__new_role__") && !s.row, "Pengold sem catálogo: lista antiga (com 'Cadastrar novo cargo') e sem linha de CBO/salário");
+  await $eval(() => document.getElementById("employeePopupCancel")?.click());
+
+  console.log("[7] Quadro de Vagas");
+  await $eval(() => {
+    AppData.setActiveCompany("Chez Pitu");
+    window.__render("quadro-vagas", "QuadroVagasModule");
+  });
+  s = await $eval(() => [...document.querySelectorAll("[data-vagas-tab]")].map((b) => b.textContent.trim()));
+  assert(s.join("|") === "Vagas em aberto|Painel RH|Recrutamento e Seleção|Admissões", "4 sub-abas (guias da planilha)");
+  await $eval(() => document.getElementById("btnNewVaga").click());
+  s = await $eval(() => [...document.querySelector("#vagasForm [name='cargoId']").options].map((o) => o.textContent));
+  assert(s.includes("Garçom") && s.includes("Encarregado de Manutenção"), "cargo da vaga vem de Cargos e Salários");
+  await $eval(() => {
+    const f = document.getElementById("vagasForm");
+    f.elements.cargoId.value = RhCatalog.findCargoByName("Chez Pitu", "Garçom").id;
+    f.elements.department.value = "Restaurante";
+    f.elements.quantity.value = "2";
+    f.elements.contractType.value = "Temporário";
+    f.elements.reason.value = "Sazonalidade";
+    f.elements.priority.value = "Urgente";
+    f.elements.status.value = "Entrevistas";
+    f.elements.manager.value = "Jorge";
+    f.elements.notes.value = "Disponibilidade 08h às 22h";
+    f.requestSubmit();
+  });
+  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
+  assert(s.includes("Garçom") && s.includes("CBO 5134-05") && s.includes("Urgente") && s.includes("Entrevistas"), "vaga na tabela com CBO da função, prioridade e status");
+  const vagaId = await $eval(() => AppData.getCompanyData("Chez Pitu").vagas[0].id);
+  await page.screenshot({ path: path.join(tmp, "vagas.png") });
+
+  await $eval(() => document.querySelector('[data-vagas-tab="rs"]').click());
+  await $eval(() => document.getElementById("btnNewCand").click());
+  await $eval((vid) => {
+    const f = document.getElementById("vagasForm");
+    f.elements.vagaId.value = vid;
+    f.elements.name.value = "Jorge Candidato";
+    f.elements.situation.value = "Agendado";
+    f.requestSubmit();
+  }, vagaId);
+  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
+  assert(s.includes("Jorge Candidato") && s.includes("Garçom · Restaurante"), "candidato listado com a vaga");
+
+  await $eval(() => document.querySelector('[data-vagas-tab="admissoes"]').click());
+  await $eval(() => document.getElementById("btnNewAdm").click());
+  await $eval((vid) => {
+    const f = document.getElementById("vagasForm");
+    f.elements.name.value = "Mariana Admitida";
+    f.elements.vagaId.value = vid;
+    f.elements.situation.value = "Iniciou";
+    f.requestSubmit();
+  }, vagaId);
+  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
+  assert(s.includes("Mariana Admitida") && s.includes("Garçom") && s.includes("Iniciou"), "admissão herda a função da vaga");
+
+  await $eval(() => document.querySelector('[data-vagas-tab="painel"]').click());
+  s = await $eval(() => Object.fromEntries([...document.querySelectorAll(".rh-kpi")].map((k) => [k.querySelector("span").textContent, k.querySelector("strong").textContent])));
+  assert(s["Vagas em andamento"] === "1" && s["Posições previstas"] === "2" && s["Posições em aberto"] === "1" && s["Admitidos (iniciaram)"] === "1" && s["Vagas urgentes"] === "1", `Painel RH calculado: ${JSON.stringify(s)}`);
+  await page.screenshot({ path: path.join(tmp, "painel.png") });
+
+  console.log("[8] Separação por empresa e Lixeira");
+  await $eval(() => {
+    AppData.setActiveCompany("Pengold");
+    window.__render("quadro-vagas", "QuadroVagasModule");
+    document.querySelector('[data-vagas-tab="vagas"]').click();
+  });
+  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
+  assert(s.includes("Nenhuma vaga") && !s.includes("Garçom"), "Pengold não vê as vagas da Chez Pitu");
+  await $eval(() => {
+    AppData.setActiveCompany("Chez Pitu");
+    window.__render("quadro-vagas", "QuadroVagasModule");
+    document.querySelector("[data-remove-vaga]").click();
+  });
+  s = await $eval(() => ({
+    vagas: AppData.getCompanyData("Chez Pitu").vagas.length,
+    lixeira: AppData.listDeletedArchive({ company: "Chez Pitu", kinds: ["vaga"] }).length,
+    btn: document.querySelector('[id^="btnVagasArchive"]')?.textContent || ""
+  }));
+  assert(s.vagas === 0 && s.lixeira === 1 && /Lixeira \(1\)/.test(s.btn), "excluir vaga (com confirmação) leva à Lixeira");
+
+  assert(pageErrors.length === 0, `sem erros de JavaScript na página${pageErrors.length ? `: ${pageErrors.join(" | ")}` : ""}`);
+  console.log(`\nCapturas: ${tmp}`);
+} finally {
+  await browser.close();
+}
+
+console.log(`\nResultado: ${passed} passou, ${failed} falhou`);
+process.exit(failed ? 1 : 0);

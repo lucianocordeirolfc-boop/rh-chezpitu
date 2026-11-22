@@ -194,6 +194,23 @@ if (window.firebase && firebase.apps.length) {
     };
   }
 
+  const RH_COLLECTIONS = ["cargos", "comissoes", "vagas", "candidatos", "admissoes"];
+
+  function rhBlockToFirebase(block) {
+    const out = {};
+    RH_COLLECTIONS.forEach((col) => {
+      out[col] = Array.isArray(block?.[col]) ? block[col] : [];
+    });
+    return out;
+  }
+
+  /** O RTDB devolve lista como array ou objeto indexado; vazio nem vem. */
+  function rhListFromFirebase(value) {
+    if (Array.isArray(value)) return value.filter((row) => row && typeof row === "object");
+    if (value && typeof value === "object") return Object.values(value).filter((row) => row && typeof row === "object");
+    return [];
+  }
+
   function stateToFirebase(state) {
     const empresas = {};
     const funcionarios = {};
@@ -212,7 +229,10 @@ if (window.firebase && firebase.apps.length) {
       escalasMeta[company] = block.manualScaleMeta || {};
       ferias[company] = {
         vacations: block.vacations || [],
-        absences: block.absences || []
+        absences: block.absences || [],
+        // Cargos e Salários + Quadro de Vagas trafegam ANINHADOS aqui (nó por
+        // empresa já permitido pelas regras do RTDB) — sem nó novo de topo.
+        __rh: rhBlockToFirebase(block)
       };
       feriados[company] = block.holidays || [];
       vtDescontos[company] = state.valeTransporte?.deductionDays?.[company] || {};
@@ -300,12 +320,16 @@ if (window.firebase && firebase.apps.length) {
       const feriasBlock = data.ferias?.[company];
       let vacations = [];
       let absences = [];
+      const rh = {};
 
       if (Array.isArray(feriasBlock)) {
         vacations = feriasBlock;
       } else if (feriasBlock && typeof feriasBlock === "object") {
         vacations = feriasBlock.vacations || [];
         absences = feriasBlock.absences || [];
+        RH_COLLECTIONS.forEach((col) => {
+          rh[col] = rhListFromFirebase(feriasBlock.__rh?.[col]);
+        });
       }
 
       companies[company] = {
@@ -316,7 +340,8 @@ if (window.firebase && firebase.apps.length) {
         vacations,
         absences,
         holidays: data.feriados?.[company] || [],
-        contadorLancamentos: data.contadorLancamentos?.[company] || {}
+        contadorLancamentos: data.contadorLancamentos?.[company] || {},
+        ...Object.fromEntries(RH_COLLECTIONS.map((col) => [col, rh[col] || []]))
       };
     });
 

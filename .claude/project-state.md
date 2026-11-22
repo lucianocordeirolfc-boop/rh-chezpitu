@@ -17,6 +17,15 @@
   jan/2027 cumprida (36/36, leitura de 2026-11-17). Aguardando o usuário salvar
   a escala de dezembro e aprovar.
 
+## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (LOCAL, não commitado)
+
+- Implementado e testado (validate 35/35, npm test 47/47); **sem commit/deploy**
+  (aguardando autorização). Ver PROJECT_HISTORY.md → 2026-11-22.
+- Próximo passo do usuário após o deploy: em cada empresa, Cargos e Salários →
+  "Padronizar e importar do cadastro" → conferir grafias → preencher CBO/salário.
+- REGRA FIXA nova: uma função = um salário; um CBO = uma função; salário/CBO
+  nunca editáveis no Cadastro (PROJECT_RULES.md → "Cargos e Salários").
+
 ## ⚠️ REGRAS FIXAS NOVAS (2026-11-17)
 
 - **Alteração de folga no cadastro não é retroativa:** folga fixa e domingos

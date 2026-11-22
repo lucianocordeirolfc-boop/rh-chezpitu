@@ -7,6 +7,54 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 — Novas abas: Cargos e Salários + Quadro de Vagas
+
+Pedido do usuário: aba **Cargos e Salários** por empresa (Função, Salário, CBO,
+Comissões em lista suspensa; sub-aba Comissões com explicação editável), com
+CBO exclusivo por função e um salário por função; Cadastro de Funcionários
+escolhendo a função na lista e herdando salário/CBO (não editáveis lá); funções
+iniciais = cargos do cadastro com grafia padronizada. Depois, aba **Quadro de
+Vagas** por empresa, baseada na planilha "Controle de Vagas" do RH (guias →
+sub-abas).
+
+- **Leitura da base (somente leitura, 2026-11-22):** nenhum funcionário tinha
+  salário/CBO; só `role`, com grafias mistas — Chez Pitu: "Enc. De Manutenção",
+  "Aux. De Almoxarifado/Reservas"…; Pengold em MAIÚSCULAS, "GARÇON",
+  "ALIMENTACAO", "SUB GERENTE". Planilha: 4 guias (Vagas em aberto, Painel RH,
+  R&S, ADMISSÕES).
+- **Dados (`js/data.js`):** coleções por empresa `cargos`, `comissoes`,
+  `vagas`, `candidatos`, `admissoes` (`RH_COLLECTIONS`): shape no bloco, merge
+  por id (newer-wins), tombstones por id, Lixeira (`cargo`, `vaga`,
+  `candidato`, `admissao`) com restauração; `findCargoConflict` (nome/CBO);
+  `upsertEmployee` grava `roleId`. Exporta `archiveDeletion`,
+  `recordTombstone`, `newId`, `currentUserEmail`.
+- **Sync (`js/firebase-sync.js`):** aninhado em `ferias/{empresa}.__rh` — sem
+  nó novo de topo. Remoto sem `__rh` (versão antiga) não apaga o local.
+- **Regras (`js/rh-catalog.js`, novo):** funções, comissões (grafia corrigida:
+  "Frigobar", "Extensão"), padronização (`canonicalRoleName`: abreviações por
+  extenso, acentos, caixa de título, "Garçom", "Subgerente"), vagas,
+  candidatos, admissões e Painel RH.
+- **Telas:** `js/cargos.js` e `js/quadro-vagas.js` (novos), `css/rh-catalog.css`
+  (novo), `index.html` (2 itens no menu), `js/app.js`. Cadastro
+  (`js/funcionarios.js`): Cargo só do catálogo da empresa (sem "Cadastrar novo
+  cargo" quando há catálogo), CBO/salário somente leitura e fora do payload,
+  cargo legado preservado com aviso; Exportar Excel ganha colunas Y (CBO) e Z
+  (Salário). Empresa com catálogo vazio mantém o comportamento anterior.
+- **Dados de produção:** nenhum alterado. A padronização dos cargos é feita
+  pelo usuário no botão "Padronizar e importar do cadastro" (com confirmação).
+- Regras: `PROJECT_RULES.md` ("Cargos e Salários (REGRA FIXA)", "Quadro de
+  Vagas", "Transporte de Cargos/Vagas"), `CLAUDE.md`, `ARCHITECTURE.md`;
+  manuais (`MANUAL_USUARIO.md`, `js/manual.js`).
+- Testes: novas `verify-cargos-salarios.mjs` (68), `verify-quadro-vagas.mjs`
+  (35), `verify-cargos-vagas-ui.mjs` (33, Chrome real); `verify-exportar-excel`
+  atualizada (autofiltro A1:Z4, colunas CBO/Salário). `npm test` 47/47.
+- **Ajuste a pedido do usuário (mesmo dia):** regra do CBO flexibilizada para
+  função igualitária — níveis da mesma função (Cozinheiro I / Cozinheiro II;
+  I…X, 1…99, Júnior/Pleno/Sênior no fim do nome) podem dividir o CBO
+  (`cargoFamilyKey` em `findCargoConflict`); funções diferentes continuam com
+  CBO exclusivo. `verify-cargos-salarios.mjs` → 75.
+- **Publicação:** pendente de autorização (commit/deploy).
+
 ## 2026-11-17 (6) — REGRA FIXA: alteração de folga no cadastro não é retroativa
 
 Pedido do usuário: alterar a folga (ex.: domingo do Hudson) deve valer só a
