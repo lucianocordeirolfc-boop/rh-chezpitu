@@ -369,6 +369,22 @@ try {
   });
   assert(!s.overlap && s.wraps && s.inside, "observação longa quebra linha dentro do cartão, sem encostar em Editar/Excluir");
   assert(s.pre === "pre-line", "quebras de linha digitadas são respeitadas");
+  s = await $eval(() => {
+    const card = document.querySelector(".vaga-card");
+    const size = (el) => parseFloat(getComputedStyle(el).fontSize);
+    const qtd = [...card.querySelectorAll(".vaga-card-meta div")].find((d) => d.querySelector("dt").textContent === "Quantidade");
+    return {
+      cbo: size(card.querySelector(".vaga-card-cbo")),
+      title: size(card.querySelector("h3")),
+      urgent: size(card.querySelector(".vaga-card-priority .rh-pill")),
+      status: size(card.querySelector(".vaga-card-title > .rh-pill")),
+      qtd: qtd?.querySelector("dd").textContent,
+      admitidos: card.textContent.includes("admitido")
+    };
+  });
+  assert(s.cbo < 12 && s.cbo < s.title, `CBO com fonte menor (${s.cbo}px; título ${s.title}px)`);
+  assert(s.urgent >= 13 && s.urgent > s.status, `"Urgente" com fonte maior (${s.urgent}px; status ${s.status}px)`);
+  assert(s.qtd === "2" && !s.admitidos, `Quantidade mostra só o número ("${s.qtd}"), sem admitidos nesta aba`);
   const vagaId = await $eval(() => AppData.getCompanyData("Chez Pitu").vagas[0].id);
   await page.screenshot({ path: path.join(tmp, "vagas.png"), fullPage: true });
 

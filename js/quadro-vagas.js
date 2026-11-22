@@ -158,11 +158,10 @@
     }
     const cards = vagas
       .map((v) => {
-        const admitted = RhCatalog.admittedForVaga(co, v.id);
         const cargo = RhCatalog.getCargo(co, v.cargoId);
         const meta = [
           ["Setor", v.department || "—"],
-          ["Quantidade", `${v.quantity} · ${admitted} admitido(s)`],
+          ["Quantidade", String(v.quantity)],
           ["Contrato", v.contractType || "—"],
           ["Motivo", v.reason || "—"],
           ["Abertura", v.openDate ? AppData.formatDateBR(v.openDate) : "—"],
@@ -177,8 +176,8 @@
             <header class="vaga-card-head">
               <div class="vaga-card-title">
                 <h3>${esc(v.role)}</h3>
-                ${cargo?.cbo ? `<span class="help-text">CBO ${esc(cargo.cbo)}</span>` : ""}
-                ${v.priority ? pill(v.priority) : ""} ${pill(v.status)}
+                ${cargo?.cbo ? `<span class="vaga-card-cbo">CBO ${esc(cargo.cbo)}</span>` : ""}
+                ${v.priority ? `<span class="vaga-card-priority">${pill(v.priority)}</span>` : ""} ${pill(v.status)}
               </div>
               <div class="vaga-card-actions">
                 <button type="button" class="secondary btn-sm" data-edit-vaga="${esc(v.id)}">Editar</button>

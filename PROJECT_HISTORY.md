@@ -7,6 +7,19 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (7) — Vagas em aberto: ajustes de leitura do cartão
+
+Pedido do usuário: fonte do CBO menor, fonte do "Urgente" um pouco maior e
+Quantidade só com o número (sem "admitidos" nesta aba).
+
+- `js/quadro-vagas.js`: CBO em `.vaga-card-cbo`; prioridade em
+  `.vaga-card-priority`; Quantidade = só o número. Admitidos seguem no Painel
+  RH e no relatório PDF.
+- `css/rh-catalog.css`: CBO 0,72rem (11,5px); prioridade 13px (status 11px).
+- Teste: `verify-cargos-vagas-ui` 59 (mede as fontes no Chrome e confere a
+  Quantidade sem admitidos).
+- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (6) — Quadro de Vagas: escolaridade, atribuições, requisitos e cartões
 
 Pedido do usuário: campos de escolaridade, atribuições do cargo, requisitos

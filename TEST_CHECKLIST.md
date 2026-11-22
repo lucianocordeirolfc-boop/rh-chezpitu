@@ -108,6 +108,8 @@ Use este checklist antes de qualquer commit ou deploy.
 - [ ] Escolaridade, atribuições e requisitos (obrigatórios, desejáveis,
       diferenciais) gravados e exibidos no cartão.
 - [ ] Observação longa quebra linha no cartão, sem cobrir Editar/Excluir.
+- [ ] Cartão: CBO em fonte menor, "Urgente" em destaque, Quantidade só com o
+      número (admitidos só no Painel RH).
 - [ ] Vaga nova da mesma função sugere o perfil da última.
 - [ ] Candidato (R&S) e admissão ligados à vaga; "Iniciou" conta como admitido.
 - [ ] Painel RH confere com as tabelas.

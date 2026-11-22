@@ -322,6 +322,18 @@
   font-size: 1.05rem;
 }
 
+/* CBO discreto ao lado do título; prioridade (Urgente) um pouco maior. */
+.vaga-card-cbo {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.vaga-card-priority .rh-pill {
+  padding: 4px 11px;
+  font-size: 13px;
+}
+
 .vaga-card-actions {
   display: flex;
   flex-shrink: 0;
