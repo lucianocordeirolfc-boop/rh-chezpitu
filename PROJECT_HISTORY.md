@@ -20,7 +20,8 @@ sozinha na linha de baixo).
   linha (0,68rem). `js/quadro-vagas.js`: rótulo com dica (`title`).
 - Teste: `verify-cargos-vagas-ui` 62 — mede no Chrome: 1 linha a 1500px e a
   1280px sem rótulo cortado; 2 linhas de 4 a 1000px.
-- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. **Publicação:** versão `20261122.06`,
+  commit `9b8b227` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (7) — Vagas em aberto: ajustes de leitura do cartão
 

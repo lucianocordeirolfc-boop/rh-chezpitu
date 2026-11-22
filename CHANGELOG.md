@@ -1,3 +1,8 @@
+2026-11-22 (4) - Vagas em aberto: dados do cartao em uma so linha (20261122.06)
+- [CORRECAO] Escolaridade caia sozinha numa segunda linha (grade cabia 7 colunas). Agora 8 colunas fixas: Setor, Quantidade, Contrato, Motivo, Abertura, Prazo, Gestor e Escolaridade na mesma linha; telas estreitas 2x4, celular 4x2
+- Arquivos: css/rh-catalog.css, js/quadro-vagas.js, scripts/verify-cargos-vagas-ui.mjs
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 (3) - Vagas em aberto: CBO menor, Urgente maior, quantidade sem admitidos (20261122.05)
 - [MELHORIA] Cartao da vaga: CBO em fonte menor; prioridade "Urgente" maior; Quantidade so com o numero (admitidos no Painel RH e no PDF)
 - Arquivos: js/quadro-vagas.js, css/rh-catalog.css, scripts/verify-cargos-vagas-ui.mjs

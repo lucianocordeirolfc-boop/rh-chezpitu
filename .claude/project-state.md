@@ -8,12 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261122.05` (exibida como `v2026.11.22.05`) — fonte: `js/version.js`
+- **Versão atual:** `20261122.06` (exibida como `v2026.11.22.06`) — fonte: `js/version.js`
 - **Branch atual:** `main` — sincronizado com `origin/main`
-- **Último commit de código:** `b778722` — style(vagas): CBO menor, Urgente maior e
-  quantidade sem admitidos no cartão (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.05`. Até `.03` aprovado pelo
-  usuário; `.04` (perfil da vaga + cartões) e `.05` (ajustes do cartão)
+- **Último commit de código:** `9b8b227` — style(vagas): dados do cartão em uma só
+  linha (8 colunas) (+ carimbo)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.06`. Até `.03` aprovado pelo
+  usuário; `.04` a `.06` (perfil da vaga, cartões e ajustes de layout)
   aguardando aprovação.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.03`)
@@ -25,6 +25,7 @@
   Vagas em aberto em cartões.
 - `20261122.05` (b778722): cartão com CBO menor, Urgente maior, quantidade sem
   admitidos.
+- `20261122.06` (9b8b227): dados do cartão em uma só linha (8 colunas).
 - validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22 (1)–(5).
 - **Pendente do usuário (dados, pela tela):** em cada empresa, Cargos e
   Salários → "Padronizar e importar do cadastro" → conferir grafias → preencher
