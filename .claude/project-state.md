@@ -12,11 +12,10 @@
 - **Branch atual:** `main` — sincronizado com `origin/main`
 - **Último commit de código:** `e32222f` — feat(vagas): etiqueta de entrevista
   agendada no cartão da vaga (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.07`. Até `.03` aprovado pelo
-  usuário; `.04` a `.07` (perfil da vaga, cartões, ajustes de layout e
-  etiqueta de entrevista) aguardando aprovação.
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.07`, **tudo aprovado pelo
+  usuário em 2026-11-22** (`.01` a `.07`). Nenhuma tarefa de código pendente.
 
-## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.03`)
+## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.07`)
 
 - `20261122.01` (e130610): abas Cargos e Salários e Quadro de Vagas.
 - `20261122.02` (66ad6d2): insalubridade com salário base + relatórios PDF.

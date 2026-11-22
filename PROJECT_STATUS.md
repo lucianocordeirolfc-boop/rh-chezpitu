@@ -30,7 +30,7 @@ push em `origin/main`.
   Recrutamento e Seleção, Admissões; vaga com escolaridade, atribuições e
   requisitos (obrigatórios, desejáveis, diferenciais), exibida em cartões
   (`20261122.04`; ajustes de fonte/quantidade em `.05`; dados do cartão em uma linha em `.06`;
-  etiqueta de entrevista agendada em `.07`; aguardando aprovação).
+  etiqueta de entrevista agendada em `.07`).
 - **Relatórios PDF** das duas abas, com escolha de seções.
 - Nenhum dado de produção alterado. **Pendente do usuário:** em cada empresa,
   "Padronizar e importar do cadastro" e preencher CBO/salário das funções.
@@ -301,9 +301,9 @@ empresas (Ctrl+F5) e comparar com os PDFs de referência. ✅ as duas entregas d
 produção, inclusive o critério de que lançamento com todos os campos zerados não
 aparece na grade da sub-aba Lançamentos (o registro continua gravado).
 
-✅ as entregas de 22/11/2026 (`20261122.01` a `.03` — Cargos e Salários,
-Quadro de Vagas, insalubridade, gratificação, relatórios PDF) foram **aprovadas
-pelo usuário**.
+✅ as entregas de 22/11/2026 (`20261122.01` a `.07` — Cargos e Salários,
+Quadro de Vagas, insalubridade, gratificação, relatórios PDF, perfil da vaga,
+cartões e etiqueta de entrevista) foram **aprovadas pelo usuário**.
 
 **Próximo deploy recomendado:** conforme novas demandas.
 

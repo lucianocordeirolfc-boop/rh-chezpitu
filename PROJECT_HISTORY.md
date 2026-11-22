@@ -7,6 +7,14 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (10) — Aprovação das versões 20261122.04 a .07
+
+Usuário: "tudo certo, aprovado". Aprovadas em produção: `.04` (escolaridade,
+atribuições, requisitos e cartões), `.05` (CBO menor, Urgente maior,
+quantidade sem admitidos), `.06` (dados do cartão em uma linha) e `.07`
+(etiqueta de entrevista agendada). Com isso, todas as entregas do dia
+(`.01` a `.07`) estão aprovadas. Só documentação; sem deploy.
+
 ## 2026-11-22 (9) — Etiqueta de entrevista agendada no cartão da vaga
 
 Pedido do usuário: quando houver entrevista agendada para a vaga, mostrar um
