@@ -201,7 +201,11 @@ de conflito é `AppData.findCargoConflict`, usada também pela Lixeira).
 6. **Salário tem histórico** (`cargo.salaryHistory`).
 7. **Excluir função** só sem funcionário vinculado (ativo ou inativo) e sem vaga
    em andamento; arquiva na Lixeira (`cargo`) + tombstone. Restaurar recusa se
-   o nome já tiver sido usado por outra função.
+   o nome já tiver sido usado por outra função. **Desde 2026-11-22 (pedido do
+   usuário) a tela de Cargos não tem botão Lixeira:** a função excluída sai da
+   lista na hora e a confirmação não menciona Lixeira. O arquivamento interno
+   (`deletedArchive`) continua obrigatório — restauração, se precisar, só por
+   suporte técnico.
 8. **Insalubridade** (2026-11-22, pedido do usuário): percentual na função
    (`cargo.insalubridade`, 0,01–100; ausente = sem insalubridade), com graus da
    CLT art. 192 sugeridos (10% mínimo, 20% médio, 40% máximo) ou percentual

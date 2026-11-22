@@ -99,7 +99,6 @@
           <div class="rh-actions">
             ${plan.length ? `<button type="button" class="secondary btn-sm" id="btnStandardizeRoles" title="Traz os cargos do Cadastro de Funcionários com grafia padronizada">Padronizar e importar do cadastro (${pendingEmployees})</button>` : ""}
             <button type="button" class="secondary btn-sm" data-rh-report title="Gera relatório para impressão ou PDF">Relatório PDF</button>
-            ${window.LixeiraUI?.toggleButtonHTML({ id: "btnCargoArchive", company: co, kinds: ["cargo"] }) || ""}
             <button type="button" class="primary btn-sm" id="btnNewCargo">+ Nova função</button>
           </div>
         </div>
@@ -490,9 +489,6 @@
     container.querySelector("#btnNewCargo")?.addEventListener("click", () => openCargoForm(container));
     container.querySelector("[data-rh-report]")?.addEventListener("click", () => window.RhReports?.openCargosReport(co));
     container.querySelector("#btnStandardizeRoles")?.addEventListener("click", () => openStandardization(container));
-    container.querySelector("#btnCargoArchive")?.addEventListener("click", () =>
-      window.LixeiraUI?.open({ company: co, kinds: ["cargo"], onRestored: () => render(container) })
-    );
     container.querySelectorAll("[data-edit-cargo]").forEach((btn) =>
       btn.addEventListener("click", () => openCargoForm(container, btn.dataset.editCargo))
     );
@@ -500,13 +496,15 @@
       btn.addEventListener("click", () => {
         const cargo = RhCatalog.getCargo(co, btn.dataset.removeCargo);
         if (!cargo) return;
-        if (!window.confirm(`Excluir a função "${cargo.name}"? Ela vai para a Lixeira e pode ser restaurada.`)) return;
+        if (!window.confirm(`Excluir a função "${cargo.name}"?`)) return;
         const result = RhCatalog.removeCargo(co, cargo.id);
         if (!result.ok) {
           alert(result.error);
           return;
         }
-        toast("Função excluída (disponível na Lixeira).");
+        // A cópia continua guardada em deletedArchive (regra fixa: nada some),
+        // mas a tela de Cargos não exibe Lixeira (decisão do usuário, 2026-11-22).
+        toast(`Função "${cargo.name}" excluída.`);
         render(container);
       })
     );

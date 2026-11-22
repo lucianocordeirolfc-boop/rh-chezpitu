@@ -622,6 +622,33 @@ try {
   }));
   assert(s.vagas === 0 && s.lixeira === 1 && /Lixeira \(1\)/.test(s.btn), "excluir vaga (com confirmação) leva à Lixeira");
 
+  console.log("[9] Cargos: excluir função sai da lista, sem botão Lixeira");
+  s = await $eval(() => {
+    AppData.setActiveCompany("Chez Pitu");
+    const co = "Chez Pitu";
+    const extra = RhCatalog.saveCargo(co, { name: "Função Teste Exclusão", cbo: "", salary: "1500" }).cargo;
+    const archiveBefore = AppData.listDeletedArchive({ company: co, kinds: ["cargo"] }).length;
+    window.__render("cargos", "CargosModule");
+    document.querySelector('#cargos [data-rh-tab="funcoes"]').click();
+    const root = document.getElementById("cargos");
+    const hadRow = root.textContent.includes("Função Teste Exclusão");
+    const hasLixeiraBtn = !!root.querySelector("#btnCargoArchive") || /Lixeira/.test(root.querySelector(".rh-actions")?.textContent || "");
+    window.__confirms = [];
+    root.querySelector(`[data-remove-cargo="${extra.id}"]`).click();
+    const after = document.getElementById("cargos");
+    return {
+      hadRow,
+      hasLixeiraBtn,
+      gone: !after.textContent.includes("Função Teste Exclusão") && !RhCatalog.getCargo(co, extra.id),
+      archived: AppData.listDeletedArchive({ company: co, kinds: ["cargo"] }).length === archiveBefore + 1,
+      confirmText: window.__confirms[0] || ""
+    };
+  });
+  assert(s.hadRow && !s.hasLixeiraBtn, "tela de Cargos sem botão Lixeira");
+  assert(s.gone, "função excluída some da lista na hora");
+  assert(s.archived, "cópia continua guardada (regra fixa: nada some)");
+  assert(/Excluir a função/.test(s.confirmText) && !/Lixeira/.test(s.confirmText), "confirmação sem mencionar Lixeira");
+
   assert(pageErrors.length === 0, `sem erros de JavaScript na página${pageErrors.length ? `: ${pageErrors.join(" | ")}` : ""}`);
   console.log(`\nCapturas: ${tmp}`);
 } finally {

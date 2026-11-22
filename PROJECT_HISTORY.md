@@ -7,6 +7,28 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (17) — Cargos e Salários sem botão Lixeira
+
+Pedido do usuário: "remova a opção de lixeira, ao excluir uma função já deve
+sair da lista". A exclusão já tirava a função da lista; removido o botão
+"Lixeira (N)" da tela de Cargos e Salários e a menção à Lixeira na confirmação
+e no aviso ("Função "X" excluída."). **Regra fixa preservada:** a cópia
+continua em `deletedArchive` + tombstone (nada some); restauração só por
+suporte técnico. Quadro de Vagas e demais telas mantêm a Lixeira.
+
+- `js/cargos.js`: sem botão/handler da Lixeira; textos de exclusão.
+- `js/manual.js`, `PROJECT_RULES.md` (Cargos e Salários, item 7).
+- `scripts/verify-cargos-vagas-ui.mjs` [9]: +4 testes (sem botão; some da
+  lista; cópia arquivada; confirmação sem Lixeira) — 86/86.
+- `npm test` 47/47, `npm run validate` 36/36.
+- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+
+## 2026-11-22 (16) — Aprovação da versão 20261122.10
+
+Usuário: "tudo certo aprovado". Aprovada em produção a `.10` (relatório de
+Cargos com só as comissões vinculadas à empresa) e as correções de dados
+(Camareira → Frigobar; explicações copiadas para a Pengold).
+
 ## 2026-11-22 (14) — Correção de dado: Camareira na Taxa de Serviço Frigobar
 
 Relato: o relatório de Cargos e Salários (Chez Pitu), na explicação da
