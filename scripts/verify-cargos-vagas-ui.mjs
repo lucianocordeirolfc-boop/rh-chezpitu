@@ -385,6 +385,22 @@ try {
   assert(s.cbo < 12 && s.cbo < s.title, `CBO com fonte menor (${s.cbo}px; título ${s.title}px)`);
   assert(s.urgent >= 13 && s.urgent > s.status, `"Urgente" com fonte maior (${s.urgent}px; status ${s.status}px)`);
   assert(s.qtd === "2" && !s.admitidos, `Quantidade mostra só o número ("${s.qtd}"), sem admitidos nesta aba`);
+  const metaRows = () =>
+    $eval(() => {
+      const items = [...document.querySelectorAll(".vaga-card .vaga-card-meta > div")];
+      const tops = [...new Set(items.map((d) => Math.round(d.getBoundingClientRect().top)))];
+      const cut = items.map((d) => d.querySelector("dt")).filter((dt) => dt.scrollWidth > dt.clientWidth + 1).map((dt) => dt.textContent);
+      return { n: items.length, rows: tops.length, perRow: tops.map((t) => items.filter((d) => Math.round(d.getBoundingClientRect().top) === t).length), cut, last: items.at(-1).querySelector("dt").textContent };
+    });
+  s = await metaRows();
+  assert(s.n === 8 && s.rows === 1 && s.last === "Escolaridade" && !s.cut.length, `1500px: as 8 informações (até Escolaridade) na mesma linha, rótulos inteiros (${JSON.stringify(s)})`);
+  await page.setViewport({ width: 1280, height: 900 });
+  s = await metaRows();
+  assert(s.rows === 1 && !s.cut.length, `1280px: continua uma linha só, rótulos inteiros (${JSON.stringify(s)})`);
+  await page.setViewport({ width: 1000, height: 900 });
+  s = await metaRows();
+  assert(s.rows === 2 && s.perRow.join(",") === "4,4", `tela estreita: 2 linhas completas de 4, sem item sozinho (${JSON.stringify(s)})`);
+  await page.setViewport({ width: 1500, height: 1000 });
   const vagaId = await $eval(() => AppData.getCompanyData("Chez Pitu").vagas[0].id);
   await page.screenshot({ path: path.join(tmp, "vagas.png"), fullPage: true });
 

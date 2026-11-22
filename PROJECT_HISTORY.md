@@ -7,6 +7,21 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (8) — Vagas em aberto: dados do cartão em uma só linha
+
+Pedido do usuário: Setor, Quantidade, Contrato, Motivo, Abertura, Prazo
+desejado, Gestor solicitante e Escolaridade na mesma linha (Escolaridade caía
+sozinha na linha de baixo).
+
+- **Causa:** grade `auto-fill` com mínimo de 170px — na largura do cartão
+  cabiam 7 colunas; a 8ª (Escolaridade) descia sozinha.
+- `css/rh-catalog.css`: grade fixa de 8 colunas iguais; até 1100px vira 2
+  linhas de 4 e até 600px 4 linhas de 2 (sempre completas); rótulo em uma
+  linha (0,68rem). `js/quadro-vagas.js`: rótulo com dica (`title`).
+- Teste: `verify-cargos-vagas-ui` 62 — mede no Chrome: 1 linha a 1500px e a
+  1280px sem rótulo cortado; 2 linhas de 4 a 1000px.
+- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (7) — Vagas em aberto: ajustes de leitura do cartão
 
 Pedido do usuário: fonte do CBO menor, fonte do "Urgente" um pouco maior e

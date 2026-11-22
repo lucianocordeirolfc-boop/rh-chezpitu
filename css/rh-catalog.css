@@ -341,11 +341,25 @@
   gap: 8px;
 }
 
+/* 8 informações numa só linha (setor … escolaridade). Em telas menores a
+   grade vira 2 linhas de 4 e, no celular, 4 linhas de 2 — sempre completas. */
 .vaga-card-meta {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 8px 16px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px 14px;
   margin: 10px 0 0;
+}
+
+@media (max-width: 1100px) {
+  .vaga-card-meta {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .vaga-card-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .vaga-card-meta div {
@@ -354,10 +368,13 @@
 
 .vaga-card-meta dt {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .vaga-card-meta dd {

@@ -184,7 +184,7 @@
                 <button type="button" class="link-button danger-link" data-remove-vaga="${esc(v.id)}">Excluir</button>
               </div>
             </header>
-            <dl class="vaga-card-meta">${meta.map(([k, val]) => `<div><dt>${esc(k)}</dt><dd>${esc(val)}</dd></div>`).join("")}</dl>
+            <dl class="vaga-card-meta">${meta.map(([k, val]) => `<div><dt title="${esc(k)}">${esc(k)}</dt><dd>${esc(val)}</dd></div>`).join("")}</dl>
             ${perfil || notes ? `<div class="vaga-perfil-grid">${perfil}${notes}</div>` : ""}
           </article>`;
       })
