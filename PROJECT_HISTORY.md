@@ -30,7 +30,8 @@ aberto" (observação em linha reta conflitando com Editar/Excluir).
   quebra dentro do cartão e não sobrepõe Editar/Excluir).
 - Dados de produção: nenhum alterado (vagas antigas seguem válidas; campos
   novos vazios).
-- **Publicação:** pendente de autorização.
+- **Publicação:** versão `20261122.04`, commit `1835bde` (feat) + carimbo;
+  commit, push e deploy autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (5) — Aprovação e revisão final da documentação
 

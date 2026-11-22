@@ -8,18 +8,20 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261122.03` (exibida como `v2026.11.22.03`) — fonte: `js/version.js`
+- **Versão atual:** `20261122.04` (exibida como `v2026.11.22.04`) — fonte: `js/version.js`
 - **Branch atual:** `main` — sincronizado com `origin/main`
-- **Último commit de código:** `4c53b99` — feat(cargos): CBO repetido com aviso e
-  confirmação; campo Gratificação (+ carimbo `884c79b`)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.03`, **aprovado pelo usuário em
-  2026-11-22**. Nenhuma tarefa de código pendente.
+- **Último commit de código:** `1835bde` — feat(vagas): escolaridade, atribuições
+  e requisitos; vagas em cartões (+ carimbo)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.04`. Até `.03` aprovado pelo
+  usuário; `.04` (perfil da vaga + cartões) aguardando aprovação.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.03`)
 
 - `20261122.01` (e130610): abas Cargos e Salários e Quadro de Vagas.
 - `20261122.02` (66ad6d2): insalubridade com salário base + relatórios PDF.
 - `20261122.03` (4c53b99): CBO repetido com aviso/confirmação + Gratificação.
+- `20261122.04` (1835bde): vaga com escolaridade, atribuições e requisitos;
+  Vagas em aberto em cartões.
 - validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22 (1)–(5).
 - **Pendente do usuário (dados, pela tela):** em cada empresa, Cargos e
   Salários → "Padronizar e importar do cadastro" → conferir grafias → preencher

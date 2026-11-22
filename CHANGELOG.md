@@ -1,3 +1,10 @@
+2026-11-22 (2) - Quadro de Vagas: escolaridade, atribuicoes, requisitos e cartoes (20261122.04)
+- [NOVO] Vaga com escolaridade (lista), atribuicoes do cargo e requisitos obrigatorios, desejaveis e diferenciais; vaga nova sugere o perfil da ultima vaga da mesma funcao
+- [CORRECAO] Vagas em aberto: observacao longa em linha reta espremia Editar/Excluir - vagas agora em cartoes (acoes no topo, textos em blocos com quebra de linha)
+- [MELHORIA] Relatorio PDF do Quadro de Vagas com escolaridade e perfil da vaga
+- Arquivos: js/rh-catalog.js, js/quadro-vagas.js, js/rh-reports.js, css/rh-catalog.css, js/manual.js
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 - Cargos e Salarios, Quadro de Vagas, insalubridade, gratificacao e relatorios PDF (20261122.01 a .03)
 - [NOVO] Aba Cargos e Salarios por empresa: funcao, CBO, salario, gratificacao, insalubridade e comissoes (lista suspensa); sub-aba Comissoes (Taxa de Servico Bar, Taxa de Servico Frigobar, Comissao Ocupacao, Walk-in, Extensao de Diaria, PL Anual) com explicacao editavel
 - [REGRA FIXA] Uma funcao = um salario (nome unico por empresa). CBO ja usado por outra funcao: aviso + confirmacao do usuario (niveis da mesma funcao, Cozinheiro I/II, sem aviso)
