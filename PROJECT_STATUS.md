@@ -9,15 +9,15 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261122.08 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
+**Versão:** 20261122.09 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
 **Data:** 2026-11-22
 **Status:** ✅ Publicado em Produção (Firebase Hosting) — **aprovado pelo usuário** em 2026-11-22
 
 ## Último Deploy
 
 Data: 22/11/2026
-Versões: 20261122.01 → 20261122.08 (Firebase Hosting — chez-pitu-rh), commits
-`e130610`, `66ad6d2`, `4c53b99`, `1835bde`, `b778722`, `9b8b227`, `e32222f`, `174d51f` (+ carimbos),
+Versões: 20261122.01 → 20261122.09 (Firebase Hosting — chez-pitu-rh), commits
+`e130610`, `66ad6d2`, `4c53b99`, `1835bde`, `b778722`, `9b8b227`, `e32222f`, `174d51f`, `304c12b` (+ carimbos),
 push em `origin/main`.
 
 - Nova aba **Cargos e Salários** (por empresa): função, CBO, salário,
@@ -31,12 +31,13 @@ push em `origin/main`.
   requisitos (obrigatórios, desejáveis, diferenciais), exibida em cartões
   (`20261122.04`; ajustes de fonte/quantidade em `.05`; dados do cartão em uma linha em `.06`;
   etiqueta de entrevista agendada em `.07`; admissões por etapas com cadastro
-  do funcionário só ao concluir em `.08`, aguardando aprovação).
+  do funcionário só ao concluir em `.08`; vaga amarrada à função na admissão
+  em `.09`; `.08`/`.09` aguardando aprovação).
 - **Relatórios PDF** das duas abas, com escolha de seções.
 - Nenhum dado de produção alterado. **Pendente do usuário:** em cada empresa,
   "Padronizar e importar do cadastro" e preencher CBO/salário das funções.
 
-Detalhes em `PROJECT_HISTORY.md` → 2026-11-22 a 2026-11-22 (11).
+Detalhes em `PROJECT_HISTORY.md` → 2026-11-22 a 2026-11-22 (12).
 
 ## Deploy 20261117.01 a 20261117.08
 

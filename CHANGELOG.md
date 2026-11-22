@@ -1,3 +1,8 @@
+2026-11-22 (7) - Admissao: vaga amarrada a funcao (20261122.09)
+- [CORRECAO] Nova admissao mostrava todas as vagas apos escolher a funcao. Agora so as vagas da funcao ("Nenhuma vaga para esta funcao" quando nao houver); trocar a funcao limpa vaga de outra; vaga escolhida antes preenche a funcao; gravacao recusa vaga de outra funcao
+- Arquivos: js/quadro-vagas.js, js/rh-catalog.js
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 (6) - Admissoes por etapas; cadastro do funcionario so ao concluir (20261122.08)
 - [NOVO] Admissao com a data de cada etapa: documentos recebidos, ASO agendado, ASO liberado, documentacao enviada a contabilidade e inicio; linha do tempo no cartao; situacao atualizada pelas etapas
 - [NOVO] Concluidas todas as etapas, "Cadastrar funcionario" abre o Cadastro de Funcionarios completo ja preenchido (nome, funcao, setor, admissao = inicio); ao salvar, a admissao e concluida e vinculada

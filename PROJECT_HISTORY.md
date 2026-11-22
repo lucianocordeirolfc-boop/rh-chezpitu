@@ -18,7 +18,8 @@ mostrava todas as vagas; deve mostrar só as da função selecionada.
   função da vaga.
 - `js/rh-catalog.js`: `saveAdmissao` recusa vaga de outra função.
 - Testes: `verify-quadro-vagas` 56, `verify-cargos-vagas-ui` 82.
-- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. **Publicação:** versão `20261122.09`,
+  commit `304c12b` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (11) — Admissões: etapas do processo e cadastro só ao concluir
 

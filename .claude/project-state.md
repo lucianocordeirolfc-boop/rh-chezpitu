@@ -8,12 +8,13 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261122.08` (exibida como `v2026.11.22.08`) — fonte: `js/version.js`
+- **Versão atual:** `20261122.09` (exibida como `v2026.11.22.09`) — fonte: `js/version.js`
 - **Branch atual:** `main` — sincronizado com `origin/main`
-- **Último commit de código:** `174d51f` — feat(vagas): admissões por etapas;
-  cadastro do funcionário só ao concluir (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.08`. `.01` a `.07` aprovados pelo
-  usuário; `.08` (admissões por etapas) aguardando aprovação.
+- **Último commit de código:** `304c12b` — feat(vagas): na admissão, vaga
+  amarrada à função (+ carimbo)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.09`. `.01` a `.07` aprovados pelo
+  usuário; `.08` (admissões por etapas) e `.09` (vaga amarrada à função)
+  aguardando aprovação.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.07`)
 
@@ -29,6 +30,7 @@
   horário da entrevista no candidato.
 - `20261122.08` (174d51f): admissões por etapas (datas); "Cadastrar
   funcionário" só ao concluir, abrindo o cadastro pré-preenchido.
+- `20261122.09` (304c12b): na admissão, lista de vagas só da função escolhida.
 - validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22 (1)–(5).
 - **Pendente do usuário (dados, pela tela):** em cada empresa, Cargos e
   Salários → "Padronizar e importar do cadastro" → conferir grafias → preencher
