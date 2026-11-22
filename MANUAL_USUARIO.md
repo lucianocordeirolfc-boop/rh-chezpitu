@@ -65,9 +65,9 @@ O funcionário é cadastrado na **empresa da aba ativa**. O cadastro é a fonte 
 
 **Alterar folga não mexe no passado:** ao mudar a **folga fixa**, os **domingos de folga** ou a **2ª folga**, a mudança vale **a partir da data em que você salva**. Os dias anteriores (escala, VT e feriados) ficam exatamente como estavam.
 
-O **Cargo** é escolhido em lista suspensa com as funções de **Cargos e Salários** da empresa. Ao escolher a função, o **CBO**, o **salário** e a **insalubridade** aparecem preenchidos e **não podem ser alterados no cadastro** — mudam só em Cargos e Salários. Cargo antigo que ainda não está em Cargos e Salários continua salvo e aparece com o aviso "não cadastrada em Cargos e Salários". Enquanto a empresa não tiver nenhuma função cadastrada, vale a lista antiga com **➕ Cadastrar novo cargo**.
+O **Cargo** é escolhido em lista suspensa com as funções de **Cargos e Salários** da empresa. Ao escolher a função, o **CBO**, o **salário**, a **gratificação** e a **insalubridade** aparecem preenchidos e **não podem ser alterados no cadastro** — mudam só em Cargos e Salários. Cargo antigo que ainda não está em Cargos e Salários continua salvo e aparece com o aviso "não cadastrada em Cargos e Salários". Enquanto a empresa não tiver nenhuma função cadastrada, vale a lista antiga com **➕ Cadastrar novo cargo**.
 
-A planilha do **Exportar Excel** ganhou no fim as colunas **CBO**, **Salário (Cargos e Salários)** e **Insalubridade (%)**.
+A planilha do **Exportar Excel** ganhou no fim as colunas **CBO**, **Salário (Cargos e Salários)**, **Insalubridade (%)**, **Base insalubridade**, **Valor insalubridade** e **Gratificação**.
 
 **Exportar Excel:** o botão **Exportar Excel**, na Lista de funcionários, baixa uma planilha `.xlsx` com **todos** os funcionários da empresa da aba ativa (ativos e inativos, sem considerar os filtros da tela). Cada linha é um funcionário e cada coluna um campo do cadastro: empresa, razão social, CNPJ, ID interno, nome, CPF, CTPS, cargo, setor, status, admissão, desligamento, folga fixa (vigente e agendada), horário, domingos de folga, VT diário, origem, observações e datas de cadastro/atualização. CPF e CTPS saem como texto (zeros à esquerda preservados); datas e VT saem como data e valor reais do Excel. A exportação apenas lê os dados — nada é alterado.
 
@@ -79,14 +79,15 @@ Cada empresa tem as suas funções. Duas sub-abas:
 
 - **Funções e Salários:** função, CBO (0000-00), salário e comissões.
   - Uma função tem **um único salário**: não existem duas funções com o mesmo nome (maiúsculas, acentos e espaços não contam).
-  - Um **CBO** só pode estar em **uma** função da empresa — exceto **níveis da mesma função**, que podem dividir o CBO: Cozinheiro I e Cozinheiro II, Recepcionista Júnior e Recepcionista Sênior (nível no fim do nome: I, II, III…, 1, 2…, Júnior, Pleno, Sênior). Cada nível tem seu próprio salário.
+  - **CBO repetido:** se o CBO já estiver em outra função, o sistema **avisa** qual é a função e pergunta se deseja atribuir o mesmo CBO mesmo assim. Confirmando, a função é salva (fica registrado quem confirmou) e a tabela mostra "⚠ também em …". Níveis da mesma função (Cozinheiro I e Cozinheiro II, Recepcionista Júnior e Sênior) dividem o CBO sem aviso.
+  - **Gratificação:** valor em R$, no mesmo formato do salário. Aparece na tabela, no pop-up do funcionário (somente leitura), no Exportar Excel e nos relatórios; as mudanças ficam no histórico.
   - Toda mudança de salário fica no **histórico** da função.
   - **Insalubridade:** em **Editar**, escolha *Não*, um grau da CLT (mínimo 10%, médio 20%, máximo 40%) ou *Outro percentual (CCT/laudo)* e informe o valor. Ao lado, informe o **Salário base para cálculo** (ex.: salário mínimo ou piso da categoria): o sistema mostra na hora o **valor da insalubridade** (base × percentual). Percentual, base e valor aparecem na tabela, no pop-up do funcionário (somente leitura) e no Exportar Excel; as mudanças ficam no histórico da função.
 - **Comissões:** Taxa de Serviço Bar, Taxa de Serviço Frigobar, Comissão Ocupação, Walk-in, Extensão de Diária e PL Anual — cada uma com um campo para explicar como funciona. Em *Funções e Salários* você marca (lista suspensa) quais comissões cada função recebe. É possível criar comissões novas.
 
 **Padronizar e importar do cadastro:** traz os cargos já usados no Cadastro de Funcionários (ativos e inativos) com a grafia padrão sugerida — por exemplo "GARÇON" → "Garçom", "Enc. De Manutenção" → "Encarregado de Manutenção", "SUB GERENTE" → "Subgerente". Você pode ajustar cada nome (dois grupos com o mesmo nome viram uma só função). Nada é gravado antes da confirmação, que mostra cada grafia alterada. A grafia antiga fica guardada no histórico do funcionário. Depois, preencha CBO e salário em **Editar**.
 
-**Relatório PDF:** o botão **Relatório PDF** abre a escolha das seções — *Funções e salários* (com a folha estimada de salário + insalubridade), *Comissões* e *Funcionários por função* (opção de incluir inativos). Na janela de impressão, escolha **Salvar como PDF**.
+**Relatório PDF:** o botão **Relatório PDF** abre a escolha das seções — *Funções e salários* (com a folha estimada de salário + gratificação + insalubridade), *Comissões* e *Funcionários por função* (opção de incluir inativos). Na janela de impressão, escolha **Salvar como PDF**.
 
 **Excluir função** só é possível sem funcionários vinculados (ativos ou inativos) e sem vaga em andamento; ela vai para a **Lixeira** e pode ser restaurada.
 

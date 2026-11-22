@@ -7,6 +7,26 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (4) — CBO repetido com aviso + campo Gratificação
+
+Pedido do usuário: CBO de outra função só avisa e, com confirmação, permite;
+novo campo Gratificação (R$, formato do salário).
+
+- `js/data.js`: `findCargoConflict` só bloqueia NOME repetido;
+  `findCboShared` (novo) lista funções de outra família com o mesmo CBO.
+- `js/rh-catalog.js`: `saveCargo` lança `CBO_SHARED` até `confirmCboShared`;
+  grava `cboShared` {with, by, at}; reconfirma só se o CBO mudar.
+  `gratificacao` + `gratificacaoHistory`; `remuneracaoCargo`.
+- `js/cargos.js`: confirmação "Deseja atribuir o mesmo CBO…?", aviso "⚠ também
+  em …" na tabela; campo e coluna Gratificação; histórico.
+- `js/funcionarios.js`: gratificação somente leitura no pop-up; Excel AD.
+- `js/rh-reports.js`: coluna Gratificação; folha e remuneração incluem a
+  gratificação.
+- Testes: `verify-cargos-salarios` 100, `verify-rh-reports` 23,
+  `verify-cargos-vagas-ui` 49, `verify-exportar-excel` 46 (A1:AD4).
+- Dados de produção: nenhum alterado.
+- **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (3) — Salário base da insalubridade + relatórios PDF
 
 Pedido do usuário: salário base para cálculo ao lado da insalubridade; depois,

@@ -104,9 +104,9 @@
   // ── Cargos e Salários ─────────────────────────────────────────────────────
 
   const CARGOS_SECTIONS = [
-    { id: "funcoes", label: "Funções e salários", hint: "função, CBO, salário, insalubridade, comissões e quantidade de funcionários" },
+    { id: "funcoes", label: "Funções e salários", hint: "função, CBO, salário, gratificação, insalubridade, comissões e quantidade de funcionários" },
     { id: "comissoes", label: "Comissões", hint: "explicação de cada comissão e funções que a recebem" },
-    { id: "funcionarios", label: "Funcionários por função", hint: "funcionários agrupados por função, com salário e insalubridade" }
+    { id: "funcionarios", label: "Funcionários por função", hint: "funcionários agrupados por função, com a remuneração da função" }
   ];
 
   function insalText(cargo) {
@@ -126,13 +126,14 @@
       .map((cargo) => {
         const linked = RhCatalog.employeesForCargo(company, cargo).filter((e) => includeInactive || AppData.isEmployeeActive(e));
         totalEmployees += linked.length;
-        const valor = RhCatalog.insalubridadeValor(cargo) || 0;
-        if (cargo.salary != null) folha += (cargo.salary + valor) * linked.length;
+        const remuneracao = RhCatalog.remuneracaoCargo(cargo);
+        if (remuneracao != null) folha += remuneracao * linked.length;
         const comissoes = (cargo.commissions || []).map((id) => RhCatalog.comissaoName(company, id)).filter(Boolean).join(", ");
         return `<tr>
           <td><b>${esc(cargo.name)}</b>${cargo.notes ? `<small>${esc(cargo.notes)}</small>` : ""}</td>
           <td>${esc(cargo.cbo || "a definir")}</td>
           <td class="num">${esc(money(cargo.salary))}</td>
+          <td class="num">${cargo.gratificacao != null ? esc(money(cargo.gratificacao)) : "—"}</td>
           <td>${insalText(cargo)}</td>
           <td>${esc(comissoes || "—")}</td>
           <td class="num">${linked.length}</td>
@@ -142,9 +143,9 @@
     return `<section>
       <h2>Funções e salários<small>${cargos.length} função(ões)</small></h2>
       <table>
-        <thead><tr><th style="width:24%">Função</th><th style="width:9%">CBO</th><th class="num" style="width:11%">Salário</th><th style="width:20%">Insalubridade</th><th>Comissões</th><th class="num" style="width:9%">Funcionários${includeInactive ? "" : " ativos"}</th></tr></thead>
+        <thead><tr><th style="width:22%">Função</th><th style="width:9%">CBO</th><th class="num" style="width:10%">Salário</th><th class="num" style="width:10%">Gratificação</th><th style="width:18%">Insalubridade</th><th>Comissões</th><th class="num" style="width:9%">Funcionários${includeInactive ? "" : " ativos"}</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="5">Total de funcionários · folha estimada (salário + insalubridade): ${esc(RhCatalog.formatMoney(folha))}</td><td class="num">${totalEmployees}</td></tr></tfoot>
+        <tfoot><tr><td colspan="6">Total de funcionários · folha estimada (salário + gratificação + insalubridade): ${esc(RhCatalog.formatMoney(folha))}</td><td class="num">${totalEmployees}</td></tr></tfoot>
       </table>
     </section>`;
   }
@@ -180,7 +181,7 @@
         const valor = g.cargo ? RhCatalog.insalubridadeValor(g.cargo) : null;
         const head = `<tr class="group"><td colspan="5">${esc(g.role)}${
           g.cargo
-            ? ` · CBO ${esc(g.cargo.cbo || "a definir")} · ${esc(money(g.cargo.salary))}${g.cargo.insalubridade != null ? ` · insalubridade ${esc(RhCatalog.insalubridadeLabel(g.cargo.insalubridade))}${valor != null ? ` (${esc(money(valor))})` : ""}` : ""}`
+            ? ` · CBO ${esc(g.cargo.cbo || "a definir")} · ${esc(money(g.cargo.salary))}${g.cargo.gratificacao != null ? ` · gratificação ${esc(money(g.cargo.gratificacao))}` : ""}${g.cargo.insalubridade != null ? ` · insalubridade ${esc(RhCatalog.insalubridadeLabel(g.cargo.insalubridade))}${valor != null ? ` (${esc(money(valor))})` : ""}` : ""}`
             : " · fora de Cargos e Salários"
         } — ${g.list.length}</td></tr>`;
         return (
@@ -189,7 +190,7 @@
             .map(
               (e) => `<tr><td>${esc(e.name)}</td><td>${esc(e.department || "—")}</td><td>${fmtDate(e.admissionDate)}</td>
                 <td>${AppData.isEmployeeActive(e) ? "Ativo" : `Inativo${e.deactivatedAt ? ` desde ${fmtDate(e.deactivatedAt)}` : ""}`}</td>
-                <td class="num">${g.cargo ? esc(money(g.cargo.salary != null ? g.cargo.salary + (valor || 0) : null)) : "—"}</td></tr>`
+                <td class="num">${g.cargo ? esc(money(RhCatalog.remuneracaoCargo(g.cargo))) : "—"}</td></tr>`
             )
             .join("")
         );
@@ -198,7 +199,7 @@
     return `<section>
       <h2>Funcionários por função<small>${employees.length} funcionário(s)${includeInactive ? ", inclui inativos" : ", somente ativos"}</small></h2>
       <table>
-        <thead><tr><th style="width:34%">Funcionário</th><th>Setor</th><th style="width:12%">Admissão</th><th style="width:16%">Situação</th><th class="num" style="width:16%">Salário + insalubridade</th></tr></thead>
+        <thead><tr><th style="width:34%">Funcionário</th><th>Setor</th><th style="width:12%">Admissão</th><th style="width:16%">Situação</th><th class="num" style="width:16%">Remuneração (salário + gratificação + insalubridade)</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </section>`;

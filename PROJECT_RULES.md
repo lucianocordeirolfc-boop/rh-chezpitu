@@ -172,15 +172,21 @@ de conflito é `AppData.findCargoConflict`, usada também pela Lixeira).
 
 1. **Uma função = um salário.** Nome da função único por empresa (caixa,
    acento e espaços não contam). Não existe a mesma função com dois salários.
-2. **Um CBO = uma função.** CBO (6 dígitos, `0000-00`) não se repete entre
-   funções da mesma empresa. **Exceção (2026-11-22, pedido do usuário) —
-   função igualitária:** níveis da mesma função dividem o CBO — mesmo
-   nome-base com nível no fim (I…X, 1…99, Júnior/Jr, Pleno, Sênior/Sr), ex.:
-   Cozinheiro I e Cozinheiro II (`AppData.cargoFamilyKey`). Cada nível segue
-   com nome e salário próprios. Variação de gênero (Cozinheira × Cozinheiro)
-   NÃO é nível. CBO e salário podem ficar "a definir".
-3. **Salário e CBO nunca são gravados nem editados pelo Cadastro de
-   Funcionários.** O funcionário guarda `roleId` (vínculo) + `role` (nome);
+2. **CBO: aviso com confirmação (não bloqueia).** Desde 2026-11-22 (2º
+   ajuste a pedido do usuário), CBO já usado por função DIFERENTE é permitido
+   depois de aviso + confirmação: `saveCargo` lança `code: "CBO_SHARED"` (nada
+   gravado) até receber `confirmCboShared`; grava `cargo.cboShared` {with, by,
+   at}. Pergunta de novo só se o CBO mudar. `AppData.findCboShared` lista as
+   funções de outra família com o mesmo CBO; tabela mostra "⚠ também em …".
+   Níveis da mesma função (I…X, 1…99, Júnior/Jr, Pleno, Sênior/Sr no fim do
+   nome — `AppData.cargoFamilyKey`, ex.: Cozinheiro I / II) não geram aviso.
+   A Lixeira só recusa restaurar por NOME repetido. CBO e salário podem ficar
+   "a definir".
+3. **Salário, gratificação, CBO e insalubridade nunca são gravados nem
+   editados pelo Cadastro de Funcionários.** **Gratificação** (2026-11-22):
+   `cargo.gratificacao` em R$ (formato do salário), histórico em
+   `gratificacaoHistory`; Excel coluna AD; relatórios PDF e
+   `RhCatalog.remuneracaoCargo` (salário + gratificação + insalubridade). O funcionário guarda `roleId` (vínculo) + `role` (nome);
    salário/CBO são lidos da função (`RhCatalog.resolveEmployeeCargo`; legado
    sem `roleId` resolve pelo nome normalizado). No pop-up aparecem somente
    leitura, sem `name` (não vão no payload); `upsertEmployee` ignora
@@ -195,7 +201,7 @@ de conflito é `AppData.findCargoConflict`, usada também pela Lixeira).
 6. **Salário tem histórico** (`cargo.salaryHistory`).
 7. **Excluir função** só sem funcionário vinculado (ativo ou inativo) e sem vaga
    em andamento; arquiva na Lixeira (`cargo`) + tombstone. Restaurar recusa se
-   o nome/CBO já tiver sido usado por outra função.
+   o nome já tiver sido usado por outra função.
 8. **Insalubridade** (2026-11-22, pedido do usuário): percentual na função
    (`cargo.insalubridade`, 0,01–100; ausente = sem insalubridade), com graus da
    CLT art. 192 sugeridos (10% mínimo, 20% médio, 40% máximo) ou percentual
@@ -218,8 +224,8 @@ Cobertura: `scripts/verify-cargos-salarios.mjs`, `scripts/verify-cargos-vagas-ui
 `js/rh-reports.js`, mesmo padrão do relatório de feriados: HTML montado sem
 DOM e impresso em `<iframe>` isolado ("Salvar como PDF"); SOMENTE LEITURA.
 Botão "Relatório PDF" em cada aba, com escolha de seções. Cargos e Salários
-(retrato): Funções e salários (com folha estimada salário + insalubridade dos
-ativos), Comissões, Funcionários por função (inativos opcionais). Quadro de
+(retrato): Funções e salários (com folha estimada salário + gratificação +
+insalubridade dos ativos), Comissões, Funcionários por função (inativos opcionais). Quadro de
 Vagas (paisagem): Painel RH, Vagas (concluídas/canceladas opcionais),
 Recrutamento e Seleção, Admissões. Todo texto do usuário é escapado.
 Cobertura: `scripts/verify-rh-reports.mjs`, `scripts/verify-cargos-vagas-ui.mjs`

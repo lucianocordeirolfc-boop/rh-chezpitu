@@ -122,6 +122,12 @@
     return `${formatPercent(value)} (${grau ? grau.label.toLocaleLowerCase("pt-BR") : "CCT/laudo"})`;
   }
 
+  /** Remuneração da função: salário + insalubridade (valor) + gratificação. */
+  function remuneracaoCargo(cargo) {
+    if (!cargo || cargo.salary == null) return null;
+    return Math.round((cargo.salary + (insalubridadeValor(cargo) || 0) + (cargo.gratificacao || 0)) * 100) / 100;
+  }
+
   /** Valor da insalubridade = base × percentual; null sem percentual ou sem base. */
   function insalubridadeValor(cargo) {
     const pct = Number(cargo?.insalubridade);
@@ -269,8 +275,8 @@
   }
 
   /**
-   * Cria/edita uma função. Valida nome único (um salário por função) e CBO
-   * único. Renomear atualiza o nome do cargo nos funcionários vinculados
+   * Cria/edita uma função. Valida nome único (um salário por função); CBO já
+   * usado por outra função lança erro code "CBO_SHARED" até a confirmação. Renomear atualiza o nome do cargo nos funcionários vinculados
    * (histórico em roleHistory — a grafia antiga nunca se perde).
    */
   function saveCargo(company, input) {
@@ -291,8 +297,33 @@
     const conflict = AppData.findCargoConflict(block.cargos, candidate);
     if (conflict) throw new Error(conflict);
 
+    // CBO já usado por função diferente: só avisa — grava com a confirmação
+    // do usuário (input.confirmCboShared). Pergunta de novo só se o CBO mudar.
+    const shared = AppData.findCboShared(block.cargos, candidate);
+    const cboChanged = !previous || AppData.cboDigits(previous.cbo) !== AppData.cboDigits(cbo);
+    if (shared.length && cboChanged && !input.confirmCboShared) {
+      const error = new Error(
+        `O CBO ${cbo} já está atribuído à função ${shared.map((c) => `"${c.name}"`).join(", ")}.`
+      );
+      error.code = "CBO_SHARED";
+      error.sharedWith = shared.map((c) => c.name);
+      throw error;
+    }
+
+    // Gratificação (R$, mesmo formato do salário). Ausente no input = mantém.
+    const gratificacao = Object.prototype.hasOwnProperty.call(input, "gratificacao")
+      ? parseMoney(input.gratificacao)
+      : previous?.gratificacao ?? null;
+    if (Number.isNaN(gratificacao)) throw new Error("Gratificação inválida.");
+
     const stamp = AppData.now();
     const user = AppData.currentUserEmail();
+    const gratificacaoHistory = Array.isArray(previous?.gratificacaoHistory) ? [...previous.gratificacaoHistory] : [];
+    if ((previous?.gratificacao ?? null) !== (gratificacao ?? null)) {
+      const entry = { from: AppData.todayISO(), at: stamp, by: user };
+      if (gratificacao !== null) entry.value = gratificacao; // ausência = removida
+      gratificacaoHistory.push(entry);
+    }
     const salaryHistory = Array.isArray(previous?.salaryHistory) ? [...previous.salaryHistory] : [];
     const previousSalary = previous ? (previous.salary ?? null) : null;
     if (previousSalary !== (salary ?? null)) {
@@ -331,6 +362,7 @@
       cbo: cbo || "",
       salary: salary ?? null,
       insalubridadeHistory,
+      gratificacaoHistory,
       commissions,
       notes: String(input.notes ?? previous?.notes ?? "").trim(),
       salaryHistory,
@@ -341,6 +373,13 @@
     if (record.salary === null) delete record.salary; // RTDB: ausência = sem salário
     if (insalubridade !== null) record.insalubridade = insalubridade;
     if (insalubridadeBase !== null) record.insalubridadeBase = insalubridadeBase;
+    if (gratificacao !== null) record.gratificacao = gratificacao;
+    if (shared.length) {
+      // Registro de quem confirmou o CBO compartilhado (mantido enquanto valer).
+      record.cboShared = cboChanged || !previous?.cboShared
+        ? { with: shared.map((c) => c.name).join(", "), by: user, at: stamp }
+        : { ...previous.cboShared, with: shared.map((c) => c.name).join(", ") };
+    }
 
     let renamed = 0;
     if (previous && previous.name !== name) {
@@ -629,6 +668,7 @@
     formatPercent,
     insalubridadeLabel,
     insalubridadeValor,
+    remuneracaoCargo,
     formatMoney,
     formatMoneyInput,
     formatCbo,

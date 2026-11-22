@@ -150,7 +150,19 @@ const coz2 = RhCatalog.saveCargo(CO, { name: "Chapeiro II", cbo: "5132-05", sala
 assert(coz1.cbo === coz2.cbo && coz1.salary !== coz2.salary, "Chapeiro I e II com o mesmo CBO e salários próprios");
 const coz3 = RhCatalog.saveCargo(CO, { name: "Chapeiro Sênior", cbo: "5132-05", salary: "2500" }).cargo;
 assert(coz3.cbo === "5132-05", "Chapeiro Sênior também pode usar o CBO da família");
-throws(() => RhCatalog.saveCargo(CO, { name: "Confeiteiro", cbo: "5132-05", salary: "1900" }), /Só níveis da mesma função/, "função de outra família continua não podendo usar o CBO");
+console.log("[5c] CBO em função diferente: aviso + confirmação");
+let sharedErr = null;
+try { RhCatalog.saveCargo(CO, { name: "Confeiteiro", cbo: "5132-05", salary: "1900" }); } catch (e) { sharedErr = e; }
+assert(sharedErr?.code === "CBO_SHARED" && /já está atribuído à função "Chapeiro I"/.test(sharedErr.message), "sem confirmação: avisa a função que já usa o CBO");
+assert(!RhCatalog.findCargoByName(CO, "Confeiteiro"), "sem confirmação nada é gravado");
+const confeiteiro = RhCatalog.saveCargo(CO, { name: "Confeiteiro", cbo: "5132-05", salary: "1900", confirmCboShared: true }).cargo;
+assert(confeiteiro.cbo === "5132-05" && confeiteiro.cboShared?.with.includes("Chapeiro I") && confeiteiro.cboShared.at > 0, "com confirmação grava e registra quem confirmou e com quem divide");
+const confEdit = RhCatalog.saveCargo(CO, { id: confeiteiro.id, name: "Confeiteiro", cbo: "5132-05", salary: "2000" }).cargo;
+assert(confEdit.salary === 2000 && confEdit.cboShared.at === confeiteiro.cboShared.at, "editar outro campo não pede confirmação de novo");
+let chapErr = null;
+try { RhCatalog.saveCargo(CO, { name: "Chapeiro III", cbo: "5132-05", salary: "2600" }); } catch (e) { chapErr = e; }
+assert(chapErr?.code === "CBO_SHARED" && /Confeiteiro/.test(chapErr.message) && !/Chapeiro/.test(chapErr.message), "aviso cita só as funções de outra família");
+RhCatalog.removeCargo(CO, confeiteiro.id);
 throws(() => RhCatalog.saveCargo(CO, { name: "Chapeiro II", cbo: "5132-05", salary: "2200" }), /Já existe a função/, "mesmo nível com outro salário continua recusado");
 [coz1, coz2, coz3].forEach((c) => RhCatalog.removeCargo(CO, c.id));
 
@@ -189,6 +201,15 @@ throws(() => RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza"
 const b4 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "", insalubridadeBase: "1518" }).cargo;
 assert(!("insalubridadeBase" in b4) && RhCatalog.insalubridadeValor(b4) === null, "sem insalubridade, a base não é guardada");
 assert(RhCatalog.insalubridadeValor({ insalubridade: 40 }) === null, "sem base, valor a definir");
+const g1 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", gratificacao: "350,50" }).cargo;
+assert(g1.gratificacao === 350.5 && g1.gratificacaoHistory.length === 1 && g1.gratificacaoHistory[0].value === 350.5, "gratificação no formato do salário, com histórico");
+const g2 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600" }).cargo;
+assert(g2.gratificacao === 350.5 && g2.gratificacaoHistory.length === 1, "edição sem o campo mantém a gratificação");
+throws(() => RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", gratificacao: "x" }), /Gratificação inválida/, "gratificação inválida recusada");
+const g3 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", gratificacao: "", insalubridade: "20", insalubridadeBase: "1000" }).cargo;
+assert(!("gratificacao" in g3) && g3.gratificacaoHistory.length === 2, "retirar a gratificação fica no histórico");
+const g4 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", gratificacao: "100" }).cargo;
+assert(RhCatalog.remuneracaoCargo(g4) === 1900, "remuneração = salário 1.600 + gratificação 100 + insalubridade 200");
 RhCatalog.removeCargo(CO, insal.id);
 
 console.log("[6] Funcionário herda salário/CBO; cadastro não grava salário/CBO");
@@ -217,9 +238,9 @@ assert(removed.ok && !RhCatalog.getCargo(CO, vazia.id), "função sem vinculados
 const entry = AppData.listDeletedArchive({ kinds: ["cargo"] })[0];
 assert(AppData.listDeletedArchive({ kinds: ["cargo"] }).length === archiveBefore + 1 && entry.payload.record.name === "Mensageiro", "cópia completa na Lixeira");
 assert(Number(AppData.state.tombstones.cargos?.[CO]?.[vazia.id]) > 0, "tombstone gravado");
-const conflictCargo = RhCatalog.saveCargo(CO, { name: "Carregador", cbo: "5151-10", salary: "1600" }).cargo;
+const conflictCargo = RhCatalog.saveCargo(CO, { name: "mensageiro", cbo: "5151-11", salary: "1700" }).cargo;
 const blockedRestore = AppData.restoreDeletedArchiveEntry(entry.id, { recompute: false });
-assert(!blockedRestore.ok && /CBO/.test(blockedRestore.error), "restaurar não fura a regra do CBO único");
+assert(!blockedRestore.ok && /Já existe a função/.test(blockedRestore.error), "restaurar não fura a regra do nome único (um salário por função)");
 RhCatalog.removeCargo(CO, conflictCargo.id);
 const restored = AppData.restoreDeletedArchiveEntry(entry.id, { recompute: false });
 assert(restored.ok && RhCatalog.getCargo(CO, vazia.id)?.salary === 1600, "restauração devolve a função completa");

@@ -42,7 +42,7 @@ co.companyInfo.legalName = "Chez Pitu Hotelaria Ltda";
 co.companyInfo.cnpj = "12345678000190";
 ["cargos", "comissoes", "vagas", "candidatos", "admissoes"].forEach((c) => { co[c] = []; AppData.getCompanyData(PG)[c] = []; });
 const limp = RhCatalog.saveCargo(CO, { name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "40", insalubridadeBase: "1.518,00", commissions: ["walk-in"], notes: "Obs <script>alert(1)</script>" }).cargo;
-const recep = RhCatalog.saveCargo(CO, { name: "Recepcionista", cbo: "4221-05", salary: "2000" }).cargo;
+const recep = RhCatalog.saveCargo(CO, { name: "Recepcionista", cbo: "4221-05", salary: "2000", gratificacao: "250" }).cargo;
 RhCatalog.saveComissao(CO, { id: "walk-in", name: "Walk-in", description: "5% da diária <b>sem reserva</b>" });
 co.employees = [
   { id: "e1", name: "Ana Limpeza", role: limp.name, roleId: limp.id, department: "Governança", status: "Ativo", admissionDate: "2024-01-10" },
@@ -65,7 +65,9 @@ assert(all.includes("Funções e salários") && all.includes("Comissões") && al
 assert(all.includes("Auxiliar de Limpeza") && all.includes("5143-20") && all.includes("40% (grau máximo)"), "função, CBO e insalubridade");
 assert(/607,20/.test(all) && /1\.518,00/.test(all), "valor da insalubridade (40% de R$ 1.518,00 = R$ 607,20) e base");
 assert(!all.includes("Garçom Pengold"), "não mistura funções da outra empresa");
-assert(/folha estimada[^<]*4\.207,20/.test(all), "folha estimada dos ativos = (1.600 + 607,20) + 2.000");
+assert(/folha estimada \(salário \+ gratificação \+ insalubridade\)[^<]*4\.457,20/.test(all), "folha estimada dos ativos = (1.600 + 607,20) + (2.000 + 250)");
+assert(all.includes("<th class=\"num\" style=\"width:10%\">Gratificação</th>") && /250,00/.test(all), "coluna de gratificação");
+assert(/2\.250,00/.test(all), "remuneração do recepcionista = salário + gratificação");
 assert(all.includes("Ana Limpeza") && !all.includes("Bia Limpeza"), "sem inativos por padrão");
 assert(all.includes("Caio Recepção") && all.includes("Davi Legado") && all.includes("fora de Cargos e Salários"), "legado pelo nome e cargo fora do catálogo aparecem");
 assert(/2\.207,20/.test(all), "salário + insalubridade por funcionário");

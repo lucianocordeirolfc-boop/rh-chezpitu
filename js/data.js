@@ -1534,11 +1534,22 @@
       if (nameKey && normalizeSearchText(String(other.name || "").replace(/\s+/g, " ").trim()) === nameKey) {
         return `Já existe a função "${other.name}" nesta empresa (uma função só pode ter um salário).`;
       }
-      if (cbo && cboDigits(other.cbo) === cbo && cargoFamilyKey(other.name) !== cargoFamilyKey(record.name)) {
-        return `O CBO ${record.cbo} já está atribuído à função "${other.name}". Só níveis da mesma função (ex.: Cozinheiro I e Cozinheiro II) podem dividir o CBO.`;
-      }
     }
     return "";
+  }
+
+  /**
+   * CBO repetido em função DIFERENTE (outra família) — desde 2026-11-22 não
+   * bloqueia: devolve as funções que já usam o CBO, para a tela avisar e pedir
+   * confirmação. Níveis da mesma função (Cozinheiro I / II) não entram.
+   */
+  function findCboShared(list, record) {
+    const cbo = cboDigits(record?.cbo);
+    if (!cbo) return [];
+    return (list || []).filter(
+      (other) =>
+        other && other.id !== record.id && cboDigits(other.cbo) === cbo && cargoFamilyKey(other.name) !== cargoFamilyKey(record.name)
+    );
   }
 
   function restoreArchivedRecords(entry, restoredAt) {
@@ -5976,6 +5987,7 @@
     recordTombstone,
     findCargoConflict,
     cargoFamilyKey,
+    findCboShared,
     cboDigits,
     newId: uid,
     currentUserEmail,

@@ -35,11 +35,18 @@
     return names.map((name) => `<span class="pill info rh-pill">${esc(name)}</span>`).join(" ");
   }
 
+  /** Aviso discreto quando o CBO também está em outra função (confirmado). */
+  function sharedCboHTML(co, cargo) {
+    const shared = AppData.findCboShared(RhCatalog.listCargos(co), cargo);
+    if (!shared.length) return "";
+    return `<small class="help-text role-catalog-warn" title="${esc(cargo.cboShared ? `Confirmado por ${cargo.cboShared.by}` : "")}">⚠ também em ${esc(shared.map((c) => c.name).join(", "))}</small>`;
+  }
+
   function cargoRows() {
     const co = company();
     const cargos = RhCatalog.listCargos(co);
     if (!cargos.length) {
-      return `<tr><td colspan="7" class="rh-empty">Nenhuma função cadastrada para ${esc(co)}. Use "Padronizar e importar do cadastro" para trazer os cargos já usados no Cadastro de Funcionários, ou "+ Nova função".</td></tr>`;
+      return `<tr><td colspan="8" class="rh-empty">Nenhuma função cadastrada para ${esc(co)}. Use "Padronizar e importar do cadastro" para trazer os cargos já usados no Cadastro de Funcionários, ou "+ Nova função".</td></tr>`;
     }
     return cargos
       .map((cargo) => {
@@ -48,8 +55,9 @@
         return `
           <tr>
             <td><strong>${esc(cargo.name)}</strong>${cargo.notes ? `<small class="help-text">${esc(cargo.notes)}</small>` : ""}</td>
-            <td>${cargo.cbo ? esc(cargo.cbo) : `<span class="pill warning rh-pill">a definir</span>`}</td>
+            <td>${cargo.cbo ? esc(cargo.cbo) : `<span class="pill warning rh-pill">a definir</span>`}${sharedCboHTML(co, cargo)}</td>
             <td class="rh-num">${cargo.salary != null ? esc(RhCatalog.formatMoney(cargo.salary)) : `<span class="pill warning rh-pill">a definir</span>`}</td>
+            <td class="rh-num">${cargo.gratificacao != null ? esc(RhCatalog.formatMoney(cargo.gratificacao)) : `<span class="help-text">—</span>`}</td>
             <td>${cargo.insalubridade != null ? `<span class="pill warning rh-pill">${esc(RhCatalog.insalubridadeLabel(cargo.insalubridade))}</span>${insalubridadeValueHTML(cargo)}` : `<span class="help-text">—</span>`}</td>
             <td>${commissionPills(cargo)}</td>
             <td class="rh-num" title="${active} ativo(s) de ${linked.length} vinculado(s)">${active}<small class="help-text">${linked.length} no total</small></td>
@@ -86,7 +94,7 @@
           <div>
             <p class="eyebrow">${esc(co)}</p>
             <h2>Funções e salários</h2>
-            <p class="help-text">Cada função tem um único salário. O CBO é exclusivo da função — só níveis da mesma função (ex.: Cozinheiro I e Cozinheiro II) podem dividi-lo. O Cadastro de Funcionários escolhe a função desta lista e herda salário, CBO e insalubridade (não editáveis lá).</p>
+            <p class="help-text">Cada função tem um único salário. Se o CBO já estiver em outra função, o sistema avisa e pede confirmação (níveis da mesma função, como Cozinheiro I e II, não geram aviso). O Cadastro de Funcionários escolhe a função desta lista e herda salário, gratificação, CBO e insalubridade (não editáveis lá).</p>
           </div>
           <div class="rh-actions">
             ${plan.length ? `<button type="button" class="secondary btn-sm" id="btnStandardizeRoles" title="Traz os cargos do Cadastro de Funcionários com grafia padronizada">Padronizar e importar do cadastro (${pendingEmployees})</button>` : ""}
@@ -97,7 +105,7 @@
         </div>
         <div class="table-wrap">
           <table class="table-premium rh-table">
-            <thead><tr><th>Função</th><th>CBO</th><th>Salário</th><th>Insalubridade</th><th>Comissões</th><th>Funcionários ativos</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Função</th><th>CBO</th><th>Salário</th><th>Gratificação</th><th>Insalubridade</th><th>Comissões</th><th>Funcionários ativos</th><th>Ações</th></tr></thead>
             <tbody>${cargoRows()}</tbody>
           </table>
         </div>
@@ -166,6 +174,18 @@
       </div>`;
   }
 
+  function gratificacaoHistoryHTML(cargo) {
+    const history = (cargo?.gratificacaoHistory || []).slice().reverse();
+    if (!history.length) return "";
+    return `
+      <div class="rh-history">
+        <p class="eyebrow">Histórico de gratificação</p>
+        <ul>${history
+          .map((h) => `<li>${esc(AppData.formatDateBR(h.from))} — ${h.value != null ? esc(RhCatalog.formatMoney(h.value)) : "sem gratificação"} <small class="help-text">${esc(h.by || "")}</small></li>`)
+          .join("")}</ul>
+      </div>`;
+  }
+
   function salaryHistoryHTML(cargo) {
     const history = (cargo?.salaryHistory || []).slice().reverse();
     if (!history.length) return "";
@@ -219,6 +239,9 @@
           <label>Salário (R$)<input name="salary" inputmode="decimal" autocomplete="off" value="${esc(RhCatalog.formatMoneyInput(cargo?.salary))}" placeholder="0,00"></label>
         </div>
         <div class="func-form-row cols-3">
+          <label>Gratificação (R$)<input name="gratificacao" inputmode="decimal" autocomplete="off" value="${esc(RhCatalog.formatMoneyInput(cargo?.gratificacao))}" placeholder="0,00"></label>
+        </div>
+        <div class="func-form-row cols-3">
           ${insalubridadeFieldHTML(cargo)}
         </div>
         <div class="func-form-row">
@@ -229,6 +252,7 @@
         </div>
         ${cargo ? `<p class="help-text">${linked.length} funcionário(s) vinculado(s). Renomear a função atualiza o cargo deles; salário e CBO valem para todos.</p>` : ""}
         ${salaryHistoryHTML(cargo)}
+        ${gratificacaoHistoryHTML(cargo)}
         ${insalubridadeHistoryHTML(cargo)}
         <div class="popup-actions">
           <button type="button" class="btn btn-cancel" data-rh-close>Cancelar</button>
@@ -285,6 +309,7 @@
         name: form.elements.name.value,
         cbo: form.elements.cbo.value,
         salary: form.elements.salary.value,
+        gratificacao: form.elements.gratificacao.value,
         notes: form.elements.notes.value,
         commissions: [...form.querySelectorAll("input[name='commissions']:checked")].map((cb) => cb.value),
         insalubridade: insalMode.value === "outro" ? insalOutro.value : insalMode.value,
@@ -305,12 +330,25 @@
           if (!window.confirm(`O salário de "${cargo.name}" passa de ${RhCatalog.formatMoney(cargo.salary)} para ${nextSalary != null ? RhCatalog.formatMoney(nextSalary) : "a definir"} — vale para os ${linked.length} funcionário(s) da função. Continuar?`)) return;
         }
       }
-      try {
-        const result = RhCatalog.saveCargo(company(), payload);
+      const save = (extra = {}) => {
+        const result = RhCatalog.saveCargo(company(), { ...payload, ...extra });
         closePopup();
         toast(result.renamedEmployees ? `Função salva. ${result.renamedEmployees} funcionário(s) atualizado(s).` : "Função salva.");
         render(container);
+      };
+      try {
+        save();
       } catch (error) {
+        if (error.code === "CBO_SHARED") {
+          // CBO em outra função: avisa e só grava com a confirmação do usuário.
+          if (!window.confirm(`Atenção: ${error.message}\n\nDeseja atribuir o mesmo CBO a "${newName}" também?`)) return;
+          try {
+            save({ confirmCboShared: true });
+          } catch (again) {
+            alert(again.message || "Não foi possível salvar a função.");
+          }
+          return;
+        }
         alert(error.message || "Não foi possível salvar a função.");
       }
     });

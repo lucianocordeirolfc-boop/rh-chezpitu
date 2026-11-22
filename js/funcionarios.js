@@ -660,7 +660,8 @@
         <label>CBO<input id="roleCboDisplay" readonly tabindex="-1" class="func-readonly-input" placeholder="—" title="Definido em Cargos e Salários"></label>
         <label>Salário<input id="roleSalaryDisplay" readonly tabindex="-1" class="func-readonly-input" placeholder="—" title="Definido em Cargos e Salários"></label>
         <label>Insalubridade<input id="roleInsalubridadeDisplay" readonly tabindex="-1" class="func-readonly-input" placeholder="—" title="Definido em Cargos e Salários"></label>
-        <small id="roleCatalogHint" class="help-text compact-help role-catalog-hint full">Salário, CBO e insalubridade vêm da função em Cargos e Salários e não podem ser alterados aqui.</small>
+        <label>Gratificação<input id="roleGratificacaoDisplay" readonly tabindex="-1" class="func-readonly-input" placeholder="—" title="Definido em Cargos e Salários"></label>
+        <small id="roleCatalogHint" class="help-text compact-help role-catalog-hint full">Salário, gratificação, CBO e insalubridade vêm da função em Cargos e Salários e não podem ser alterados aqui.</small>
       </div>` : ""}
       <div class="func-form-row cols-3">
         <label>Admissão<input type="date" name="admissionDate" required value="${AppData.todayISO()}"></label>
@@ -894,6 +895,8 @@
     const cargo = cargoId ? window.RhCatalog.getCargo(AppData.getActiveCompany(), cargoId) : null;
     cboEl.value = cargo ? cargo.cbo || "a definir" : "";
     salaryEl.value = cargo ? (cargo.salary != null ? window.RhCatalog.formatMoney(cargo.salary) : "a definir") : "";
+    const gratEl = form.querySelector("#roleGratificacaoDisplay");
+    if (gratEl) gratEl.value = cargo ? (cargo.gratificacao != null ? window.RhCatalog.formatMoney(cargo.gratificacao) : "Não") : "";
     const insalEl = form.querySelector("#roleInsalubridadeDisplay");
     if (insalEl) {
       const valor = cargo ? window.RhCatalog.insalubridadeValor(cargo) : null;
@@ -908,7 +911,7 @@
       hint.classList.toggle("role-catalog-warn", Boolean(legacy));
       hint.textContent = legacy
         ? "Este cargo não está em Cargos e Salários: escolha uma função da lista para vincular salário e CBO."
-        : "Salário, CBO e insalubridade vêm da função em Cargos e Salários e não podem ser alterados aqui.";
+        : "Salário, gratificação, CBO e insalubridade vêm da função em Cargos e Salários e não podem ser alterados aqui.";
     }
   }
 
@@ -1255,7 +1258,8 @@
     { header: "Salário (Cargos e Salários)", width: 16 },
     { header: "Insalubridade (%)", width: 16 },
     { header: "Base insalubridade", width: 16 },
-    { header: "Valor insalubridade", width: 16 }
+    { header: "Valor insalubridade", width: 16 },
+    { header: "Gratificação", width: 14 }
   ];
 
   /** CBO e salário vêm SEMPRE da função em Cargos e Salários. */
@@ -1332,6 +1336,9 @@
           : null,
         exportCargo(employee, company) && window.RhCatalog.insalubridadeValor(exportCargo(employee, company)) != null
           ? { type: "currency", value: window.RhCatalog.insalubridadeValor(exportCargo(employee, company)) }
+          : null,
+        exportCargo(employee, company)?.gratificacao != null
+          ? { type: "currency", value: exportCargo(employee, company).gratificacao }
           : null
       ];
     });

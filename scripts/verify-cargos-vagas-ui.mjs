@@ -60,7 +60,7 @@ ${["css/style.css", "css/funcionarios.css", "css/ausencias.css", "css/rh-catalog
   window.__toasts = [];
   window.__alerts = [];
   window.__confirms = [];
-  window.confirm = (m) => { window.__confirms.push(m); return true; };
+  window.confirm = (m) => { window.__confirms.push(m); return !window.__confirmNo; };
   window.alert = (m) => window.__alerts.push(m);
   window.prompt = () => null;
   window.App = {
@@ -154,9 +154,12 @@ try {
   assert(s.cbo === "5134-05" && s.salary === 1850 && s.commissions[0] === "taxa-servico-bar", "função salva com CBO mascarado, salário e comissão");
   s = await $eval(() => document.querySelector("#cargos .rh-table tbody").textContent);
   assert(s.includes("5134-05") && s.includes("1.850,00") && s.includes("Taxa de Serviço Bar"), "tabela mostra CBO, salário e comissão");
+  await $eval(() => { window.__confirmNo = true; });
   await editCargo("Encarregado de Manutenção", "5134-05", "2500");
-  s = await $eval(() => ({ alert: window.__alerts.at(-1) || "", open: Boolean(document.getElementById("cargoForm")) }));
-  assert(/CBO 5134-05 já está atribuído/.test(s.alert) && s.open, "CBO de outra função: alerta e formulário continua aberto");
+  s = await $eval(() => ({ confirm: window.__confirms.at(-1) || "", open: Boolean(document.getElementById("cargoForm")), cbo: RhCatalog.findCargoByName("Chez Pitu", "Encarregado de Manutenção").cbo }));
+  await $eval(() => { window.__confirmNo = false; });
+  assert(/CBO 5134-05 já está atribuído à função "Garçom"/.test(s.confirm) && /Deseja atribuir o mesmo CBO/.test(s.confirm), "CBO de outra função: avisa e pede confirmação");
+  assert(s.open && s.cbo === "", "recusando, nada é gravado e o formulário continua aberto");
   await $eval(() => {
     const f = document.getElementById("cargoForm");
     f.elements.cbo.value = "9101-05";
@@ -187,6 +190,15 @@ try {
   s = await $eval(() => document.querySelector("#cargos .rh-table tbody").textContent);
   assert(s.includes("40% (grau máximo)") && /607,20 sobre R\$\s1\.518,00/.test(s), "tabela mostra a insalubridade, o valor e a base");
 
+  await $eval(() => {
+    document.querySelector(`[data-edit-cargo="${RhCatalog.findCargoByName("Chez Pitu", "Garçom").id}"]`).click();
+    const f = document.getElementById("cargoForm");
+    f.elements.gratificacao.value = "300,00";
+    f.requestSubmit();
+  });
+  s = await $eval(() => ({ g: RhCatalog.findCargoByName("Chez Pitu", "Garçom").gratificacao, body: document.querySelector("#cargos .rh-table tbody").textContent }));
+  assert(s.g === 300 && /300,00/.test(s.body), "gratificação salva no formato do salário e exibida na tabela");
+
   console.log("[2b] Relatório PDF — Cargos e Salários");
   await $eval(() => {
     window.__printed = [];
@@ -198,6 +210,7 @@ try {
   await $eval(() => document.querySelector("#rhReportOptions [data-report-go]").click());
   s = await $eval(() => window.__printed[0]);
   assert(s && /^cargos-e-salarios-chez-pitu-\d{4}-\d{2}-\d{2}$/.test(s.title) && s.html.includes("Encarregado de Manutenção") && s.html.includes("607,20"), "Gerar PDF monta o relatório com nome de arquivo sugerido");
+  assert(s.html.includes("Gratificação") && /300,00/.test(s.html), "relatório traz a gratificação");
   const pdfPage = await browser.newPage();
   await pdfPage.setContent(s.html, { waitUntil: "load" });
   const pdf = await pdfPage.pdf({ preferCSSPageSize: true, printBackground: true });
@@ -250,6 +263,17 @@ try {
   assert(s.cbo === "9101-05" && /2\.500,00/.test(s.salary), "trocar a função atualiza CBO e salário na hora");
   s = await $eval(() => ({ v: document.getElementById("roleInsalubridadeDisplay").value, ro: document.getElementById("roleInsalubridadeDisplay").readOnly, named: Boolean(document.querySelector("#employeeForm [name='insalubridade']")) }));
   assert(/^40% \(grau máximo\) — R\$\s607,20$/.test(s.v) && s.ro && !s.named, "insalubridade e valor da função exibidos somente leitura, fora do formulário");
+  s = await $eval(() => {
+    const sel = document.getElementById("roleSelect");
+    sel.value = "Garçom";
+    sel.dispatchEvent(new Event("change"));
+    const el = document.getElementById("roleGratificacaoDisplay");
+    const out = { v: el.value, ro: el.readOnly, named: Boolean(document.querySelector("#employeeForm [name='gratificacao']")) };
+    sel.value = "Encarregado de Manutenção";
+    sel.dispatchEvent(new Event("change"));
+    return out;
+  });
+  assert(/300,00/.test(s.v) && s.ro && !s.named, "gratificação da função exibida somente leitura, fora do formulário");
   await $eval(() => document.getElementById("employeeForm").requestSubmit());
   s = await $eval(() => AppData.getCompanyData("Chez Pitu").employees.find((e) => e.id === "e1"));
   const enc = await $eval(() => RhCatalog.findCargoByName("Chez Pitu", "Encarregado de Manutenção").id);
@@ -264,6 +288,12 @@ try {
   assert(s.headers.join("|") === "CBO|Salário (Cargos e Salários)" && s.cbo?.value === "9101-05" && s.salary?.type === "currency" && s.salary.value === 2500, "Exportar Excel traz CBO e salário da função");
   assert(s.insalHeader === "Insalubridade (%)" && s.insal === "40% (grau máximo)", "Exportar Excel traz a insalubridade da função");
   assert(s.base?.value === 1518 && s.valor?.value === 607.2, "Exportar Excel traz base e valor da insalubridade");
+  s = await $eval(() => {
+    const sheet = window.FuncionariosModule.buildEmployeeExportSheet("Chez Pitu");
+    const i = sheet.columns.findIndex((c) => c.header === "Gratificação");
+    return sheet.rows.find((r) => r[3]?.value === "e3")?.[i];
+  });
+  assert(s?.type === "currency" && s.value === 300, "Exportar Excel traz a gratificação da função");
 
   console.log("[5] Cargo legado fora do catálogo é preservado e sinalizado");
   await $eval(() => {

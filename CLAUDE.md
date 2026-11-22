@@ -84,9 +84,10 @@ exclusão sem autorização explícita. Detalhamento: PROJECT_RULES.md →
 
 ## Cargos e Salários (REGRA FIXA)
 
-Uma função = um salário (nome único por empresa); um CBO = uma função, exceto
-níveis da mesma função (Cozinheiro I / Cozinheiro II dividem o CBO).
-Salário, CBO e insalubridade (%) vêm sempre da função e nunca são gravados/editados pelo Cadastro
+Uma função = um salário (nome único por empresa). CBO já usado por outra
+função: só avisa e pede confirmação (níveis da mesma função, Cozinheiro I / II,
+nem avisam).
+Salário, gratificação, CBO e insalubridade (%) vêm sempre da função e nunca são gravados/editados pelo Cadastro
 de Funcionários (funcionário guarda `roleId` + `role`). Padronização de grafia
 só com confirmação do usuário, guardando a grafia antiga em `roleHistory`.
 Detalhamento: PROJECT_RULES.md → "Cargos e Salários (REGRA FIXA)".
