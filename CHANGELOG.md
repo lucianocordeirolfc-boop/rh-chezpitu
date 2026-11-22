@@ -1,3 +1,9 @@
+2026-11-22 (5) - Vagas em aberto: etiqueta de entrevista agendada (20261122.07)
+- [NOVO] Candidato com situacao "Agendado" vira etiqueta no topo do cartao da vaga (linha de Editar/Excluir): data e horario, "Hoje" em destaque, data passada em alerta, +N; clique abre Recrutamento e Selecao
+- [NOVO] Candidato com horario da entrevista (opcional), tambem na tabela R&S e no PDF
+- Arquivos: js/rh-catalog.js, js/quadro-vagas.js, js/rh-reports.js, css/rh-catalog.css, js/manual.js
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 (4) - Vagas em aberto: dados do cartao em uma so linha (20261122.06)
 - [CORRECAO] Escolaridade caia sozinha numa segunda linha (grade cabia 7 colunas). Agora 8 colunas fixas: Setor, Quantidade, Contrato, Motivo, Abertura, Prazo, Gestor e Escolaridade na mesma linha; telas estreitas 2x4, celular 4x2
 - Arquivos: css/rh-catalog.css, js/quadro-vagas.js, scripts/verify-cargos-vagas-ui.mjs

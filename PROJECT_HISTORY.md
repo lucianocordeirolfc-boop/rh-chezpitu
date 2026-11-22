@@ -24,7 +24,8 @@ banner pequeno no espaço em branco da linha de Editar/Excluir.
 - Docs: PROJECT_RULES, manuais, TEST_CHECKLIST.
 - Testes: `verify-quadro-vagas` 46, `verify-cargos-vagas-ui` 68 (etiqueta na
   mesma linha de Editar/Excluir, sem sobrepor, clique leva ao R&S).
-- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. **Publicação:** versão `20261122.07`,
+  commit `e32222f` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (8) — Vagas em aberto: dados do cartão em uma só linha
 
