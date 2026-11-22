@@ -39,7 +39,7 @@
     const co = company();
     const cargos = RhCatalog.listCargos(co);
     if (!cargos.length) {
-      return `<tr><td colspan="6" class="rh-empty">Nenhuma função cadastrada para ${esc(co)}. Use "Padronizar e importar do cadastro" para trazer os cargos já usados no Cadastro de Funcionários, ou "+ Nova função".</td></tr>`;
+      return `<tr><td colspan="7" class="rh-empty">Nenhuma função cadastrada para ${esc(co)}. Use "Padronizar e importar do cadastro" para trazer os cargos já usados no Cadastro de Funcionários, ou "+ Nova função".</td></tr>`;
     }
     return cargos
       .map((cargo) => {
@@ -50,6 +50,7 @@
             <td><strong>${esc(cargo.name)}</strong>${cargo.notes ? `<small class="help-text">${esc(cargo.notes)}</small>` : ""}</td>
             <td>${cargo.cbo ? esc(cargo.cbo) : `<span class="pill warning rh-pill">a definir</span>`}</td>
             <td class="rh-num">${cargo.salary != null ? esc(RhCatalog.formatMoney(cargo.salary)) : `<span class="pill warning rh-pill">a definir</span>`}</td>
+            <td>${cargo.insalubridade != null ? `<span class="pill warning rh-pill">${esc(RhCatalog.insalubridadeLabel(cargo.insalubridade))}</span>${insalubridadeValueHTML(cargo)}` : `<span class="help-text">—</span>`}</td>
             <td>${commissionPills(cargo)}</td>
             <td class="rh-num" title="${active} ativo(s) de ${linked.length} vinculado(s)">${active}<small class="help-text">${linked.length} no total</small></td>
             <td class="actions">
@@ -85,17 +86,18 @@
           <div>
             <p class="eyebrow">${esc(co)}</p>
             <h2>Funções e salários</h2>
-            <p class="help-text">Cada função tem um único salário. O CBO é exclusivo da função — só níveis da mesma função (ex.: Cozinheiro I e Cozinheiro II) podem dividi-lo. O Cadastro de Funcionários escolhe a função desta lista e herda salário e CBO (não editáveis lá).</p>
+            <p class="help-text">Cada função tem um único salário. O CBO é exclusivo da função — só níveis da mesma função (ex.: Cozinheiro I e Cozinheiro II) podem dividi-lo. O Cadastro de Funcionários escolhe a função desta lista e herda salário, CBO e insalubridade (não editáveis lá).</p>
           </div>
           <div class="rh-actions">
             ${plan.length ? `<button type="button" class="secondary btn-sm" id="btnStandardizeRoles" title="Traz os cargos do Cadastro de Funcionários com grafia padronizada">Padronizar e importar do cadastro (${pendingEmployees})</button>` : ""}
+            <button type="button" class="secondary btn-sm" data-rh-report title="Gera relatório para impressão ou PDF">Relatório PDF</button>
             ${window.LixeiraUI?.toggleButtonHTML({ id: "btnCargoArchive", company: co, kinds: ["cargo"] }) || ""}
             <button type="button" class="primary btn-sm" id="btnNewCargo">+ Nova função</button>
           </div>
         </div>
         <div class="table-wrap">
           <table class="table-premium rh-table">
-            <thead><tr><th>Função</th><th>CBO</th><th>Salário</th><th>Comissões</th><th>Funcionários ativos</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Função</th><th>CBO</th><th>Salário</th><th>Insalubridade</th><th>Comissões</th><th>Funcionários ativos</th><th>Ações</th></tr></thead>
             <tbody>${cargoRows()}</tbody>
           </table>
         </div>
@@ -114,6 +116,54 @@
         <summary><span id="cargoCommissionSummary">${chosen.size ? `${chosen.size} selecionada(s)` : "Selecionar comissões"}</span></summary>
         <div class="rh-dropdown-menu">${items}</div>
       </details>`;
+  }
+
+  /** Insalubridade: Não / graus da CLT / outro percentual (CCT ou laudo). */
+  function insalubridadeFieldHTML(cargo) {
+    const current = cargo?.insalubridade ?? null;
+    const isGrau = RhCatalog.INSALUBRIDADE_GRAUS.some((g) => g.percent === current);
+    const mode = current === null ? "" : isGrau ? String(current) : "outro";
+    const opts = [
+      `<option value="" ${mode === "" ? "selected" : ""}>Não</option>`,
+      ...RhCatalog.INSALUBRIDADE_GRAUS.map(
+        (g) => `<option value="${g.percent}" ${mode === String(g.percent) ? "selected" : ""}>${esc(g.label)} — ${g.percent}%</option>`
+      ),
+      `<option value="outro" ${mode === "outro" ? "selected" : ""}>Outro percentual (CCT/laudo)</option>`
+    ].join("");
+    return `
+      <label>Insalubridade
+        <select id="cargoInsalubridadeMode">${opts}</select>
+        <input id="cargoInsalubridadeOutro" inputmode="decimal" autocomplete="off" placeholder="Percentual, ex.: 25"
+          value="${mode === "outro" ? esc(String(current).replace(".", ",")) : ""}" style="${mode === "outro" ? "" : "display:none"}">
+        <small class="help-text">CLT art. 192: mínimo 10%, médio 20%, máximo 40%.</small>
+      </label>
+      <label>Salário base para cálculo (R$)
+        <input id="cargoInsalubridadeBase" inputmode="decimal" autocomplete="off" placeholder="Ex.: salário mínimo ou piso"
+          value="${esc(RhCatalog.formatMoneyInput(cargo?.insalubridadeBase))}" ${current === null ? "disabled" : ""}>
+        <small class="help-text">Base sobre a qual o percentual é aplicado.</small>
+      </label>
+      <label>Valor da insalubridade
+        <input id="cargoInsalubridadeValor" readonly tabindex="-1" class="func-readonly-input" value="${esc(RhCatalog.formatMoney(RhCatalog.insalubridadeValor(cargo)) || "")}" placeholder="—">
+        <small class="help-text">Calculado: base × percentual.</small>
+      </label>`;
+  }
+
+  function insalubridadeValueHTML(cargo) {
+    const valor = RhCatalog.insalubridadeValor(cargo);
+    if (valor == null) return `<small class="help-text">base a definir</small>`;
+    return `<small class="help-text">${esc(RhCatalog.formatMoney(valor))} sobre ${esc(RhCatalog.formatMoney(cargo.insalubridadeBase))}</small>`;
+  }
+
+  function insalubridadeHistoryHTML(cargo) {
+    const history = (cargo?.insalubridadeHistory || []).slice().reverse();
+    if (!history.length) return "";
+    return `
+      <div class="rh-history">
+        <p class="eyebrow">Histórico de insalubridade</p>
+        <ul>${history
+          .map((h) => `<li>${esc(AppData.formatDateBR(h.from))} — ${h.percent != null ? esc(RhCatalog.insalubridadeLabel(h.percent)) : "sem insalubridade"}${h.base != null ? ` · base ${esc(RhCatalog.formatMoney(h.base))}` : ""} <small class="help-text">${esc(h.by || "")}</small></li>`)
+          .join("")}</ul>
+      </div>`;
   }
 
   function salaryHistoryHTML(cargo) {
@@ -168,6 +218,9 @@
           <label>CBO<input name="cbo" inputmode="numeric" autocomplete="off" value="${esc(cargo?.cbo || "")}" placeholder="0000-00" maxlength="7"></label>
           <label>Salário (R$)<input name="salary" inputmode="decimal" autocomplete="off" value="${esc(RhCatalog.formatMoneyInput(cargo?.salary))}" placeholder="0,00"></label>
         </div>
+        <div class="func-form-row cols-3">
+          ${insalubridadeFieldHTML(cargo)}
+        </div>
         <div class="func-form-row">
           <label class="full">Comissões${commissionChecklist(cargo?.commissions)}</label>
         </div>
@@ -176,6 +229,7 @@
         </div>
         ${cargo ? `<p class="help-text">${linked.length} funcionário(s) vinculado(s). Renomear a função atualiza o cargo deles; salário e CBO valem para todos.</p>` : ""}
         ${salaryHistoryHTML(cargo)}
+        ${insalubridadeHistoryHTML(cargo)}
         <div class="popup-actions">
           <button type="button" class="btn btn-cancel" data-rh-close>Cancelar</button>
           <button class="primary btn-sm" type="submit">Salvar função</button>
@@ -192,6 +246,32 @@
       const v = RhCatalog.parseMoney(form.elements.salary.value);
       if (v != null && !Number.isNaN(v)) form.elements.salary.value = RhCatalog.formatMoneyInput(v);
     });
+    const insalMode = form.querySelector("#cargoInsalubridadeMode");
+    const insalOutro = form.querySelector("#cargoInsalubridadeOutro");
+    const insalBase = form.querySelector("#cargoInsalubridadeBase");
+    const insalValor = form.querySelector("#cargoInsalubridadeValor");
+    const refreshInsalValor = () => {
+      const pct = RhCatalog.parsePercent(insalMode.value === "outro" ? insalOutro.value : insalMode.value);
+      const base = RhCatalog.parseMoney(insalBase.value);
+      insalBase.disabled = !insalMode.value;
+      insalValor.value =
+        pct != null && !Number.isNaN(pct) && base != null && !Number.isNaN(base)
+          ? RhCatalog.formatMoney(RhCatalog.insalubridadeValor({ insalubridade: pct, insalubridadeBase: base }))
+          : "";
+    };
+    insalMode.addEventListener("change", () => {
+      const outro = insalMode.value === "outro";
+      insalOutro.style.display = outro ? "" : "none";
+      if (outro) insalOutro.focus();
+      else insalOutro.value = "";
+      refreshInsalValor();
+    });
+    insalOutro.addEventListener("input", refreshInsalValor);
+    insalBase.addEventListener("input", refreshInsalValor);
+    insalBase.addEventListener("blur", () => {
+      const v = RhCatalog.parseMoney(insalBase.value);
+      if (v != null && !Number.isNaN(v)) insalBase.value = RhCatalog.formatMoneyInput(v);
+    });
     form.querySelectorAll("input[name='commissions']").forEach((cb) =>
       cb.addEventListener("change", () => {
         const n = form.querySelectorAll("input[name='commissions']:checked").length;
@@ -206,8 +286,15 @@
         cbo: form.elements.cbo.value,
         salary: form.elements.salary.value,
         notes: form.elements.notes.value,
-        commissions: [...form.querySelectorAll("input[name='commissions']:checked")].map((cb) => cb.value)
+        commissions: [...form.querySelectorAll("input[name='commissions']:checked")].map((cb) => cb.value),
+        insalubridade: insalMode.value === "outro" ? insalOutro.value : insalMode.value,
+        insalubridadeBase: insalMode.value ? insalBase.value : ""
       };
+      if (insalMode.value === "outro" && !String(insalOutro.value).trim()) {
+        alert("Informe o percentual de insalubridade.");
+        insalOutro.focus();
+        return;
+      }
       const newName = payload.name.replace(/\s+/g, " ").trim();
       if (cargo && newName && newName !== cargo.name && linked.length) {
         if (!window.confirm(`Renomear "${cargo.name}" para "${newName}" atualiza o cargo de ${linked.length} funcionário(s). A grafia anterior fica no histórico de cada um. Continuar?`)) return;
@@ -321,7 +408,10 @@
     return `
       <div class="rh-commission-toolbar">
         <p class="help-text">Explique cada comissão. As funções que recebem cada uma são marcadas em "Funções e Salários".</p>
-        <button type="button" class="secondary btn-sm" id="btnNewComissao">+ Nova comissão</button>
+        <div class="rh-actions">
+          <button type="button" class="secondary btn-sm" data-rh-report title="Gera relatório para impressão ou PDF">Relatório PDF</button>
+          <button type="button" class="secondary btn-sm" id="btnNewComissao">+ Nova comissão</button>
+        </div>
       </div>
       <div class="rh-commission-grid">${cards}</div>`;
   }
@@ -360,6 +450,7 @@
       })
     );
     container.querySelector("#btnNewCargo")?.addEventListener("click", () => openCargoForm(container));
+    container.querySelector("[data-rh-report]")?.addEventListener("click", () => window.RhReports?.openCargosReport(co));
     container.querySelector("#btnStandardizeRoles")?.addEventListener("click", () => openStandardization(container));
     container.querySelector("#btnCargoArchive")?.addEventListener("click", () =>
       window.LixeiraUI?.open({ company: co, kinds: ["cargo"], onRestored: () => render(container) })

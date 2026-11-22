@@ -43,7 +43,7 @@ const fileUrl = (rel) => pathToFileURL(path.join(root, rel)).href;
 const htmlPath = path.join(tmp, "cargos.html");
 const scripts = [
   "js/import-utils.js", "js/data.js", "js/lixeira.js", "js/inactive-employees.js", "js/xlsx-export.js",
-  "js/rh-catalog.js", "js/funcionarios.js", "js/cargos.js", "js/quadro-vagas.js"
+  "js/rh-catalog.js", "js/funcionarios.js", "js/cargos.js", "js/quadro-vagas.js", "js/rh-reports.js"
 ];
 fs.writeFileSync(
   htmlPath,
@@ -160,10 +160,53 @@ try {
   await $eval(() => {
     const f = document.getElementById("cargoForm");
     f.elements.cbo.value = "9101-05";
+    const mode = document.getElementById("cargoInsalubridadeMode");
+    mode.value = "outro";
+    mode.dispatchEvent(new Event("change"));
+    window.__outroVisible = document.getElementById("cargoInsalubridadeOutro").style.display !== "none";
+    document.getElementById("cargoInsalubridadeOutro").value = "";
     f.requestSubmit();
   });
+  s = await $eval(() => ({ alert: window.__alerts.at(-1), open: Boolean(document.getElementById("cargoForm")), outro: window.__outroVisible }));
+  assert(s.outro && /percentual de insalubridade/.test(s.alert) && s.open, "insalubridade 'Outro percentual' exige o valor");
+  await $eval(() => {
+    const mode = document.getElementById("cargoInsalubridadeMode");
+    mode.value = "40";
+    mode.dispatchEvent(new Event("change"));
+    const base = document.getElementById("cargoInsalubridadeBase");
+    window.__baseEnabled = !base.disabled;
+    base.value = "1.518,00";
+    base.dispatchEvent(new Event("input"));
+    window.__valorPreview = document.getElementById("cargoInsalubridadeValor").value;
+    document.getElementById("cargoForm").requestSubmit();
+  });
+  s = await $eval(() => ({ en: window.__baseEnabled, prev: window.__valorPreview }));
+  assert(s.en && /607,20/.test(s.prev), "salário base ao lado da insalubridade; valor calculado na hora (R$ 607,20)");
   s = await $eval(() => RhCatalog.findCargoByName("Chez Pitu", "Encarregado de Manutenção"));
-  assert(s.cbo === "9101-05" && s.salary === 2500, "corrigido o CBO, a função é salva");
+  assert(s.cbo === "9101-05" && s.salary === 2500 && s.insalubridade === 40, "corrigido o CBO, a função é salva com insalubridade grau máximo 40%");
+  s = await $eval(() => document.querySelector("#cargos .rh-table tbody").textContent);
+  assert(s.includes("40% (grau máximo)") && /607,20 sobre R\$\s1\.518,00/.test(s), "tabela mostra a insalubridade, o valor e a base");
+
+  console.log("[2b] Relatório PDF — Cargos e Salários");
+  await $eval(() => {
+    window.__printed = [];
+    window.RhReports.printHTML = (html, title) => window.__printed.push({ html, title });
+    document.querySelector("#cargos [data-rh-report]").click();
+  });
+  s = await $eval(() => [...document.querySelectorAll("#rhReportOptions input[name='rhReportSection']")].map((i) => i.value));
+  assert(s.join("|") === "funcoes|comissoes|funcionarios", "janela com as seções do relatório");
+  await $eval(() => document.querySelector("#rhReportOptions [data-report-go]").click());
+  s = await $eval(() => window.__printed[0]);
+  assert(s && /^cargos-e-salarios-chez-pitu-\d{4}-\d{2}-\d{2}$/.test(s.title) && s.html.includes("Encarregado de Manutenção") && s.html.includes("607,20"), "Gerar PDF monta o relatório com nome de arquivo sugerido");
+  const pdfPage = await browser.newPage();
+  await pdfPage.setContent(s.html, { waitUntil: "load" });
+  const pdf = await pdfPage.pdf({ preferCSSPageSize: true, printBackground: true });
+  fs.writeFileSync(path.join(tmp, "cargos.pdf"), pdf);
+  await pdfPage.setViewport({ width: 900, height: 1100 });
+  await pdfPage.emulateMediaType("print");
+  await pdfPage.screenshot({ path: path.join(tmp, "relatorio-cargos.png"), fullPage: true });
+  await pdfPage.close();
+  assert(pdf.length > 5000 && Buffer.from(pdf).subarray(0, 4).toString() === "%PDF", `PDF gerado pelo Chrome (${pdf.length} bytes)`);
   await page.screenshot({ path: path.join(tmp, "funcoes.png") });
 
   console.log("[3] Sub-aba Comissões");
@@ -203,8 +246,10 @@ try {
     sel.value = "Encarregado de Manutenção";
     sel.dispatchEvent(new Event("change"));
   });
-  s = await $eval(() => ({ cbo: document.getElementById("roleCboDisplay").value, salary: document.getElementById("roleSalaryDisplay").value }));
+  s = await $eval(() => ({ cbo: document.getElementById("roleCboDisplay").value, salary: document.getElementById("roleSalaryDisplay").value, insal: document.getElementById("roleInsalubridadeDisplay") }));
   assert(s.cbo === "9101-05" && /2\.500,00/.test(s.salary), "trocar a função atualiza CBO e salário na hora");
+  s = await $eval(() => ({ v: document.getElementById("roleInsalubridadeDisplay").value, ro: document.getElementById("roleInsalubridadeDisplay").readOnly, named: Boolean(document.querySelector("#employeeForm [name='insalubridade']")) }));
+  assert(/^40% \(grau máximo\) — R\$\s607,20$/.test(s.v) && s.ro && !s.named, "insalubridade e valor da função exibidos somente leitura, fora do formulário");
   await $eval(() => document.getElementById("employeeForm").requestSubmit());
   s = await $eval(() => AppData.getCompanyData("Chez Pitu").employees.find((e) => e.id === "e1"));
   const enc = await $eval(() => RhCatalog.findCargoByName("Chez Pitu", "Encarregado de Manutenção").id);
@@ -213,9 +258,12 @@ try {
   s = await $eval(() => {
     const sheet = window.FuncionariosModule.buildEmployeeExportSheet("Chez Pitu");
     const row = sheet.rows.find((r) => r[3]?.value === "e1");
-    return { headers: sheet.columns.slice(-2).map((c) => c.header), cbo: row.at(-2), salary: row.at(-1) };
+    const col = (h) => row[sheet.columns.findIndex((c) => c.header === h)];
+    return { headers: ["CBO", "Salário (Cargos e Salários)"].filter((h) => sheet.columns.some((c) => c.header === h)), cbo: col("CBO"), salary: col("Salário (Cargos e Salários)"), insal: col("Insalubridade (%)"), insalHeader: "Insalubridade (%)", base: col("Base insalubridade"), valor: col("Valor insalubridade") };
   });
   assert(s.headers.join("|") === "CBO|Salário (Cargos e Salários)" && s.cbo?.value === "9101-05" && s.salary?.type === "currency" && s.salary.value === 2500, "Exportar Excel traz CBO e salário da função");
+  assert(s.insalHeader === "Insalubridade (%)" && s.insal === "40% (grau máximo)", "Exportar Excel traz a insalubridade da função");
+  assert(s.base?.value === 1518 && s.valor?.value === 607.2, "Exportar Excel traz base e valor da insalubridade");
 
   console.log("[5] Cargo legado fora do catálogo é preservado e sinalizado");
   await $eval(() => {
@@ -303,6 +351,25 @@ try {
   s = await $eval(() => Object.fromEntries([...document.querySelectorAll(".rh-kpi")].map((k) => [k.querySelector("span").textContent, k.querySelector("strong").textContent])));
   assert(s["Vagas em andamento"] === "1" && s["Posições previstas"] === "2" && s["Posições em aberto"] === "1" && s["Admitidos (iniciaram)"] === "1" && s["Vagas urgentes"] === "1", `Painel RH calculado: ${JSON.stringify(s)}`);
   await page.screenshot({ path: path.join(tmp, "painel.png") });
+  await $eval(() => {
+    window.__printed = [];
+    document.getElementById("btnVagasReport").click();
+  });
+  await $eval(() => {
+    document.querySelector("#rhReportOptions input[value='painel']").checked = false;
+    document.querySelector("#rhReportOptions [data-report-go]").click();
+  });
+  s = await $eval(() => window.__printed[0]);
+  assert(s && s.html.includes("Mariana Admitida") && s.html.includes("Jorge Candidato") && !s.html.includes("<h2>Painel RH</h2>"), "Relatório PDF do Quadro de Vagas respeita as seções escolhidas");
+  const vPage = await browser.newPage();
+  await vPage.setContent(s.html, { waitUntil: "load" });
+  const vPdf = await vPage.pdf({ preferCSSPageSize: true, printBackground: true });
+  fs.writeFileSync(path.join(tmp, "vagas.pdf"), vPdf);
+  await vPage.setViewport({ width: 1200, height: 850 });
+  await vPage.emulateMediaType("print");
+  await vPage.screenshot({ path: path.join(tmp, "relatorio-vagas.png"), fullPage: true });
+  await vPage.close();
+  assert(Buffer.from(vPdf).subarray(0, 4).toString() === "%PDF", "PDF do Quadro de Vagas gerado");
 
   console.log("[8] Separação por empresa e Lixeira");
   await $eval(() => {

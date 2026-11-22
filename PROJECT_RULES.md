@@ -196,12 +196,34 @@ de conflito é `AppData.findCargoConflict`, usada também pela Lixeira).
 7. **Excluir função** só sem funcionário vinculado (ativo ou inativo) e sem vaga
    em andamento; arquiva na Lixeira (`cargo`) + tombstone. Restaurar recusa se
    o nome/CBO já tiver sido usado por outra função.
-8. **Comissões:** 6 padrão por empresa (Taxa de Serviço Bar, Taxa de Serviço
+8. **Insalubridade** (2026-11-22, pedido do usuário): percentual na função
+   (`cargo.insalubridade`, 0,01–100; ausente = sem insalubridade), com graus da
+   CLT art. 192 sugeridos (10% mínimo, 20% médio, 40% máximo) ou percentual
+   próprio (CCT/laudo). Histórico em `cargo.insalubridadeHistory`. Como
+   salário/CBO: herdada pelo funcionário, somente leitura no Cadastro, nunca
+   gravada no funcionário; coluna AA no Exportar Excel. **Salário base para
+   cálculo** (`cargo.insalubridadeBase`, R$, só existe com insalubridade):
+   valor = base × % arredondado ao centavo (`RhCatalog.insalubridadeValor`);
+   sem base = "a definir". Base e % entram no histórico; Excel colunas AB
+   (base) e AC (valor).
+9. **Comissões:** 6 padrão por empresa (Taxa de Serviço Bar, Taxa de Serviço
    Frigobar, Comissão Ocupação, Walk-in, Extensão de Diária, PL Anual — grafia
    corrigida de "Fribogar"/"Extenção") + criadas pelo usuário; explicação
    editável. Só o que o usuário edita é gravado (`comissoes`).
 
 Cobertura: `scripts/verify-cargos-salarios.mjs`, `scripts/verify-cargos-vagas-ui.mjs`.
+
+### Relatórios PDF (Cargos e Salários / Quadro de Vagas)
+
+`js/rh-reports.js`, mesmo padrão do relatório de feriados: HTML montado sem
+DOM e impresso em `<iframe>` isolado ("Salvar como PDF"); SOMENTE LEITURA.
+Botão "Relatório PDF" em cada aba, com escolha de seções. Cargos e Salários
+(retrato): Funções e salários (com folha estimada salário + insalubridade dos
+ativos), Comissões, Funcionários por função (inativos opcionais). Quadro de
+Vagas (paisagem): Painel RH, Vagas (concluídas/canceladas opcionais),
+Recrutamento e Seleção, Admissões. Todo texto do usuário é escapado.
+Cobertura: `scripts/verify-rh-reports.mjs`, `scripts/verify-cargos-vagas-ui.mjs`
+(gera o PDF no Chrome).
 
 ### Quadro de Vagas
 

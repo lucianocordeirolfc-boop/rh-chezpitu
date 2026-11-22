@@ -92,6 +92,44 @@
     return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   }
 
+  // ── Insalubridade (CLT art. 192: 10% mínimo, 20% médio, 40% máximo) ──────
+  const INSALUBRIDADE_GRAUS = [
+    { percent: 10, label: "Grau mínimo" },
+    { percent: 20, label: "Grau médio" },
+    { percent: 40, label: "Grau máximo" }
+  ];
+
+  /** "20" | "20,5" | "20%" → 20.5; vazio/0 → null (sem insalubridade); inválido → NaN. */
+  function parsePercent(value) {
+    if (value === null || value === undefined) return null;
+    const s = String(value).replace("%", "").replace(/\s/g, "").replace(",", ".");
+    if (!s) return null;
+    const n = Number(s);
+    if (!Number.isFinite(n)) return NaN;
+    if (n === 0) return null;
+    return n > 0 && n <= 100 ? Math.round(n * 100) / 100 : NaN;
+  }
+
+  function formatPercent(value) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return "";
+    return `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+  }
+
+  /** "20% (grau médio)" | "25% (CCT/laudo)" | "" quando a função não tem. */
+  function insalubridadeLabel(value) {
+    if (value === null || value === undefined) return "";
+    const grau = INSALUBRIDADE_GRAUS.find((g) => g.percent === Number(value));
+    return `${formatPercent(value)} (${grau ? grau.label.toLocaleLowerCase("pt-BR") : "CCT/laudo"})`;
+  }
+
+  /** Valor da insalubridade = base × percentual; null sem percentual ou sem base. */
+  function insalubridadeValor(cargo) {
+    const pct = Number(cargo?.insalubridade);
+    const base = Number(cargo?.insalubridadeBase);
+    if (cargo?.insalubridade == null || cargo?.insalubridadeBase == null || !Number.isFinite(pct) || !Number.isFinite(base)) return null;
+    return Math.round(base * pct) / 100;
+  }
+
   function formatMoneyInput(value) {
     if (value === null || value === undefined || value === "" || !Number.isFinite(Number(value))) return "";
     return Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -263,11 +301,36 @@
       salaryHistory.push(entry);
     }
 
+    // Insalubridade: ausente no input = mantém a atual (chamadas antigas).
+    const insalubridade = Object.prototype.hasOwnProperty.call(input, "insalubridade")
+      ? parsePercent(input.insalubridade)
+      : previous?.insalubridade ?? null;
+    if (Number.isNaN(insalubridade)) {
+      throw new Error("Percentual de insalubridade inválido: informe um valor entre 0,01% e 100%.");
+    }
+    // Salário base para cálculo da insalubridade (só existe com insalubridade).
+    let insalubridadeBase = Object.prototype.hasOwnProperty.call(input, "insalubridadeBase")
+      ? parseMoney(input.insalubridadeBase)
+      : previous?.insalubridadeBase ?? null;
+    if (Number.isNaN(insalubridadeBase)) throw new Error("Salário base para cálculo da insalubridade inválido.");
+    if (insalubridade === null) insalubridadeBase = null;
+    const insalubridadeHistory = Array.isArray(previous?.insalubridadeHistory) ? [...previous.insalubridadeHistory] : [];
+    if (
+      (previous?.insalubridade ?? null) !== (insalubridade ?? null) ||
+      (previous?.insalubridadeBase ?? null) !== (insalubridadeBase ?? null)
+    ) {
+      const entry = { from: AppData.todayISO(), at: stamp, by: user };
+      if (insalubridade !== null) entry.percent = insalubridade; // ausência = removida
+      if (insalubridadeBase !== null) entry.base = insalubridadeBase;
+      insalubridadeHistory.push(entry);
+    }
+
     const record = {
       id,
       name,
       cbo: cbo || "",
       salary: salary ?? null,
+      insalubridadeHistory,
       commissions,
       notes: String(input.notes ?? previous?.notes ?? "").trim(),
       salaryHistory,
@@ -276,6 +339,8 @@
       updatedBy: user
     };
     if (record.salary === null) delete record.salary; // RTDB: ausência = sem salário
+    if (insalubridade !== null) record.insalubridade = insalubridade;
+    if (insalubridadeBase !== null) record.insalubridadeBase = insalubridadeBase;
 
     let renamed = 0;
     if (previous && previous.name !== name) {
@@ -559,6 +624,11 @@
     ADMISSION_SITUATIONS,
     ADMISSION_DONE,
     parseMoney,
+    INSALUBRIDADE_GRAUS,
+    parsePercent,
+    formatPercent,
+    insalubridadeLabel,
+    insalubridadeValor,
     formatMoney,
     formatMoneyInput,
     formatCbo,

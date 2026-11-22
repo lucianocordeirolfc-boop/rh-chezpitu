@@ -164,6 +164,33 @@ const barman3 = RhCatalog.saveCargo(CO, { id: barman.id, name: "Barman", cbo: "5
 assert(barman3.salaryHistory.length === 2, "salvar sem mudar o salário não cria histórico");
 assert(co.cargos.filter((c) => c.id === barman.id).length === 1, "edição não duplica a função");
 
+console.log("[5c] Insalubridade (percentual na função)");
+assert(RhCatalog.parsePercent("20") === 20 && RhCatalog.parsePercent("12,5%") === 12.5 && RhCatalog.parsePercent("") === null && RhCatalog.parsePercent("0") === null, "percentual: 20, 12,5% / vazio e 0 = sem insalubridade");
+assert(Number.isNaN(RhCatalog.parsePercent("150")) && Number.isNaN(RhCatalog.parsePercent("-5")) && Number.isNaN(RhCatalog.parsePercent("abc")), "acima de 100, negativo ou texto é inválido");
+const insal = RhCatalog.saveCargo(CO, { name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "20" }).cargo;
+assert(insal.insalubridade === 20 && RhCatalog.insalubridadeLabel(20) === "20% (grau médio)", "função com insalubridade grau médio 20%");
+assert(insal.insalubridadeHistory.length === 1 && insal.insalubridadeHistory[0].percent === 20, "histórico de insalubridade");
+const insal2 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600" }).cargo;
+assert(insal2.insalubridade === 20 && insal2.insalubridadeHistory.length === 1, "edição sem o campo mantém a insalubridade");
+const insal3 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "25,5" }).cargo;
+assert(insal3.insalubridade === 25.5 && RhCatalog.insalubridadeLabel(25.5) === "25,5% (CCT/laudo)", "percentual próprio (CCT/laudo)");
+throws(() => RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "120" }), /insalubridade inválido/, "percentual acima de 100% recusado");
+const insal4 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "" }).cargo;
+assert(!("insalubridade" in insal4) && insal4.insalubridadeHistory.length === 3 && insal4.insalubridadeHistory[2].percent === undefined, "retirar a insalubridade fica registrado no histórico");
+assert(!JSON.stringify(insal4).includes("null"), "registro sem null (RTDB)");
+const b1 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "40", insalubridadeBase: "1.518,00" }).cargo;
+assert(b1.insalubridadeBase === 1518 && RhCatalog.insalubridadeValor(b1) === 607.2, "salário base R$ 1.518,00 × 40% = R$ 607,20");
+assert(b1.insalubridadeHistory.at(-1).base === 1518 && b1.insalubridadeHistory.at(-1).percent === 40, "base entra no histórico");
+const b2 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "40" }).cargo;
+assert(b2.insalubridadeBase === 1518, "edição sem o campo mantém a base");
+const b3 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "20", insalubridadeBase: "1.518,33" }).cargo;
+assert(RhCatalog.insalubridadeValor(b3) === 303.67, "valor arredondado ao centavo (20% de 1.518,33 = 303,67)");
+throws(() => RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "20", insalubridadeBase: "abc" }), /Salário base/, "base inválida recusada");
+const b4 = RhCatalog.saveCargo(CO, { id: insal.id, name: "Auxiliar de Limpeza", cbo: "5143-20", salary: "1600", insalubridade: "", insalubridadeBase: "1518" }).cargo;
+assert(!("insalubridadeBase" in b4) && RhCatalog.insalubridadeValor(b4) === null, "sem insalubridade, a base não é guardada");
+assert(RhCatalog.insalubridadeValor({ insalubridade: 40 }) === null, "sem base, valor a definir");
+RhCatalog.removeCargo(CO, insal.id);
+
 console.log("[6] Funcionário herda salário/CBO; cadastro não grava salário/CBO");
 assert(RhCatalog.resolveEmployeeCargo(e1, CO).salary === 1850.5, "salário do funcionário vem da função");
 AppData.upsertEmployee({ id: "e8", name: "HELO", cpf: "", ctps: "1", role: "Barman", roleId: barman.id, department: "BAR", admissionDate: "2026-01-01", salary: 99999, cbo: "9999-99" }, CO);

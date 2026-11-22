@@ -431,6 +431,7 @@
           <div class="ausencias-tabs" role="tablist">
             ${TABS.map((t) => `<button type="button" class="ausencias-tab-btn ${activeTab === t.id ? "active" : ""}" data-vagas-tab="${t.id}">${esc(t.label)}</button>`).join("")}
           </div>
+          <button type="button" class="secondary btn-sm" id="btnVagasReport" title="Gera relatório para impressão ou PDF">Relatório PDF</button>
         </div>
         ${body()}
       </div>`;
@@ -456,6 +457,7 @@
         render(container);
       })
     );
+    container.querySelector("#btnVagasReport")?.addEventListener("click", () => window.RhReports?.openVagasReport(co));
     container.querySelector("#vagasShowClosed")?.addEventListener("change", (e) => {
       showClosed = e.target.checked;
       render(container);

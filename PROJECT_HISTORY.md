@@ -7,6 +7,47 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (3) — Salário base da insalubridade + relatórios PDF
+
+Pedido do usuário: salário base para cálculo ao lado da insalubridade; depois,
+opção de gerar relatórios em PDF.
+
+- `js/rh-catalog.js`: `cargo.insalubridadeBase` (R$, só com insalubridade),
+  `insalubridadeValor` (base × %, ao centavo); base no histórico.
+- `js/cargos.js`: campos "Salário base para cálculo" e "Valor da
+  insalubridade" (calculado na hora) ao lado da insalubridade; valor e base na
+  tabela; botão "Relatório PDF" (Funções e Salários e Comissões).
+- `js/funcionarios.js`: pop-up mostra "40% (grau máximo) — R$ 607,20";
+  Excel colunas AB (base) e AC (valor).
+- `js/rh-reports.js` (novo): relatórios PDF de Cargos e Salários (funções +
+  folha estimada, comissões, funcionários por função) e Quadro de Vagas
+  (painel, vagas, R&S, admissões, paisagem), com escolha de seções; iframe
+  isolado, somente leitura, texto escapado. `js/quadro-vagas.js`: botão
+  "Relatório PDF". `index.html`: script novo.
+- Testes: nova `verify-rh-reports.mjs` (21); `verify-cargos-salarios` 91,
+  `verify-cargos-vagas-ui` 44 (gera os 2 PDFs no Chrome),
+  `verify-exportar-excel` 45 (A1:AC4).
+- Dados de produção: nenhum alterado.
+- **Publicação:** pendente de autorização.
+
+## 2026-11-22 (2) — Insalubridade na função (Cargos e Salários)
+
+Pedido do usuário: opção para cadastrar insalubridade e informar o percentual.
+
+- `js/rh-catalog.js`: `cargo.insalubridade` (%, 0,01–100) +
+  `insalubridadeHistory`; graus CLT art. 192 (10/20/40) e percentual próprio
+  (CCT/laudo); `parsePercent`, `insalubridadeLabel`. Edição sem o campo
+  mantém o valor.
+- `js/cargos.js`: campo no formulário (Não / grau mínimo / médio / máximo /
+  outro percentual), coluna na tabela, histórico no pop-up.
+- `js/funcionarios.js`: insalubridade da função somente leitura no pop-up
+  (fora do payload); Exportar Excel coluna AA "Insalubridade (%)".
+- Docs: PROJECT_RULES (item 8), CLAUDE.md, manuais.
+- Testes: `verify-cargos-salarios` 84, `verify-cargos-vagas-ui` 37,
+  `verify-exportar-excel` 44 (autofiltro A1:AA4).
+- Dados de produção: nenhum alterado. Base de cálculo em R$ não implementada.
+- **Publicação:** pendente de autorização.
+
 ## 2026-11-22 — Novas abas: Cargos e Salários + Quadro de Vagas
 
 Pedido do usuário: aba **Cargos e Salários** por empresa (Função, Salário, CBO,

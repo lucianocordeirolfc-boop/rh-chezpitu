@@ -58,6 +58,7 @@ const SUITES = [
   { name: "Cargos e Salários — regras, padronização e sync", script: "scripts/verify-cargos-salarios.mjs" },
   { name: "Quadro de Vagas — vagas, R&S, admissões e painel", script: "scripts/verify-quadro-vagas.mjs" },
   { name: "Cargos/Vagas/Cadastro — telas (navegador)", script: "scripts/verify-cargos-vagas-ui.mjs" },
+  { name: "Cargos/Vagas — relatórios PDF", script: "scripts/verify-rh-reports.mjs" },
   { name: "Contador — sincronização", script: "scripts/verify-contador-sync.mjs" },
   { name: "Contador — pop-up + Lançamento", script: "scripts/verify-contador-lancamento-popup.mjs" },
   { name: "Auditoria de status", script: "scripts/verify-auditoria-status.mjs" },
