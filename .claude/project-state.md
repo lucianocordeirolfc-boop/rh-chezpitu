@@ -8,24 +8,29 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261117.08` (exibida como `v2026.11.17.08`) — fonte: `js/version.js`
-- **Branch atual:** `main` — sincronizado com `origin/main` em `c9ce1c2`
-  (docs de encerramento ainda não commitados)
-- **Último commit de código:** `c9ce1c2` — chore: carimbo de build 20261117.08 (folga nao retroativa)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261117.08` (Escala 5x2, 2ª folga,
-  folga não retroativa). 2ª folga já aplicada pelo usuário; 5x2 de dez/2026 e
-  jan/2027 cumprida (36/36, leitura de 2026-11-17). Aguardando o usuário salvar
-  a escala de dezembro e aprovar.
+- **Versão atual:** `20261122.03` (exibida como `v2026.11.22.03`) — fonte: `js/version.js`
+- **Branch atual:** `main` — sincronizado com `origin/main`
+- **Último commit de código:** `4c53b99` — feat(cargos): CBO repetido com aviso e
+  confirmação; campo Gratificação (+ carimbo `884c79b`)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.03`, **aprovado pelo usuário em
+  2026-11-22**. Nenhuma tarefa de código pendente.
 
-## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (EM PRODUÇÃO `20261122.03`)
+## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.03`)
 
-- Publicado em `20261122.01` (e130610) e `20261122.02` (66ad6d2: insalubridade
-  com salário base + relatórios PDF) e `20261122.03` (4c53b99: CBO repetido com aviso
-  e confirmação + Gratificação). validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22.
-- Próximo passo do usuário após o deploy: em cada empresa, Cargos e Salários →
-  "Padronizar e importar do cadastro" → conferir grafias → preencher CBO/salário.
-- REGRA FIXA nova: uma função = um salário; um CBO = uma função; salário/CBO
-  nunca editáveis no Cadastro (PROJECT_RULES.md → "Cargos e Salários").
+- `20261122.01` (e130610): abas Cargos e Salários e Quadro de Vagas.
+- `20261122.02` (66ad6d2): insalubridade com salário base + relatórios PDF.
+- `20261122.03` (4c53b99): CBO repetido com aviso/confirmação + Gratificação.
+- validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22 (1)–(5).
+- **Pendente do usuário (dados, pela tela):** em cada empresa, Cargos e
+  Salários → "Padronizar e importar do cadastro" → conferir grafias → preencher
+  CBO, salário, gratificação e insalubridade.
+- REGRAS FIXAS: uma função = um salário (nome único); CBO de outra função só
+  com aviso + confirmação (níveis da mesma função sem aviso); salário,
+  gratificação, CBO e insalubridade nunca editáveis/gravados no Cadastro
+  (PROJECT_RULES.md → "Cargos e Salários (REGRA FIXA)").
+- Sugestões em aberto (não pedidas): importar a planilha de vagas (.xlsx);
+  "Cadastrar funcionário" a partir da admissão "Iniciou"; indicadores de vagas
+  no Dashboard.
 
 ## ⚠️ REGRAS FIXAS NOVAS (2026-11-17)
 

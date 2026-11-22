@@ -4,7 +4,7 @@
  * Sub-abas:
  *  - Funções e Salários: função, CBO, salário e comissões. Regras (fonte única
  *    em js/rh-catalog.js / AppData.findCargoConflict): uma função = um salário
- *    (nome único) e um CBO = uma função.
+ *    (nome único); CBO já usado por outra função só com aviso + confirmação.
  *  - Comissões: as 6 comissões do grupo (+ criadas pelo usuário), cada uma com
  *    a explicação editável.
  *

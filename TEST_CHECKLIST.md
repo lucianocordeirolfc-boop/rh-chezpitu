@@ -23,7 +23,8 @@ Use este checklist antes de qualquer commit ou deploy.
 - [ ] Testar lançamento de férias.
 - [ ] Testar lançamento de ausência.
 - [ ] Confirmar cabeçalho fixo da escala.
-- [ ] Confirmar regras TR/TM/MR.
+- [ ] Confirmar que não há regras de cobertura ativas (TR/TM/MR retiradas em
+      17/11/2026 — painel e linha "Cobertura" ocultos).
 
 ## Vale-transporte
 
@@ -78,6 +79,37 @@ Use este checklist antes de qualquer commit ou deploy.
 - [ ] Confirmar cargo correto.
 - [ ] Confirmar que funcionário não aparece na empresa errada.
 - [ ] Confirmar funcionário ativo/inativo.
+- [ ] Cargo em lista suspensa vindo de Cargos e Salários da empresa da aba.
+- [ ] Salário, gratificação, CBO e insalubridade aparecem somente leitura.
+- [ ] Cargo antigo fora do catálogo continua salvo, com aviso.
+- [ ] Exportar Excel com colunas CBO, Salário, Insalubridade (%), Base,
+      Valor e Gratificação (Y–AD).
+
+## Cargos e Salários
+
+- [ ] Trocar empresa: cada uma com as suas funções.
+- [ ] Nova função com o nome de uma existente (caixa/acento) é recusada.
+- [ ] CBO já usado em outra função: aviso + confirmação; cancelar não grava.
+- [ ] Níveis da mesma função (Cozinheiro I / II) dividem o CBO sem aviso.
+- [ ] Insalubridade: grau 10/20/40% ou outro percentual; salário base e
+      valor calculado.
+- [ ] Gratificação no formato do salário; históricos (salário, gratificação,
+      insalubridade) no pop-up.
+- [ ] Comissões: 6 padrão com explicação; lista suspensa na função.
+- [ ] "Padronizar e importar do cadastro": quadro só leitura até confirmar.
+- [ ] Excluir função com funcionário vinculado é recusado; sem vínculo vai
+      para a Lixeira e restaura.
+- [ ] Relatório PDF (funções, comissões, funcionários por função).
+
+## Quadro de Vagas
+
+- [ ] Trocar empresa: vagas separadas.
+- [ ] Nova vaga com função de Cargos e Salários (CBO exibido).
+- [ ] Candidato (R&S) e admissão ligados à vaga; "Iniciou" conta como admitido.
+- [ ] Painel RH confere com as tabelas.
+- [ ] Mostrar concluídas/canceladas.
+- [ ] Excluir vaga/candidato/admissão → Lixeira → restaurar.
+- [ ] Relatório PDF (painel, vagas, R&S, admissões) em paisagem.
 
 ## Dashboard
 

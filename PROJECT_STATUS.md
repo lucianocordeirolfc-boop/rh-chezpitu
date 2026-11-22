@@ -9,11 +9,32 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261117.08 (Escala 5x2, 2ª folga, folga não retroativa)
-**Data:** 2026-11-17
-**Status:** ✅ Publicado em Produção (Firebase Hosting) — aguardando teste do usuário na escala de dezembro
+**Versão:** 20261122.03 (Cargos e Salários, Quadro de Vagas, insalubridade, gratificação, relatórios PDF)
+**Data:** 2026-11-22
+**Status:** ✅ Publicado em Produção (Firebase Hosting) — **aprovado pelo usuário** em 2026-11-22
 
 ## Último Deploy
+
+Data: 22/11/2026
+Versões: 20261122.01 → 20261122.03 (Firebase Hosting — chez-pitu-rh), commits
+`e130610`, `66ad6d2`, `4c53b99` (+ carimbos `8cf66a0`, `31d6dcd`, `884c79b`),
+push em `origin/main`.
+
+- Nova aba **Cargos e Salários** (por empresa): função, CBO, salário,
+  gratificação, insalubridade (grau/percentual + salário base + valor) e
+  comissões; sub-aba Comissões com explicação editável; padronização dos cargos
+  do cadastro com confirmação.
+- Cadastro de Funcionários: Cargo vem do catálogo; salário, gratificação, CBO e
+  insalubridade somente leitura; Excel com colunas Y–AD.
+- Nova aba **Quadro de Vagas** (por empresa): Vagas em aberto, Painel RH,
+  Recrutamento e Seleção, Admissões.
+- **Relatórios PDF** das duas abas, com escolha de seções.
+- Nenhum dado de produção alterado. **Pendente do usuário:** em cada empresa,
+  "Padronizar e importar do cadastro" e preencher CBO/salário das funções.
+
+Detalhes em `PROJECT_HISTORY.md` → 2026-11-22 a 2026-11-22 (5).
+
+## Deploy 20261117.01 a 20261117.08
 
 Data: 17/11/2026
 Versões: 20261117.01 → 20261117.08 (Firebase Hosting — chez-pitu-rh), commits
@@ -277,6 +298,10 @@ empresas (Ctrl+F5) e comparar com os PDFs de referência. ✅ as duas entregas d
 produção, inclusive o critério de que lançamento com todos os campos zerados não
 aparece na grade da sub-aba Lançamentos (o registro continua gravado).
 
+✅ as entregas de 22/11/2026 (`20261122.01` a `.03` — Cargos e Salários,
+Quadro de Vagas, insalubridade, gratificação, relatórios PDF) foram **aprovadas
+pelo usuário**.
+
 **Próximo deploy recomendado:** conforme novas demandas.
 
 ## Módulos
@@ -293,12 +318,19 @@ Informações Contador: OK (+ pop-up "+ Lançamento" com a base do mês
 selecionado; tela de lançamentos sem coluna Ações, só com quem tem lançamento no
 mês e em ordem alfabética)
 Dashboard: OK
+Cargos e Salários: OK (novo — 2026-11-22; funções, CBO com aviso, salário,
+gratificação, insalubridade, comissões, padronização, relatório PDF)
+Quadro de Vagas: OK (novo — 2026-11-22; vagas, Painel RH, R&S, admissões,
+relatório PDF)
 
 ## Testes
 
 **Unit/Functional Tests:**
 - npm test: 47/47 ✓
-- npm run validate: 21/21 suítes ✓
+- npm run validate: 36/36 suítes ✓ (2026-11-22)
+- Cargos/Vagas (2026-11-22): verify-cargos-salarios 100, verify-quadro-vagas
+  35, verify-cargos-vagas-ui 49 (Chrome real, gera os PDFs), verify-rh-reports
+  23, verify-exportar-excel 46
 
 **Offline Recovery Tests:**
 - npm run test:offline: 15/15 ✓
@@ -386,5 +418,8 @@ Nenhum crítico.
 ### Futuro
 - Dashboard gerencial
 - Auditoria automática de vínculos
-- Relatórios PDF avançados
+- Relatórios PDF avançados (Cargos e Salários e Quadro de Vagas já têm PDF)
+- Cargos e Salários: valor em R$ de comissões; folha com encargos
+- Quadro de Vagas: importar a planilha .xlsx; "Cadastrar funcionário" a partir
+  da admissão "Iniciou"
 - Backup automático diário

@@ -1,3 +1,15 @@
+2026-11-22 - Cargos e Salarios, Quadro de Vagas, insalubridade, gratificacao e relatorios PDF (20261122.01 a .03)
+- [NOVO] Aba Cargos e Salarios por empresa: funcao, CBO, salario, gratificacao, insalubridade e comissoes (lista suspensa); sub-aba Comissoes (Taxa de Servico Bar, Taxa de Servico Frigobar, Comissao Ocupacao, Walk-in, Extensao de Diaria, PL Anual) com explicacao editavel
+- [REGRA FIXA] Uma funcao = um salario (nome unico por empresa). CBO ja usado por outra funcao: aviso + confirmacao do usuario (niveis da mesma funcao, Cozinheiro I/II, sem aviso)
+- [NOVO] "Padronizar e importar do cadastro": traz os cargos do Cadastro com grafia padrao (GARCON -> Garcom, Enc. -> Encarregado...), so grava com confirmacao; grafia antiga em roleHistory
+- [MELHORIA] Cadastro de Funcionarios: Cargo vem de Cargos e Salarios; salario, gratificacao, CBO e insalubridade somente leitura (nunca gravados no funcionario). Exportar Excel ganha colunas Y a AD
+- [NOVO] Insalubridade na funcao: graus CLT (10/20/40%) ou percentual proprio, salario base para calculo e valor (base x %), com historico
+- [NOVO] Aba Quadro de Vagas por empresa (base: planilha Controle de Vagas): Vagas em aberto, Painel RH, Recrutamento e Selecao, Admissoes; exclusoes na Lixeira
+- [NOVO] Relatorios PDF de Cargos e Salarios (funcoes + folha estimada, comissoes, funcionarios por funcao) e Quadro de Vagas (painel, vagas, R&S, admissoes), com escolha de secoes
+- [NOTA] Nenhum dado de producao alterado; padronizacao feita pelo usuario na tela. Dados novos trafegam em ferias/{empresa}.__rh (sem no novo de topo no Firebase)
+- Arquivos: js/rh-catalog.js, js/cargos.js, js/quadro-vagas.js, js/rh-reports.js, css/rh-catalog.css (novos); js/data.js, js/firebase-sync.js, js/funcionarios.js, js/app.js, js/manual.js, index.html; 4 suites novas
+- npm test 47/47; npm run validate 36/36. Aprovado pelo usuario em 2026-11-22
+
 2026-11-17 - Feriados nas 2 empresas, Escala 5x2 (EC 141/2026), 2a folga e folga nao retroativa (20261117.01 a .08)
 - [CORRECAO] ALTO: feriado cadastrado na aba Chez Pitu nao chegava a Pengold (29/07, 2027/2028). Feriado novo vale para as 2 empresas; "Vale para", tipo "Categoria (CCT)", botao "+ outra empresa"; 17 feriados incluidos na Pengold (autorizado)
 - [CORRECAO] CRITICO: AppData.state ficava desatualizado apos sincronizar - gravacoes por ele se perdiam (cadastro de feriado no calendario, alertas)

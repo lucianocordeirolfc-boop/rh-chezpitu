@@ -25,6 +25,10 @@ Seleção / Admissões).
 - Dados por empresa em state.companies[empresa].{cargos, comissoes, vagas,
   candidatos, admissoes}; no Firebase aninhados em ferias/{empresa}.__rh.
 
+js/rh-reports.js
+Relatórios PDF de Cargos e Salários e Quadro de Vagas (HTML sem DOM +
+impressão em iframe isolado; somente leitura).
+
 js/escala.js
 Escala de Folga
 - Somente-leitura até "Editar escala"; alterações em rascunho (scaleState.draft)

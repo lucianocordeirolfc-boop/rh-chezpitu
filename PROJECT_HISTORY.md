@@ -7,6 +7,22 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (5) — Aprovação e revisão final da documentação
+
+Usuário: "tudo certo e aprovado — revise todos os arquivos e atualize os
+necessários". Entregas `20261122.01` a `.03` aprovadas.
+
+- Revisão de código das entregas do dia (merge por id, listas vazias no RTDB,
+  Lixeira, escape de HTML nos relatórios, cargos legados, logo no PDF via
+  `companyInfo.logoDataUrl` importado do Storage no boot): nenhum defeito.
+- Documentação atualizada: `CHANGELOG.md` (entrada 2026-11-22),
+  `PROJECT_STATUS.md` (versão, último deploy, módulos, testes, evolução),
+  `TEST_CHECKLIST.md` (Cargos e Salários, Quadro de Vagas, Cadastro; item de
+  cobertura TR/TM/MR corrigido — regras retiradas em 17/11), `ARCHITECTURE.md`
+  (`rh-reports.js`), `BUGS_CONHECIDOS.md` (risco de versão antiga aberta x
+  `ferias/{empresa}.__rh`), `.claude/project-state.md`.
+- Sem mudança de código; sem deploy (só documentação).
+
 ## 2026-11-22 (4) — CBO repetido com aviso + campo Gratificação
 
 Pedido do usuário: CBO de outra função só avisa e, com confirmação, permite;

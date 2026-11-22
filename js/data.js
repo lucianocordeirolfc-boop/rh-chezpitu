@@ -1501,7 +1501,7 @@
     return { ok: true, months: [...months], date, name };
   }
 
-  /** Dígitos do CBO (6). Usado na regra "um CBO por função". */
+  /** Dígitos do CBO (6). Usado no aviso de CBO repetido (findCboShared). */
   function cboDigits(value) {
     return String(value || "").replace(/\D/g, "");
   }

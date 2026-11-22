@@ -15,7 +15,7 @@
  *
  * REGRAS FIXAS (PROJECT_RULES.md → "Cargos e Salários"):
  *  - Uma função tem UM salário: nome único por empresa (caixa/acento/espaço).
- *  - Um CBO pertence a UMA função da empresa.
+ *  - CBO já usado por outra função: aviso + confirmação (CBO_SHARED); níveis da mesma função (Cozinheiro I / II) sem aviso.
  *  - Funcionário guarda roleId + role (nome); salário e CBO vêm SEMPRE da
  *    função — nunca são gravados nem editados pelo Cadastro de Funcionários.
  *  - Exclusão arquiva antes na Lixeira (archiveDeletion) + tombstone.

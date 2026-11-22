@@ -2,6 +2,19 @@
 
 Este arquivo lista bugs conhecidos, riscos e pontos de atenção.
 
+## Risco: versão antiga aberta x dados de Cargos/Vagas (2026-11-22)
+
+Status: Monitorar.
+
+Descrição: Cargos e Salários e Quadro de Vagas trafegam aninhados em
+`ferias/{empresa}.__rh` (sem nó novo de topo). Um computador com versão anterior
+a `20261122.01` ainda aberta reenvia `ferias/{empresa}` sem `__rh` e o servidor
+fica temporariamente sem esses dados. Nada se perde: o merge é união e os PCs
+com a versão nova mantêm e reenviam na próxima alteração.
+
+Regra: após deploy, todos recarregam com Ctrl+F5. Teste:
+`verify-cargos-salarios.mjs` [11] (remoto sem `__rh` não apaga o local).
+
 ## Bug: AppData.state desatualizado após sincronização (2026-11-17)
 
 Status: Corrigido (`20261117.05`) — monitorar.
