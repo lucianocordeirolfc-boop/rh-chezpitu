@@ -92,6 +92,29 @@ assert(a1.cargoId === recep.id && a1.role === "Recepcionista", "admissão herda 
 assert(a2.role === "Manutencionista", "admissão com função escolhida");
 assert(RhCatalog.admittedForVaga(CO, v1.id) === 1, "admitidos da vaga = admissões 'Iniciou'");
 
+console.log("[2b] Entrevistas agendadas (etiqueta da vaga)");
+const T = "2026-11-22";
+assert(RhCatalog.interviewsForVaga(CO, v1.id, T).length === 1 && RhCatalog.interviewsForVaga(CO, v1.id, T)[0].when === "past", "candidato 'Agendado' de 17/11 entra como passada; reprovado não entra");
+const iSem = RhCatalog.saveCandidato(CO, { vagaId: v1.id, name: "Sem Data", situation: "Agendado" });
+const iFut = RhCatalog.saveCandidato(CO, { vagaId: v1.id, name: "Futuro Teste", situation: "Agendado", date: "2026-11-25", time: "14:30" });
+const iHoje = RhCatalog.saveCandidato(CO, { vagaId: v1.id, name: "Hoje Teste", situation: "Agendado", date: T, time: "09:00" });
+const iPass = RhCatalog.saveCandidato(CO, { vagaId: v1.id, name: "Passado Teste", situation: "Agendado", date: "2026-11-20" });
+const iOutra = RhCatalog.saveCandidato(CO, { vagaId: v2.id, name: "Outra Vaga", situation: "Agendado", date: "2026-11-23" });
+const iAgendar = RhCatalog.saveCandidato(CO, { vagaId: v1.id, name: "Ainda Agendar", situation: "Agendar", date: "2026-11-23" });
+assert(iFut.time === "14:30" && RhCatalog.saveCandidato(CO, { vagaId: v1.id, name: "Hora Ruim", time: "25:99" }).time === "", "horário HH:MM gravado; horário inválido descartado");
+const list = RhCatalog.interviewsForVaga(CO, v1.id, T);
+assert(list.map((i) => i.name).join("|") === `Hoje Teste|Futuro Teste|Sem Data|Passado Teste|${c1.name}`, `ordem: hoje, próximas, sem data, passadas da mais recente (${list.map((i) => i.name).join("|")})`);
+assert(list[0].when === "today" && list[0].time === "09:00" && list.at(-1).when === "past", "classificação hoje/passada");
+assert(!list.some((i) => i.name === "Outra Vaga" || i.name === "Ainda Agendar"), "só candidatos 'Agendado' desta vaga");
+const ld = RhCatalog.localTodayISO();
+const dd = new Date();
+assert(ld === `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, "0")}-${String(dd.getDate()).padStart(2, "0")}`, "\"hoje\" da etiqueta usa a data local (não UTC)");
+const snapI = JSON.stringify(AppData.state.companies);
+RhCatalog.interviewsForVaga(CO, v1.id, T);
+assert(JSON.stringify(AppData.state.companies) === snapI, "etiqueta é só leitura");
+[iFut, iHoje, iPass, iOutra, iAgendar, iSem].forEach((c) => RhCatalog.removeCandidato(CO, c.id));
+RhCatalog.listRecords(CO, "candidatos").filter((c) => c.name === "Hora Ruim").forEach((c) => RhCatalog.removeCandidato(CO, c.id));
+
 console.log("[3] Painel RH");
 const snapshot = JSON.stringify(AppData.state.companies);
 const p = RhCatalog.computePanel(CO);

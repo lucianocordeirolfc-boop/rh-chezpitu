@@ -111,6 +111,9 @@ Use este checklist antes de qualquer commit ou deploy.
 - [ ] Cartão: CBO em fonte menor, "Urgente" em destaque, Quantidade só com o
       número (admitidos só no Painel RH).
 - [ ] Vaga nova da mesma função sugere o perfil da última.
+- [ ] Candidato "Agendado" (com data/horário) vira etiqueta no topo do cartão,
+      ao lado de Editar/Excluir; hoje em destaque, passada em alerta, +N;
+      clique abre Recrutamento e Seleção.
 - [ ] Candidato (R&S) e admissão ligados à vaga; "Iniciou" conta como admitido.
 - [ ] Painel RH confere com as tabelas.
 - [ ] Mostrar concluídas/canceladas.

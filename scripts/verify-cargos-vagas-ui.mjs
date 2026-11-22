@@ -428,6 +428,47 @@ try {
   s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
   assert(s.includes("Jorge Candidato") && s.includes("Garçom · Restaurante"), "candidato listado com a vaga");
 
+  console.log("[7b] Etiqueta de entrevista agendada no cartão da vaga");
+  await $eval(() => document.querySelector('[data-vagas-tab="vagas"]').click());
+  s = await $eval(() => document.querySelector(".vaga-interview-badge")?.textContent.replace(/\s+/g, " ").trim());
+  assert(/Entrevista · Jorge · sem data/.test(s || ""), `candidato 'Agendado' sem data vira etiqueta (${s})`);
+  await $eval(() => {
+    const c = AppData.getCompanyData("Chez Pitu").candidatos.find((x) => x.name === "Jorge Candidato");
+    RhCatalog.saveCandidato("Chez Pitu", { ...c, date: RhCatalog.localTodayISO(), time: "09:00" });
+    RhCatalog.saveCandidato("Chez Pitu", { vagaId: c.vagaId, name: "Paula Segunda", situation: "Agendado", date: "2099-01-10", time: "15:00" });
+    window.__render("quadro-vagas", "QuadroVagasModule");
+  });
+  s = await $eval(() => {
+    const card = document.querySelector(".vaga-card");
+    const badge = card.querySelector(".vaga-interview-badge");
+    const r = (el) => el.getBoundingClientRect();
+    const b = r(badge), a = r(card.querySelector(".vaga-card-actions")), t = r(card.querySelector(".vaga-card-title")), h = r(card.querySelector(".vaga-card-head"));
+    const hit = (x, y) => !(x.right <= y.left || y.right <= x.left || x.bottom <= y.top || y.bottom <= x.top);
+    return {
+      text: badge.textContent.replace(/\s+/g, " ").trim(),
+      today: badge.classList.contains("is-today"),
+      title: badge.getAttribute("title"),
+      inHead: b.top >= h.top && b.bottom <= h.bottom,
+      sameLine: Math.abs((b.top + b.bottom) / 2 - (a.top + a.bottom) / 2) < 12,
+      overlap: hit(b, a) || hit(b, t),
+      gap: a.left - b.right
+    };
+  });
+  assert(/Entrevista · Jorge · Hoje às 09:00/.test(s.text) && /\+1/.test(s.text) && s.today, `etiqueta de hoje em destaque, com +1 (${s.text})`);
+  assert(/Paula Segunda — 10\/01 às 15:00/.test(s.title), "dica lista todas as entrevistas");
+  assert(s.inHead && s.sameLine && !s.overlap && s.gap >= 0, `etiqueta na linha de Editar/Excluir, sem sobrepor título nem botões (${JSON.stringify(s)})`);
+  await page.screenshot({ path: path.join(tmp, "vaga-entrevista.png") });
+  await $eval(() => document.querySelector(".vaga-interview-badge").click());
+  s = await $eval(() => document.querySelector("#quadro-vagas .ausencias-tab-btn.active")?.textContent.trim());
+  assert(s === "Recrutamento e Seleção", "clique na etiqueta abre Recrutamento e Seleção");
+  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
+  assert(/às 09:00/.test(s), "R&S mostra o horário da entrevista");
+  await $eval(() => {
+    const p = AppData.getCompanyData("Chez Pitu").candidatos.find((x) => x.name === "Paula Segunda");
+    RhCatalog.saveCandidato("Chez Pitu", { ...p, situation: "Desistiu" });
+    window.__render("quadro-vagas", "QuadroVagasModule");
+  });
+
   await $eval(() => document.querySelector('[data-vagas-tab="admissoes"]').click());
   await $eval(() => document.getElementById("btnNewAdm").click());
   await $eval((vid) => {

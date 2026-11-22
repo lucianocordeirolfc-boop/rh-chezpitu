@@ -334,6 +334,48 @@
   font-size: 13px;
 }
 
+/* Etiqueta "Entrevista agendada" no espaço livre do topo do cartão. */
+.vaga-card-interviews {
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.vaga-interview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--sea-200);
+  border-radius: 999px;
+  background: var(--sea-100);
+  color: var(--sea-800);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.vaga-interview-badge:hover {
+  border-color: var(--sea-500);
+}
+
+.vaga-interview-badge.is-today {
+  border-color: #f0a35e;
+  background: #fff1e3;
+  color: #8a4b12;
+}
+
+.vaga-interview-badge.is-past {
+  border-color: #e7b9b4;
+  background: #fde8e7;
+  color: var(--danger);
+}
+
 .vaga-card-actions {
   display: flex;
   flex-shrink: 0;

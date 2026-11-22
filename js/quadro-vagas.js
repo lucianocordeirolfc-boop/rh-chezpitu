@@ -137,6 +137,40 @@
 
   // ── Vagas ─────────────────────────────────────────────────────────────────
 
+  function shortDate(iso) {
+    return iso ? AppData.formatDateBR(iso).slice(0, 5) : "";
+  }
+
+  function interviewText(i) {
+    if (i.when === "today") return `Hoje${i.time ? ` às ${i.time}` : ""}`;
+    if (i.when === "nodate") return "sem data";
+    return `${shortDate(i.date)}${i.time ? ` às ${i.time}` : ""}`;
+  }
+
+  /**
+   * Etiqueta "Entrevista agendada" no topo do cartão (candidatos da vaga com
+   * situação "Agendado" em Recrutamento e Seleção). Clique abre a sub-aba R&S.
+   */
+  function interviewBadgeHTML(co, vagaId) {
+    const list = RhCatalog.interviewsForVaga(co, vagaId);
+    if (!list.length) return `<span class="vaga-card-interviews"></span>`;
+    const first = list[0];
+    const past = first.when === "past";
+    const label = past
+      ? `Entrevista de ${shortDate(first.date)} passou — atualizar situação`
+      : `Entrevista · ${first.name.split(" ")[0]} · ${interviewText(first)}`;
+    const title = list
+      .map((i) => `${i.name} — ${i.when === "past" ? `${shortDate(i.date)} (passou)` : interviewText(i)}`)
+      .join("\n");
+    return `
+      <span class="vaga-card-interviews">
+        <button type="button" class="vaga-interview-badge ${past ? "is-past" : first.when === "today" ? "is-today" : ""}"
+          data-goto-rs title="${esc(`Entrevistas agendadas:\n${title}\n\nClique para abrir Recrutamento e Seleção`)}">
+          <span aria-hidden="true">📅</span> ${esc(label)}${list.length > 1 ? ` <strong>+${list.length - 1}</strong>` : ""}
+        </button>
+      </span>`;
+  }
+
   /** Bloco de texto do perfil (atribuições, requisitos, observações). */
   function perfilBlock(label, text, cls = "") {
     if (!String(text || "").trim()) return "";
@@ -179,6 +213,7 @@
                 ${cargo?.cbo ? `<span class="vaga-card-cbo">CBO ${esc(cargo.cbo)}</span>` : ""}
                 ${v.priority ? `<span class="vaga-card-priority">${pill(v.priority)}</span>` : ""} ${pill(v.status)}
               </div>
+              ${interviewBadgeHTML(co, v.id)}
               <div class="vaga-card-actions">
                 <button type="button" class="secondary btn-sm" data-edit-vaga="${esc(v.id)}">Editar</button>
                 <button type="button" class="link-button danger-link" data-remove-vaga="${esc(v.id)}">Excluir</button>
@@ -331,7 +366,7 @@
             <td><strong>${esc(c.name)}</strong></td>
             <td>${esc(c.contact || "—")}</td>
             <td>${pill(c.situation)}</td>
-            <td>${dateBR(c.date)}</td>
+            <td>${dateBR(c.date)}${c.time ? `<small class="help-text">às ${esc(c.time)}</small>` : ""}</td>
             <td class="rh-notes">${esc(c.parecer || "")}</td>
             <td>${c.feedbackSent ? pill("Enviado") : "—"}</td>
             <td class="rh-notes">${esc(c.notes || "")}</td>
@@ -370,8 +405,12 @@
       <div class="func-form-row cols-3">
         <label>Situação<select name="situation">${options(RhCatalog.CANDIDATE_SITUATIONS, c?.situation || "Agendar", "Agendar")}</select></label>
         <label>Data (entrevista/contato)<input type="date" name="date" value="${esc(c?.date || "")}"></label>
-        <label class="rh-inline-check rh-form-check"><input type="checkbox" name="feedbackSent" ${c?.feedbackSent ? "checked" : ""}> Feedback enviado ao candidato</label>
+        <label>Horário da entrevista<input type="time" name="time" value="${esc(c?.time || "")}"></label>
       </div>
+      <div class="func-form-row">
+        <label class="rh-inline-check"><input type="checkbox" name="feedbackSent" ${c?.feedbackSent ? "checked" : ""}> Feedback enviado ao candidato</label>
+      </div>
+      <p class="help-text">Com a situação "Agendado", a entrevista aparece como etiqueta no cartão da vaga, em Vagas em aberto.</p>
       <div class="func-form-row">
         <label class="full">Parecer<textarea name="parecer" rows="2">${esc(c?.parecer || "")}</textarea></label>
       </div>
@@ -504,6 +543,12 @@
       })
     );
     container.querySelector("#btnVagasReport")?.addEventListener("click", () => window.RhReports?.openVagasReport(co));
+    container.querySelectorAll("[data-goto-rs]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        activeTab = "rs";
+        render(container);
+      })
+    );
     container.querySelector("#vagasShowClosed")?.addEventListener("change", (e) => {
       showClosed = e.target.checked;
       render(container);

@@ -613,10 +613,39 @@
       contact: clean(input.contact),
       situation: CANDIDATE_SITUATIONS.includes(input.situation) ? input.situation : "Agendar",
       date: clean(input.date),
+      // Horário da entrevista (HH:MM, opcional) — aparece na etiqueta da vaga.
+      time: /^([01]\d|2[0-3]):[0-5]\d$/.test(clean(input.time)) ? clean(input.time) : "",
       parecer: String(input.parecer || "").trim(),
       feedbackSent: Boolean(input.feedbackSent),
       notes: String(input.notes || "").trim()
     });
+  }
+
+  /**
+   * Entrevistas agendadas da vaga (candidatos com situação "Agendado"), para a
+   * etiqueta do cartão. Próximas primeiro (data/hora); sem data no fim; as que
+   * já passaram por último, marcadas "past" (situação a atualizar). Só leitura.
+   */
+  /** Data LOCAL (aaaa-mm-dd). todayISO() usa UTC e vira o dia às 21h em Brasília. */
+  function localTodayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function interviewsForVaga(company, vagaId, today = localTodayISO()) {
+    return (data(company).candidatos || [])
+      .filter((c) => c.vagaId === vagaId && c.situation === "Agendado")
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        date: c.date || "",
+        time: c.time || "",
+        when: !c.date ? "nodate" : c.date < today ? "past" : c.date === today ? "today" : "future"
+      }))
+      .sort((a, b) => {
+        const rank = { today: 0, future: 1, nodate: 2, past: 3 };
+        return rank[a.when] - rank[b.when] || `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`) * (a.when === "past" ? -1 : 1);
+      });
   }
 
   function removeCandidato(company, id) {
@@ -727,6 +756,8 @@
     vagaLabel,
     admittedForVaga,
     saveCandidato,
+    interviewsForVaga,
+    localTodayISO,
     removeCandidato,
     saveAdmissao,
     removeAdmissao,

@@ -69,7 +69,7 @@
     <p>Excluir função só é possível sem funcionários vinculados (ativos ou inativos) e sem vaga em andamento; a função vai para a <strong>Lixeira</strong>.</p>
 
     <h3>4.2 Quadro de Vagas</h3>
-    <p>Separado por empresa, com quatro sub-abas: <strong>Vagas em aberto</strong> (função de Cargos e Salários, setor, quantidade, contrato, motivo, abertura, prioridade/prazo, status, gestor, escolaridade, atribuições do cargo, requisitos obrigatórios, desejáveis e diferenciais, e observações — cada vaga em um cartão; vaga nova sugere o perfil da última vaga da mesma função), <strong>Painel RH</strong> (indicadores calculados), <strong>Recrutamento e Seleção</strong> (candidatos por vaga, situação, parecer e feedback) e <strong>Admissões</strong> (andamento de documentos, exame e início). A admissão com situação "Iniciou" conta como admitido da vaga. Exclusões vão para a <strong>Lixeira</strong>.</p>
+    <p>Separado por empresa, com quatro sub-abas: <strong>Vagas em aberto</strong> (função de Cargos e Salários, setor, quantidade, contrato, motivo, abertura, prioridade/prazo, status, gestor, escolaridade, atribuições do cargo, requisitos obrigatórios, desejáveis e diferenciais, e observações — cada vaga em um cartão; vaga nova sugere o perfil da última vaga da mesma função), <strong>Painel RH</strong> (indicadores calculados), <strong>Recrutamento e Seleção</strong> (candidatos por vaga, situação, data e horário, parecer e feedback — candidato "Agendado" aparece como etiqueta de entrevista no cartão da vaga) e <strong>Admissões</strong> (andamento de documentos, exame e início). A admissão com situação "Iniciou" conta como admitido da vaga. Exclusões vão para a <strong>Lixeira</strong>.</p>
 
     <h3>5. Escala de Folga</h3>
     <ol>

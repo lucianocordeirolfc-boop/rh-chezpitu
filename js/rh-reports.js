@@ -282,7 +282,7 @@
     const rows = list
       .map(
         (c) => `<tr><td>${esc(vagas.has(c.vagaId) ? RhCatalog.vagaLabel(vagas.get(c.vagaId)) : c.vagaLabel || "—")}</td><td><b>${esc(c.name)}</b></td>
-          <td>${esc(c.contact || "—")}</td><td>${pill(c.situation)}</td><td>${fmtDate(c.date)}</td><td class="notes">${esc(c.parecer || "")}</td>
+          <td>${esc(c.contact || "—")}</td><td>${pill(c.situation)}</td><td>${fmtDate(c.date)}${c.time ? `<small>às ${esc(c.time)}</small>` : ""}</td><td class="notes">${esc(c.parecer || "")}</td>
           <td>${c.feedbackSent ? "Enviado" : "—"}</td><td class="notes">${esc(c.notes || "")}</td></tr>`
       )
       .join("");

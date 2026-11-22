@@ -7,6 +7,25 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (9) — Etiqueta de entrevista agendada no cartão da vaga
+
+Pedido do usuário: quando houver entrevista agendada para a vaga, mostrar um
+banner pequeno no espaço em branco da linha de Editar/Excluir.
+
+- `js/rh-catalog.js`: `interviewsForVaga` (candidatos "Agendado" da vaga:
+  hoje, próximas, sem data, passadas — só leitura; "hoje" pela data LOCAL via
+  `localTodayISO`, pois `todayISO()` é UTC e vira o dia às 21h em Brasília);
+  candidato ganha `time` (HH:MM opcional, inválido descartado).
+- `js/quadro-vagas.js`: etiqueta 📅 no topo do cartão ("Entrevista · Nome ·
+  dd/mm às hh:mm", "Hoje às …" em destaque, passada em alerta "atualizar
+  situação", +N, dica com todas, clique abre R&S); campo "Horário da
+  entrevista" no candidato e horário na tabela R&S. `js/rh-reports.js`: horário
+  no PDF. `css/rh-catalog.css`: estilos da etiqueta.
+- Docs: PROJECT_RULES, manuais, TEST_CHECKLIST.
+- Testes: `verify-quadro-vagas` 46, `verify-cargos-vagas-ui` 68 (etiqueta na
+  mesma linha de Editar/Excluir, sem sobrepor, clique leva ao R&S).
+- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (8) — Vagas em aberto: dados do cartão em uma só linha
 
 Pedido do usuário: Setor, Quantidade, Contrato, Motivo, Abertura, Prazo

@@ -240,7 +240,10 @@ Cargos e Salários; desde 2026-11-22 também **escolaridade** (lista
 requisitos obrigatórios, desejáveis e diferenciais (`VAGA_PERFIL_FIELDS`);
 vaga nova da mesma função sugere o perfil da última (`lastVagaPerfil`, só
 preenche campo vazio, nada grava antes de Salvar); exibida em **cartões**, com
-ações no topo e textos em bloco), Painel RH (calculado, nunca grava), Recrutamento e Seleção
+ações no topo e textos em bloco; candidato com situação "Agendado" vira
+**etiqueta de entrevista** no topo do cartão — `RhCatalog.interviewsForVaga`,
+só leitura, "hoje" pela data LOCAL — com horário opcional do candidato
+(`time`), +N e dica com todas; clique abre R&S), Painel RH (calculado, nunca grava), Recrutamento e Seleção
 (candidatos) e Admissões ("Iniciou" = admitido da vaga). Exclusões (vaga,
 candidato, admissão) vão para a Lixeira + tombstone. Dados pessoais de
 candidato: só o necessário (LGPD). Cobertura: `scripts/verify-quadro-vagas.mjs`,

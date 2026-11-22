@@ -99,7 +99,7 @@ Separado por empresa (aba superior), baseado na planilha "Controle de Vagas" do 
 |---|---|
 | **Vagas em aberto** | Função (de Cargos e Salários, com o CBO), setor, quantidade, contrato, motivo, data de abertura, prioridade e prazo, status, gestor solicitante, **escolaridade**, **atribuições do cargo**, **requisitos obrigatórios**, **desejáveis** e **diferenciais**, e observações/próxima ação. Cada vaga aparece em um cartão (Editar/Excluir no topo; textos em blocos, com quebra de linha). Numa vaga nova, ao escolher a função, o sistema sugere a escolaridade, as atribuições e os requisitos da última vaga dessa função — revise antes de salvar. Concluídas e canceladas ficam ocultas até marcar "Mostrar concluídas/canceladas". |
 | **Painel RH** | Indicadores calculados das tabelas: vagas cadastradas, em andamento, urgentes, concluídas, posições previstas e em aberto, candidatos em processo, admissões em andamento e admitidos; vagas por status e posições por setor. |
-| **Recrutamento e Seleção** | Candidatos por vaga: contato, situação, data, parecer, feedback enviado e observações. |
+| **Recrutamento e Seleção** | Candidatos por vaga: contato, situação, data e **horário da entrevista**, parecer, feedback enviado e observações. Com a situação **Agendado**, a entrevista aparece como etiqueta no cartão da vaga (📅 "Entrevista · Nome · 25/11 às 09:00"; destaque quando é hoje; aviso "passou — atualizar situação" quando a data já passou; "+N" se houver mais de uma; clique abre esta sub-aba). |
 | **Admissões** | Nome, função, prazo/data, situação (documentação, exame, ASO, contabilidade, iniciou) e observações. A admissão com situação **Iniciou** conta como admitido da vaga. |
 
 Exclusões vão para a **Lixeira** da tela e podem ser restauradas.
