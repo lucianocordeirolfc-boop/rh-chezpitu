@@ -1,3 +1,9 @@
+2026-11-22 (8) - Relatorio de Cargos: so comissoes vinculadas a empresa (20261122.10)
+- [CORRECAO] Secao Comissoes do relatorio de Cargos e Salarios lista so as comissoes que alguma funcao da empresa recebe, cada uma com as funcoes marcadas; sem nenhuma, aviso. Tela de Comissoes segue com todas
+- [DADOS] Com autorizacao: Camareira (Chez Pitu) trocada de Taxa de Servico Bar para Frigobar; explicacoes de Bar, Ocupacao e PL Anual copiadas para a Pengold
+- Arquivos: js/rh-reports.js, scripts/verify-rh-reports.mjs
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 (7) - Admissao: vaga amarrada a funcao (20261122.09)
 - [CORRECAO] Nova admissao mostrava todas as vagas apos escolher a funcao. Agora so as vagas da funcao ("Nenhuma vaga para esta funcao" quando nao houver); trocar a funcao limpa vaga de outra; vaga escolhida antes preenche a funcao; gravacao recusa vaga de outra funcao
 - Arquivos: js/quadro-vagas.js, js/rh-catalog.js

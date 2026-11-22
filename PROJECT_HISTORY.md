@@ -38,6 +38,8 @@ empresa". A tela de Comissões continua listando todas para edição.
 - `scripts/verify-rh-reports.mjs`: +3 testes (só funções marcadas; comissão
   sem função fora; aviso para empresa sem comissão).
 - Testes: verify-rh-reports 29/29, `npm test` 47/47, `npm run validate` 36/36.
+- **Publicação:** versão `20261122.10`, commit `519785a` + carimbo; autorizados
+  pelo usuário em 2026-11-22.
 
 Dado (autorizado pelo usuário — "Copiar as 3" / "pode copiar"): copiadas
 para a Pengold as explicações de Taxa de Serviço Bar, Comissão Ocupação e PL
