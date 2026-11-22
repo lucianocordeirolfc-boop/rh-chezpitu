@@ -75,6 +75,10 @@
     .commission p { margin: 3px 0 0; white-space: pre-line; }
     .empty { color: #8a817a; font-style: italic; margin: 4px 0; }
     .notes { white-space: pre-line; }
+    tr.perfil-row td { background: #fbf9f5; }
+    .perfil-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .perfil b { color: #133169; font-size: 8.5px; text-transform: uppercase; }
+    .perfil p { margin: 1px 0 0; }
   `;
 
   function documentHTML(company, title, body, options = {}) {
@@ -243,6 +247,14 @@
     </section>`;
   }
 
+  /** Linha de perfil (atribuições e requisitos) logo abaixo da vaga. */
+  function perfilRow(v) {
+    const parts = RhCatalog.VAGA_PERFIL_FIELDS.filter((f) => String(v[f.key] || "").trim()).map(
+      (f) => `<div class="perfil"><b>${esc(f.label)}</b><p class="notes">${esc(v[f.key])}</p></div>`
+    );
+    return parts.length ? `<tr class="perfil-row"><td colspan="11"><div class="perfil-grid">${parts.join("")}</div></td></tr>` : "";
+  }
+
   function vagasHTML(company, includeClosed) {
     let vagas = RhCatalog.listRecords(company, "vagas");
     if (!includeClosed) vagas = vagas.filter((v) => !RhCatalog.VAGA_STATUS_CLOSED.includes(v.status));
@@ -254,11 +266,11 @@
           <td class="num">${esc(v.quantity)}<small>${RhCatalog.admittedForVaga(company, v.id)} admitido(s)</small></td>
           <td>${esc(v.contractType || "—")}</td><td>${esc(v.reason || "—")}</td><td>${fmtDate(v.openDate)}</td>
           <td>${pill(v.priority)}${v.deadline ? `<small>até ${fmtDate(v.deadline)}</small>` : ""}</td><td>${pill(v.status)}</td>
-          <td>${esc(v.manager || "—")}</td><td class="notes">${esc(v.notes || "")}</td></tr>`;
+          <td>${esc(v.manager || "—")}</td><td>${esc(v.escolaridade || "—")}</td><td class="notes">${esc(v.notes || "")}</td></tr>${perfilRow(v)}`;
       })
       .join("");
     return `<section><h2>Vagas<small>${includeClosed ? "todas" : "em andamento"} · ${vagas.length}</small></h2>
-      ${vagas.length ? `<table><thead><tr><th>Função</th><th>Setor</th><th class="num">Qtd.</th><th>Contrato</th><th>Motivo</th><th>Abertura</th><th>Prazo</th><th>Status</th><th>Gestor</th><th style="width:24%">Observações / próxima ação</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="empty">Nenhuma vaga.</p>`}
+      ${vagas.length ? `<table><thead><tr><th>Função</th><th>Setor</th><th class="num">Qtd.</th><th>Contrato</th><th>Motivo</th><th>Abertura</th><th>Prazo</th><th>Status</th><th>Gestor</th><th>Escolaridade</th><th style="width:20%">Observações / próxima ação</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="empty">Nenhuma vaga.</p>`}
     </section>`;
   }
 

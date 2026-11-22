@@ -235,7 +235,12 @@ Cobertura: `scripts/verify-rh-reports.mjs`, `scripts/verify-cargos-vagas-ui.mjs`
 
 Vigente desde 2026-11-22. Aba própria por empresa, baseada na planilha
 "Controle de Vagas" do RH; guias viraram sub-abas: Vagas em aberto (função de
-Cargos e Salários), Painel RH (calculado, nunca grava), Recrutamento e Seleção
+Cargos e Salários; desde 2026-11-22 também **escolaridade** (lista
+`RhCatalog.ESCOLARIDADES`) e o **perfil da vaga** — atribuições do cargo,
+requisitos obrigatórios, desejáveis e diferenciais (`VAGA_PERFIL_FIELDS`);
+vaga nova da mesma função sugere o perfil da última (`lastVagaPerfil`, só
+preenche campo vazio, nada grava antes de Salvar); exibida em **cartões**, com
+ações no topo e textos em bloco), Painel RH (calculado, nunca grava), Recrutamento e Seleção
 (candidatos) e Admissões ("Iniciou" = admitido da vaga). Exclusões (vaga,
 candidato, admissão) vão para a Lixeira + tombstone. Dados pessoais de
 candidato: só o necessário (LGPD). Cobertura: `scripts/verify-quadro-vagas.mjs`,

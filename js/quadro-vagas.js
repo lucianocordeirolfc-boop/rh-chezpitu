@@ -137,42 +137,64 @@
 
   // ── Vagas ─────────────────────────────────────────────────────────────────
 
-  function vagaRows() {
+  /** Bloco de texto do perfil (atribuições, requisitos, observações). */
+  function perfilBlock(label, text, cls = "") {
+    if (!String(text || "").trim()) return "";
+    return `<div class="vaga-perfil-item ${cls}"><p class="eyebrow">${esc(label)}</p><p class="vaga-perfil-text">${esc(text)}</p></div>`;
+  }
+
+  /**
+   * Vagas em cartões (2026-11-22): ações no topo do cartão (não disputam
+   * espaço com textos longos) e textos em bloco, com quebra de linha.
+   */
+  function vagaCards() {
     const co = company();
     let vagas = RhCatalog.listRecords(co, "vagas");
     const closed = vagas.filter((v) => RhCatalog.VAGA_STATUS_CLOSED.includes(v.status)).length;
     if (!showClosed) vagas = vagas.filter((v) => !RhCatalog.VAGA_STATUS_CLOSED.includes(v.status));
     vagas.sort((a, b) => (a.priority === "Urgente" ? -1 : 0) - (b.priority === "Urgente" ? -1 : 0) || String(a.openDate).localeCompare(String(b.openDate)));
-    const rows = vagas.length
-      ? vagas
-          .map((v) => {
-            const admitted = RhCatalog.admittedForVaga(co, v.id);
-            const cargo = RhCatalog.getCargo(co, v.cargoId);
-            return `
-            <tr>
-              <td><strong>${esc(v.role)}</strong>${cargo?.cbo ? `<small class="help-text">CBO ${esc(cargo.cbo)}</small>` : ""}</td>
-              <td>${esc(v.department || "—")}</td>
-              <td class="rh-num">${esc(v.quantity)}<small class="help-text">${admitted} admitido(s)</small></td>
-              <td>${esc(v.contractType || "—")}</td>
-              <td>${esc(v.reason || "—")}</td>
-              <td>${dateBR(v.openDate)}</td>
-              <td>${v.priority ? pill(v.priority) : ""}${v.deadline ? `<small class="help-text">até ${dateBR(v.deadline)}</small>` : ""}</td>
-              <td>${pill(v.status)}</td>
-              <td>${esc(v.manager || "—")}</td>
-              <td class="rh-notes">${esc(v.notes || "")}</td>
-              <td class="actions">
-                <button type="button" class="link-button" data-edit-vaga="${esc(v.id)}">Editar</button>
+    if (!vagas.length) {
+      return { cards: `<p class="rh-empty">Nenhuma vaga ${showClosed ? "" : "em andamento "}para ${esc(co)}.</p>`, closed };
+    }
+    const cards = vagas
+      .map((v) => {
+        const admitted = RhCatalog.admittedForVaga(co, v.id);
+        const cargo = RhCatalog.getCargo(co, v.cargoId);
+        const meta = [
+          ["Setor", v.department || "—"],
+          ["Quantidade", `${v.quantity} · ${admitted} admitido(s)`],
+          ["Contrato", v.contractType || "—"],
+          ["Motivo", v.reason || "—"],
+          ["Abertura", v.openDate ? AppData.formatDateBR(v.openDate) : "—"],
+          ["Prazo desejado", v.deadline ? AppData.formatDateBR(v.deadline) : "—"],
+          ["Gestor solicitante", v.manager || "—"],
+          ["Escolaridade", v.escolaridade || "—"]
+        ];
+        const perfil = RhCatalog.VAGA_PERFIL_FIELDS.map((f) => perfilBlock(f.label, v[f.key])).join("");
+        const notes = perfilBlock("Observações / próxima ação", v.notes, "vaga-perfil-notes");
+        return `
+          <article class="vaga-card ${v.priority === "Urgente" ? "is-urgent" : ""}" data-vaga-card="${esc(v.id)}">
+            <header class="vaga-card-head">
+              <div class="vaga-card-title">
+                <h3>${esc(v.role)}</h3>
+                ${cargo?.cbo ? `<span class="help-text">CBO ${esc(cargo.cbo)}</span>` : ""}
+                ${v.priority ? pill(v.priority) : ""} ${pill(v.status)}
+              </div>
+              <div class="vaga-card-actions">
+                <button type="button" class="secondary btn-sm" data-edit-vaga="${esc(v.id)}">Editar</button>
                 <button type="button" class="link-button danger-link" data-remove-vaga="${esc(v.id)}">Excluir</button>
-              </td>
-            </tr>`;
-          })
-          .join("")
-      : `<tr><td colspan="11" class="rh-empty">Nenhuma vaga ${showClosed ? "" : "em andamento "}para ${esc(co)}.</td></tr>`;
-    return { rows, closed };
+              </div>
+            </header>
+            <dl class="vaga-card-meta">${meta.map(([k, val]) => `<div><dt>${esc(k)}</dt><dd>${esc(val)}</dd></div>`).join("")}</dl>
+            ${perfil || notes ? `<div class="vaga-perfil-grid">${perfil}${notes}</div>` : ""}
+          </article>`;
+      })
+      .join("");
+    return { cards, closed };
   }
 
   function vagasTabHTML() {
-    const { rows, closed } = vagaRows();
+    const { cards, closed } = vagaCards();
     return `
       <article class="card">
         <div class="card-header card-header-compact">
@@ -183,12 +205,7 @@
             <button type="button" class="primary btn-sm" id="btnNewVaga">+ Nova vaga</button>
           </div>
         </div>
-        <div class="table-wrap">
-          <table class="table-premium rh-table">
-            <thead><tr><th>Cargo / Função</th><th>Setor</th><th>Qtd.</th><th>Contrato</th><th>Motivo</th><th>Abertura</th><th>Prazo</th><th>Status</th><th>Gestor</th><th>Observações / próxima ação</th><th>Ações</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
+        <div class="vaga-card-list">${cards}</div>
       </article>`;
   }
 
@@ -215,15 +232,45 @@
       </div>
       <div class="func-form-row cols-3">
         <label>Gestor solicitante<input name="manager" value="${esc(v?.manager || "")}" autocomplete="off"></label>
+        <label>Escolaridade<select name="escolaridade">${options(RhCatalog.ESCOLARIDADES, v?.escolaridade)}</select></label>
       </div>
+      <p class="help-text" id="vagaPerfilHint" style="display:none"></p>
+      ${RhCatalog.VAGA_PERFIL_FIELDS.map(
+        (f) => `
       <div class="func-form-row">
-        <label class="full">Observações / próxima ação (perfil, horário, requisitos)<textarea name="notes" rows="3">${esc(v?.notes || "")}</textarea></label>
+        <label class="full">${esc(f.label)}<textarea name="${f.key}" rows="3" placeholder="Um item por linha">${esc(v?.[f.key] || "")}</textarea></label>
+      </div>`
+      ).join("")}
+      <div class="func-form-row">
+        <label class="full">Observações / próxima ação (horário, andamento)<textarea name="notes" rows="2">${esc(v?.notes || "")}</textarea></label>
       </div>`, (payload) => {
       if (!payload.cargoId && !v?.role) throw new Error("Selecione a função (cadastre-a antes em Cargos e Salários, se ainda não existir).");
       RhCatalog.saveVaga(co, { ...payload, id: v?.id, role: payload.cargoId ? "" : v?.role });
       window.App?.toast?.("Vaga salva.", "success");
       render(container);
     });
+    // Vaga nova: ao escolher a função, sugere o perfil da última vaga dela
+    // (só preenche campos vazios; tudo continua editável).
+    if (!v) {
+      form.elements.cargoId.addEventListener("change", () => {
+        const perfil = RhCatalog.lastVagaPerfil(co, form.elements.cargoId.value);
+        const hint = form.querySelector("#vagaPerfilHint");
+        if (!perfil) {
+          hint.style.display = "none";
+          return;
+        }
+        let filled = 0;
+        Object.entries(perfil).forEach(([k, val]) => {
+          const field = form.elements[k];
+          if (field && val && !String(field.value || "").trim()) {
+            field.value = val;
+            filled += 1;
+          }
+        });
+        hint.style.display = filled ? "" : "none";
+        hint.textContent = filled ? "Escolaridade, atribuições e requisitos trazidos da última vaga desta função — revise antes de salvar." : "";
+      });
+    }
     return form;
   }
 

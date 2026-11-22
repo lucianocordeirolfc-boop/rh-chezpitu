@@ -50,7 +50,7 @@ co.employees = [
   { id: "e3", name: "Caio Recepção", role: "recepcionista", department: "Recepção", status: "Ativo", admissionDate: "2025-05-01" },
   { id: "e4", name: "Davi Legado", role: "Lavanderia", department: "Lavanderia", status: "Ativo", admissionDate: "2025-05-01" }
 ];
-const vAberta = RhCatalog.saveVaga(CO, { cargoId: recep.id, department: "Recepção", quantity: 2, status: "Entrevistas", priority: "Urgente", notes: "Turno <i>noite</i>" });
+const vAberta = RhCatalog.saveVaga(CO, { cargoId: recep.id, department: "Recepção", quantity: 2, status: "Entrevistas", priority: "Urgente", notes: "Turno <i>noite</i>", escolaridade: "Ensino médio completo", atribuicoes: "Check-in e check-out", requisitosObrigatorios: "Ensino médio <b>completo</b>", requisitosDiferenciais: "Inglês" });
 RhCatalog.saveVaga(CO, { cargoId: limp.id, department: "Governança", quantity: 1, status: "Concluída" });
 RhCatalog.saveCandidato(CO, { vagaId: vAberta.id, name: "João Candidato", contact: "(22) 99999-0000", situation: "Agendado" });
 RhCatalog.saveAdmissao(CO, { name: "Mariana Admitida", vagaId: vAberta.id, situation: "Iniciou", date: "2026-11-18" });
@@ -88,6 +88,9 @@ assert(!vg.includes("Governança</td>"), "vaga concluída oculta por padrão");
 assert(RhReports.buildVagasReportHTML(CO, { sections: ["vagas"], includeClosed: true }).includes("Concluída"), "concluídas quando pedido");
 assert(vg.includes("João Candidato") && vg.includes("Mariana Admitida") && vg.includes("1 admitido(s)"), "candidato, admissão e admitidos da vaga");
 assert(!vg.includes("<i>noite</i>") && vg.includes("&lt;i&gt;noite"), "observação da vaga escapada");
+assert(vg.includes("<th>Escolaridade</th>") && vg.includes("Ensino médio completo"), "coluna de escolaridade");
+assert(vg.includes("Atribuições do cargo") && vg.includes("Check-in e check-out") && vg.includes("Requisitos diferenciais") && !vg.includes("Requisitos desejáveis"), "perfil da vaga sob a linha (só os campos preenchidos)");
+assert(!vg.includes("<b>completo</b>") && vg.includes("&lt;b&gt;completo"), "requisito com HTML é escapado");
 assert(RhReports.buildVagasReportHTML(PG, {}).includes("Nenhuma vaga"), "outra empresa sem vagas");
 
 console.log("[4] Somente leitura");

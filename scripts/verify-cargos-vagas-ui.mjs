@@ -345,13 +345,44 @@ try {
     f.elements.priority.value = "Urgente";
     f.elements.status.value = "Entrevistas";
     f.elements.manager.value = "Jorge";
-    f.elements.notes.value = "Disponibilidade 08h às 22h";
+    f.elements.escolaridade.value = "Ensino médio completo";
+    f.elements.atribuicoes.value = "Atender mesas\nServir pratos e bebidas";
+    f.elements.requisitosObrigatorios.value = "Experiência como garçom";
+    f.elements.requisitosDesejaveis.value = "Inglês básico";
+    f.elements.requisitosDiferenciais.value = "Experiência em hotel";
+    f.elements.notes.value = "Disponibilidade 08h às 22h. Ensino médio, boa apresentação, experiência em atendimento ao público, preferência por quem já trabalhou em hotel ou restaurante a la carte, residir próximo e ter disponibilidade aos fins de semana e feriados.";
     f.requestSubmit();
   });
-  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
-  assert(s.includes("Garçom") && s.includes("CBO 5134-05") && s.includes("Urgente") && s.includes("Entrevistas"), "vaga na tabela com CBO da função, prioridade e status");
+  s = await $eval(() => AppData.getCompanyData("Chez Pitu").vagas[0]);
+  assert(s.escolaridade === "Ensino médio completo" && s.atribuicoes === "Atender mesas\nServir pratos e bebidas" && s.requisitosObrigatorios === "Experiência como garçom" && s.requisitosDesejaveis === "Inglês básico" && s.requisitosDiferenciais === "Experiência em hotel", "escolaridade, atribuições e os 3 tipos de requisito gravados na vaga");
+  s = await $eval(() => document.querySelector("#quadro-vagas .vaga-card-list").textContent);
+  assert(s.includes("Garçom") && s.includes("CBO 5134-05") && s.includes("Urgente") && s.includes("Entrevistas") && s.includes("Ensino médio completo"), "vaga em cartão com CBO, prioridade, status e escolaridade");
+  assert(["Atribuições do cargo", "Requisitos obrigatórios", "Requisitos desejáveis", "Requisitos diferenciais", "Observações / próxima ação"].every((t) => s.includes(t)), "cartão mostra atribuições, requisitos e observações em blocos");
+  s = await $eval(() => {
+    const card = document.querySelector(".vaga-card");
+    const r = (el) => el.getBoundingClientRect();
+    const actions = r(card.querySelector(".vaga-card-actions"));
+    const notes = r(card.querySelector(".vaga-perfil-notes"));
+    const text = card.querySelector(".vaga-perfil-notes .vaga-perfil-text");
+    const overlap = !(actions.right <= notes.left || notes.right <= actions.left || actions.bottom <= notes.top || notes.bottom <= actions.top);
+    return { overlap, wraps: r(text).height > 25, inside: r(text).right <= r(card).right + 1, pre: getComputedStyle(card.querySelector(".vaga-perfil-text")).whiteSpace };
+  });
+  assert(!s.overlap && s.wraps && s.inside, "observação longa quebra linha dentro do cartão, sem encostar em Editar/Excluir");
+  assert(s.pre === "pre-line", "quebras de linha digitadas são respeitadas");
   const vagaId = await $eval(() => AppData.getCompanyData("Chez Pitu").vagas[0].id);
-  await page.screenshot({ path: path.join(tmp, "vagas.png") });
+  await page.screenshot({ path: path.join(tmp, "vagas.png"), fullPage: true });
+
+  await $eval(() => document.getElementById("btnNewVaga").click());
+  s = await $eval(() => {
+    const f = document.getElementById("vagasForm");
+    f.elements.cargoId.value = RhCatalog.findCargoByName("Chez Pitu", "Garçom").id;
+    f.elements.cargoId.dispatchEvent(new Event("change"));
+    return { at: f.elements.atribuicoes.value, esc: f.elements.escolaridade.value, hint: document.getElementById("vagaPerfilHint").textContent };
+  });
+  assert(s.at === "Atender mesas\nServir pratos e bebidas" && s.esc === "Ensino médio completo" && /última vaga desta função/.test(s.hint), "vaga nova da mesma função sugere o perfil da última (editável)");
+  await $eval(() => document.querySelector("#vagasPopup [data-close]").click());
+  s = await $eval(() => AppData.getCompanyData("Chez Pitu").vagas.length);
+  assert(s === 1, "cancelar a sugestão não grava nada");
 
   await $eval(() => document.querySelector('[data-vagas-tab="rs"]').click());
   await $eval(() => document.getElementById("btnNewCand").click());
@@ -391,6 +422,7 @@ try {
   });
   s = await $eval(() => window.__printed[0]);
   assert(s && s.html.includes("Mariana Admitida") && s.html.includes("Jorge Candidato") && !s.html.includes("<h2>Painel RH</h2>"), "Relatório PDF do Quadro de Vagas respeita as seções escolhidas");
+  assert(s.html.includes("Ensino médio completo") && s.html.includes("Requisitos obrigatórios") && s.html.includes("Experiência em hotel"), "relatório traz escolaridade, atribuições e requisitos");
   const vPage = await browser.newPage();
   await vPage.setContent(s.html, { waitUntil: "load" });
   const vPdf = await vPage.pdf({ preferCSSPageSize: true, printBackground: true });
@@ -407,7 +439,7 @@ try {
     window.__render("quadro-vagas", "QuadroVagasModule");
     document.querySelector('[data-vagas-tab="vagas"]').click();
   });
-  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
+  s = await $eval(() => document.querySelector("#quadro-vagas .vaga-card-list").textContent);
   assert(s.includes("Nenhuma vaga") && !s.includes("Garçom"), "Pengold não vê as vagas da Chez Pitu");
   await $eval(() => {
     AppData.setActiveCompany("Chez Pitu");

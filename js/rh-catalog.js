@@ -35,6 +35,24 @@
   const CONTRACT_TYPES = ["CLT (fixo)", "Temporário", "Estágio", "Aprendiz", "PJ", "Outro"];
   const VAGA_REASONS = ["Substituição", "Aumento de quadro", "Sazonalidade", "Nova função", "Escala 5x2", "Outro"];
   const VAGA_PRIORITIES = ["Urgente", "Normal", "Sem pressa"];
+  const ESCOLARIDADES = [
+    "Não exigida",
+    "Ensino fundamental incompleto",
+    "Ensino fundamental completo",
+    "Ensino médio incompleto",
+    "Ensino médio completo",
+    "Curso técnico",
+    "Ensino superior incompleto",
+    "Ensino superior completo",
+    "Pós-graduação"
+  ];
+  /** Textos do perfil da vaga (2026-11-22): campo → rótulo. */
+  const VAGA_PERFIL_FIELDS = [
+    { key: "atribuicoes", label: "Atribuições do cargo" },
+    { key: "requisitosObrigatorios", label: "Requisitos obrigatórios" },
+    { key: "requisitosDesejaveis", label: "Requisitos desejáveis" },
+    { key: "requisitosDiferenciais", label: "Requisitos diferenciais" }
+  ];
   const CANDIDATE_SITUATIONS = [
     "Buscar candidatos",
     "Agendar",
@@ -549,8 +567,23 @@
       deadline: clean(input.deadline),
       status,
       manager: clean(input.manager),
+      // Escolaridade fora da lista (valor antigo) é mantida como veio.
+      escolaridade: clean(input.escolaridade),
+      ...Object.fromEntries(VAGA_PERFIL_FIELDS.map((f) => [f.key, String(input[f.key] || "").trim()])),
       notes: String(input.notes || "").trim()
     });
+  }
+
+  /** Perfil da vaga mais recente da mesma função (sugestão para vaga nova). */
+  function lastVagaPerfil(company, cargoId) {
+    if (!cargoId) return null;
+    const last = listRecords(company, "vagas")
+      .filter((v) => v.cargoId === cargoId)
+      .sort((a, b) => String(b.openDate).localeCompare(String(a.openDate)) || (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+    if (!last) return null;
+    const perfil = { escolaridade: last.escolaridade || "" };
+    VAGA_PERFIL_FIELDS.forEach((f) => { perfil[f.key] = last[f.key] || ""; });
+    return Object.values(perfil).some(Boolean) ? perfil : null;
   }
 
   function vagaLabel(vaga) {
@@ -659,6 +692,9 @@
     CONTRACT_TYPES,
     VAGA_REASONS,
     VAGA_PRIORITIES,
+    ESCOLARIDADES,
+    VAGA_PERFIL_FIELDS,
+    lastVagaPerfil,
     CANDIDATE_SITUATIONS,
     ADMISSION_SITUATIONS,
     ADMISSION_DONE,

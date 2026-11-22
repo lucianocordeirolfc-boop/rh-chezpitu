@@ -7,6 +7,31 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (6) — Quadro de Vagas: escolaridade, atribuições, requisitos e cartões
+
+Pedido do usuário: campos de escolaridade, atribuições do cargo, requisitos
+obrigatórios, desejáveis e diferenciais; melhorar a visualização de "Vagas em
+aberto" (observação em linha reta conflitando com Editar/Excluir).
+
+- **Causa (visual):** a tabela tinha 11 colunas; a observação longa ocupava a
+  coluna antes de "Ações" e empurrava/espremia Editar/Excluir.
+- `js/rh-catalog.js`: `ESCOLARIDADES`, `VAGA_PERFIL_FIELDS` (atribuicoes,
+  requisitosObrigatorios, requisitosDesejaveis, requisitosDiferenciais) em
+  `saveVaga`; `lastVagaPerfil` (sugestão para vaga nova da mesma função).
+- `js/quadro-vagas.js`: vagas em **cartões** (título com CBO, prioridade e
+  status; Editar/Excluir no topo; dados em grade; atribuições, requisitos e
+  observações em blocos com quebra de linha); formulário com escolaridade e os
+  4 textos; sugestão do perfil só em campos vazios.
+- `css/rh-catalog.css`: estilos dos cartões. `js/rh-reports.js`: coluna
+  Escolaridade e linha de perfil sob cada vaga no PDF.
+- Docs: PROJECT_RULES (Quadro de Vagas), manuais, TEST_CHECKLIST.
+- Testes: `verify-quadro-vagas` 39, `verify-rh-reports` 26,
+  `verify-cargos-vagas-ui` 56 (inclui checagem geométrica: observação longa
+  quebra dentro do cartão e não sobrepõe Editar/Excluir).
+- Dados de produção: nenhum alterado (vagas antigas seguem válidas; campos
+  novos vazios).
+- **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (5) — Aprovação e revisão final da documentação
 
 Usuário: "tudo certo e aprovado — revise todos os arquivos e atualize os

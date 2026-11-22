@@ -105,6 +105,10 @@ Use este checklist antes de qualquer commit ou deploy.
 
 - [ ] Trocar empresa: vagas separadas.
 - [ ] Nova vaga com função de Cargos e Salários (CBO exibido).
+- [ ] Escolaridade, atribuições e requisitos (obrigatórios, desejáveis,
+      diferenciais) gravados e exibidos no cartão.
+- [ ] Observação longa quebra linha no cartão, sem cobrir Editar/Excluir.
+- [ ] Vaga nova da mesma função sugere o perfil da última.
 - [ ] Candidato (R&S) e admissão ligados à vaga; "Iniciou" conta como admitido.
 - [ ] Painel RH confere com as tabelas.
 - [ ] Mostrar concluídas/canceladas.

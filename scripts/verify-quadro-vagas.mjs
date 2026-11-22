@@ -60,6 +60,13 @@ try { RhCatalog.saveVaga(CO, { quantity: 1 }); } catch (e) { threw = /cargo/i.te
 assert(threw, "vaga sem função é recusada");
 const v1 = RhCatalog.saveVaga(CO, { cargoId: recep.id, department: "Recepção", quantity: "2", contractType: "CLT (fixo)", reason: "Escala 5x2", openDate: "2026-11-11", priority: "Urgente", status: "Aberta", manager: "Luciano", notes: "Folguista 06h–15:20 e 13h–22:20" });
 assert(v1.role === "Recepcionista" && v1.cargoId === recep.id && v1.quantity === 2, "nome da vaga vem da função; quantidade numérica");
+const vp = RhCatalog.saveVaga(CO, { cargoId: recep.id, quantity: 1, escolaridade: "Ensino médio completo", atribuicoes: " Atender hóspedes\nCheck-in ", requisitosObrigatorios: "Ensino médio", requisitosDesejaveis: "Inglês", requisitosDiferenciais: "Espanhol", openDate: "2026-11-20" });
+assert(vp.escolaridade === "Ensino médio completo" && vp.atribuicoes === "Atender hóspedes\nCheck-in" && vp.requisitosObrigatorios === "Ensino médio" && vp.requisitosDesejaveis === "Inglês" && vp.requisitosDiferenciais === "Espanhol", "escolaridade, atribuições e requisitos gravados (texto aparado, quebras mantidas)");
+assert(RhCatalog.ESCOLARIDADES.includes("Ensino superior completo") && RhCatalog.ESCOLARIDADES[0] === "Não exigida", "lista de escolaridade");
+const sug = RhCatalog.lastVagaPerfil(CO, recep.id);
+assert(sug && sug.atribuicoes === "Atender hóspedes\nCheck-in" && sug.escolaridade === "Ensino médio completo", "perfil da última vaga da função para sugestão");
+assert(RhCatalog.lastVagaPerfil(CO, manut.id) === null, "função sem vaga anterior não sugere nada");
+RhCatalog.removeVaga(CO, vp.id);
 const v2 = RhCatalog.saveVaga(CO, { cargoId: manut.id, department: "Manutenção", quantity: 1, status: "Suspensa", priority: "Normal" });
 const v3 = RhCatalog.saveVaga(CO, { cargoId: manut.id, department: "Manutenção", quantity: 1, status: "Concluída" });
 const v4 = RhCatalog.saveVaga(CO, { cargoId: recep.id, quantity: 3, status: "Cancelada" });
