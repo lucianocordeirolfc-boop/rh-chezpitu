@@ -7,6 +7,18 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (18) — Cargos: coluna de ativos com "+N inativo(s)"
+
+Dúvida do usuário: coluna "Funcionários ativos" mostrava "4" e embaixo "5 no
+total". Não era erro (total = ativos + inativos vinculados). A pedido do
+usuário, o texto de baixo passa a ser "+1 inativo" / "+N inativos", e nada
+quando não há inativos. Dica ao passar o mouse mantida.
+
+- `js/cargos.js`: `inactiveNoteHTML`.
+- `scripts/verify-cargos-vagas-ui.mjs` [10]: +4 testes — 90/90.
+- `npm test` 47/47, `npm run validate` 36/36. Captura conferida.
+- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (17) — Cargos e Salários sem botão Lixeira
 
 Pedido do usuário: "remova a opção de lixeira, ao excluir uma função já deve

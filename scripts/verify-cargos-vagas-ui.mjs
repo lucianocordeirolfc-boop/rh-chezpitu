@@ -649,6 +649,31 @@ try {
   assert(s.archived, "cópia continua guardada (regra fixa: nada some)");
   assert(/Excluir a função/.test(s.confirmText) && !/Lixeira/.test(s.confirmText), "confirmação sem mencionar Lixeira");
 
+  console.log("[10] Cargos: coluna de ativos mostra +N inativo(s)");
+  s = await $eval(() => {
+    const co = "Chez Pitu";
+    const block = AppData.getCompanyData(co);
+    const mk = (name) => RhCatalog.saveCargo(co, { name, cbo: "", salary: "1500" }).cargo;
+    const a = mk("Teste Ativos Só"), b = mk("Teste Um Inativo"), c = mk("Teste Dois Inativos");
+    const emp = (id, cargo, status) => ({ id, name: id, role: cargo.name, roleId: cargo.id, status, admissionDate: "2024-01-01" });
+    block.employees.push(
+      emp("tA1", a, "Ativo"),
+      emp("tB1", b, "Ativo"), emp("tB2", b, "Ativo"), emp("tB3", b, "Inativo"),
+      emp("tC1", c, "Ativo"), emp("tC2", c, "Inativo"), emp("tC3", c, "Inativo")
+    );
+    window.__render("cargos", "CargosModule");
+    document.querySelector('#cargos [data-rh-tab="funcoes"]').click();
+    const cell = (cargo) => {
+      const tr = document.querySelector(`#cargos [data-edit-cargo="${cargo.id}"]`).closest("tr");
+      return tr.children[6].textContent.replace(/\s+/g, " ").trim();
+    };
+    return { a: cell(a), b: cell(b), c: cell(c), old: document.getElementById("cargos").textContent.includes("no total") };
+  });
+  assert(s.a === "1", `sem inativos: só o número (${s.a})`);
+  assert(s.b === "2+1 inativo", `um inativo: "+1 inativo" (${s.b})`);
+  assert(s.c === "1+2 inativos", `dois inativos: "+2 inativos" (${s.c})`);
+  assert(!s.old, "texto \"no total\" não aparece mais");
+
   assert(pageErrors.length === 0, `sem erros de JavaScript na página${pageErrors.length ? `: ${pageErrors.join(" | ")}` : ""}`);
   console.log(`\nCapturas: ${tmp}`);
 } finally {

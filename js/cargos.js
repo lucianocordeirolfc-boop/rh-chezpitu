@@ -42,6 +42,12 @@
     return `<small class="help-text role-catalog-warn" title="${esc(cargo.cboShared ? `Confirmado por ${cargo.cboShared.by}` : "")}">⚠ também em ${esc(shared.map((c) => c.name).join(", "))}</small>`;
   }
 
+  /** Abaixo do nº de ativos: "+1 inativo" / "+N inativos"; nada quando não há. */
+  function inactiveNoteHTML(inactive) {
+    if (!inactive) return "";
+    return `<small class="help-text">+${inactive} ${inactive === 1 ? "inativo" : "inativos"}</small>`;
+  }
+
   function cargoRows() {
     const co = company();
     const cargos = RhCatalog.listCargos(co);
@@ -60,7 +66,7 @@
             <td class="rh-num">${cargo.gratificacao != null ? esc(RhCatalog.formatMoney(cargo.gratificacao)) : `<span class="help-text">—</span>`}</td>
             <td>${cargo.insalubridade != null ? `<span class="pill warning rh-pill">${esc(RhCatalog.insalubridadeLabel(cargo.insalubridade))}</span>${insalubridadeValueHTML(cargo)}` : `<span class="help-text">—</span>`}</td>
             <td>${commissionPills(cargo)}</td>
-            <td class="rh-num" title="${active} ativo(s) de ${linked.length} vinculado(s)">${active}<small class="help-text">${linked.length} no total</small></td>
+            <td class="rh-num" title="${active} ativo(s) de ${linked.length} vinculado(s)">${active}${inactiveNoteHTML(linked.length - active)}</td>
             <td class="actions">
               <button type="button" class="link-button" data-edit-cargo="${esc(cargo.id)}">Editar</button>
               <button type="button" class="link-button danger-link" data-remove-cargo="${esc(cargo.id)}">Excluir</button>
