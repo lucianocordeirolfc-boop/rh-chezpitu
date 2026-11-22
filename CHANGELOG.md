@@ -1,3 +1,8 @@
+2026-11-22 (3) - Vagas em aberto: CBO menor, Urgente maior, quantidade sem admitidos (20261122.05)
+- [MELHORIA] Cartao da vaga: CBO em fonte menor; prioridade "Urgente" maior; Quantidade so com o numero (admitidos no Painel RH e no PDF)
+- Arquivos: js/quadro-vagas.js, css/rh-catalog.css, scripts/verify-cargos-vagas-ui.mjs
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 (2) - Quadro de Vagas: escolaridade, atribuicoes, requisitos e cartoes (20261122.04)
 - [NOVO] Vaga com escolaridade (lista), atribuicoes do cargo e requisitos obrigatorios, desejaveis e diferenciais; vaga nova sugere o perfil da ultima vaga da mesma funcao
 - [CORRECAO] Vagas em aberto: observacao longa em linha reta espremia Editar/Excluir - vagas agora em cartoes (acoes no topo, textos em blocos com quebra de linha)

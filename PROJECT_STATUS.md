@@ -9,15 +9,15 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261122.04 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
+**Versão:** 20261122.05 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
 **Data:** 2026-11-22
 **Status:** ✅ Publicado em Produção (Firebase Hosting) — **aprovado pelo usuário** em 2026-11-22
 
 ## Último Deploy
 
 Data: 22/11/2026
-Versões: 20261122.01 → 20261122.04 (Firebase Hosting — chez-pitu-rh), commits
-`e130610`, `66ad6d2`, `4c53b99`, `1835bde` (+ carimbos),
+Versões: 20261122.01 → 20261122.05 (Firebase Hosting — chez-pitu-rh), commits
+`e130610`, `66ad6d2`, `4c53b99`, `1835bde`, `b778722` (+ carimbos),
 push em `origin/main`.
 
 - Nova aba **Cargos e Salários** (por empresa): função, CBO, salário,
@@ -29,12 +29,12 @@ push em `origin/main`.
 - Nova aba **Quadro de Vagas** (por empresa): Vagas em aberto, Painel RH,
   Recrutamento e Seleção, Admissões; vaga com escolaridade, atribuições e
   requisitos (obrigatórios, desejáveis, diferenciais), exibida em cartões
-  (`20261122.04`, aguardando aprovação do usuário).
+  (`20261122.04`; ajustes de fonte/quantidade em `.05`; aguardando aprovação).
 - **Relatórios PDF** das duas abas, com escolha de seções.
 - Nenhum dado de produção alterado. **Pendente do usuário:** em cada empresa,
   "Padronizar e importar do cadastro" e preencher CBO/salário das funções.
 
-Detalhes em `PROJECT_HISTORY.md` → 2026-11-22 a 2026-11-22 (6).
+Detalhes em `PROJECT_HISTORY.md` → 2026-11-22 a 2026-11-22 (7).
 
 ## Deploy 20261117.01 a 20261117.08
 

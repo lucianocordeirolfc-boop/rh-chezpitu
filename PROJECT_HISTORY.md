@@ -18,7 +18,8 @@ Quantidade só com o número (sem "admitidos" nesta aba).
 - `css/rh-catalog.css`: CBO 0,72rem (11,5px); prioridade 13px (status 11px).
 - Teste: `verify-cargos-vagas-ui` 59 (mede as fontes no Chrome e confere a
   Quantidade sem admitidos).
-- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. **Publicação:** versão `20261122.05`,
+  commit `b778722` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (6) — Quadro de Vagas: escolaridade, atribuições, requisitos e cartões
 
