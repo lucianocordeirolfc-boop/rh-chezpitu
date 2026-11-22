@@ -21,7 +21,8 @@ suporte técnico. Quadro de Vagas e demais telas mantêm a Lixeira.
 - `scripts/verify-cargos-vagas-ui.mjs` [9]: +4 testes (sem botão; some da
   lista; cópia arquivada; confirmação sem Lixeira) — 86/86.
 - `npm test` 47/47, `npm run validate` 36/36.
-- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. **Publicação:** versão `20261122.11`,
+  commit `4e8ab16` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (16) — Aprovação da versão 20261122.10
 

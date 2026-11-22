@@ -8,12 +8,12 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261122.10` (exibida como `v2026.11.22.10`) — fonte: `js/version.js`
+- **Versão atual:** `20261122.11` (exibida como `v2026.11.22.11`) — fonte: `js/version.js`
 - **Branch atual:** `main` — sincronizado com `origin/main`
-- **Último commit de código:** `519785a` — fix(cargos): relatório mostra só
-  comissões vinculadas a funções da empresa (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.10`. `.01` a `.09` aprovadas;
-  `.10` (relatório de comissões) aguardando conferência do usuário.
+- **Último commit de código:** `4e8ab16` — feat(cargos): tela sem botão Lixeira;
+  função excluída sai da lista (+ carimbo)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.11`. `.01` a `.10` aprovadas;
+  `.11` (Cargos sem botão Lixeira) aguardando conferência do usuário.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.09`)
 
@@ -33,6 +33,8 @@
 - `20261122.10` (519785a): relatório de Cargos — seção Comissões só com as
   comissões vinculadas a funções da empresa. Dados (autorizados): Camareira →
   Frigobar; explicações de Bar/Ocupação/PL Anual copiadas para a Pengold.
+- `20261122.11` (4e8ab16): tela de Cargos sem botão Lixeira; função excluída
+  sai da lista (cópia segue arquivada internamente).
 - validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22 (1)–(5).
 - **Pendente do usuário (dados, pela tela):** em cada empresa, Cargos e
   Salários → "Padronizar e importar do cadastro" → conferir grafias → preencher

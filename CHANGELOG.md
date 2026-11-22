@@ -1,3 +1,8 @@
+2026-11-22 (9) - Cargos e Salarios sem botao Lixeira (20261122.11)
+- [AJUSTE] Tela de Cargos sem o botao Lixeira; funcao excluida sai da lista na hora, confirmacao e aviso sem mencionar Lixeira. Copia continua guardada internamente (regra fixa)
+- Arquivos: js/cargos.js, js/manual.js, scripts/verify-cargos-vagas-ui.mjs
+- verify-cargos-vagas-ui 86/86; npm test 47/47; npm run validate 36/36
+
 2026-11-22 (8) - Relatorio de Cargos: so comissoes vinculadas a empresa (20261122.10)
 - [CORRECAO] Secao Comissoes do relatorio de Cargos e Salarios lista so as comissoes que alguma funcao da empresa recebe, cada uma com as funcoes marcadas; sem nenhuma, aviso. Tela de Comissoes segue com todas
 - [DADOS] Com autorizacao: Camareira (Chez Pitu) trocada de Taxa de Servico Bar para Frigobar; explicacoes de Bar, Ocupacao e PL Anual copiadas para a Pengold
