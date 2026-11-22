@@ -1,3 +1,8 @@
+2026-11-22 (11) - Manual atualizado (20261122.13)
+- [DOC] Manual do sistema e MANUAL_USUARIO: comissoes por empresa, relatorio so com comissoes vinculadas, exclusao de funcao sem Lixeira, +N inativos; TEST_CHECKLIST de Cargos
+- Arquivos: js/manual.js, MANUAL_USUARIO.md, TEST_CHECKLIST.md
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 (10) - Cargos: coluna de ativos com +N inativo(s) (20261122.12)
 - [AJUSTE] Abaixo do numero de ativos aparece "+1 inativo" / "+N inativos" (antes "N no total"); nada quando nao ha inativos
 - Arquivos: js/cargos.js, scripts/verify-cargos-vagas-ui.mjs

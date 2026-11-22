@@ -8,12 +8,13 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261122.12` (exibida como `v2026.11.22.12`) — fonte: `js/version.js`
+- **Versão atual:** `20261122.13` (exibida como `v2026.11.22.13`) — fonte: `js/version.js`
 - **Branch atual:** `main` — sincronizado com `origin/main`
-- **Último commit de código:** `cb96254` — feat(cargos): coluna de ativos com
-  "+N inativo(s)" (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.12`, **tudo aprovado pelo
-  usuário em 2026-11-22** (`.01` a `.12`). Nenhuma tarefa de código pendente.
+- **Último commit de código:** `d41b08c` — docs: manual e checklist atualizados
+  (+ carimbo). Último de código: `cb96254`
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.13`. `.01` a `.12` aprovadas;
+  `.13` só texto do manual. Nenhuma tarefa de código pendente. Sessão
+  encerrada em 2026-11-22.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.09`)
 
@@ -36,6 +37,7 @@
 - `20261122.11` (4e8ab16): tela de Cargos sem botão Lixeira; função excluída
   sai da lista (cópia segue arquivada internamente).
 - `20261122.12` (cb96254): coluna de ativos mostra "+N inativo(s)".
+- `20261122.13` (d41b08c): manual do sistema/usuário e checklist atualizados.
 - validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22 (1)–(5).
 - **Pendente do usuário (dados, pela tela):** em cada empresa, Cargos e
   Salários → "Padronizar e importar do cadastro" → conferir grafias → preencher

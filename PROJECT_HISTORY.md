@@ -12,7 +12,8 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 Atualizados com as mudanças `.10`–`.12`: `MANUAL_USUARIO.md` (relatório de
 comissões por empresa, exclusão sem Lixeira, "+N inativos"), `TEST_CHECKLIST.md`
 (Cargos e Salários) e `js/manual.js` (comissões por empresa). Só
-documentação/texto do manual; publicação pendente de autorização.
+documentação/texto do manual. **Publicação:** versão `20261122.13`, commit
+`d41b08c` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (19) — Aprovação das versões 20261122.11 e .12
 
