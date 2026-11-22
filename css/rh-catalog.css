@@ -460,3 +460,108 @@
     flex-direction: column;
   }
 }
+
+/* Admissões — etapas do processo (2026-11-22) */
+.adm-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adm-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "dot label" "dot date";
+  align-items: center;
+  column-gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--muted);
+}
+
+.adm-step-dot {
+  grid-area: dot;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--sea-200);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.adm-step-label {
+  grid-area: label;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.adm-step-date {
+  grid-area: date;
+  font-size: 0.82rem;
+}
+
+.adm-step.is-done {
+  border-color: #b8dcc8;
+  background: #eef8f2;
+  color: #1f5e45;
+}
+
+.adm-step.is-done .adm-step-dot {
+  border-color: #1f8a5c;
+  background: #1f8a5c;
+  color: #fff;
+}
+
+.adm-step.is-next {
+  border-color: var(--gold);
+  background: #fff6ec;
+  color: #8a4b12;
+}
+
+.adm-footer {
+  margin: 10px 0 0;
+}
+
+.adm-footer-ready {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eef8f2;
+  color: #1f5e45;
+  font-weight: 700;
+}
+
+.adm-footer-done {
+  color: #1f5e45;
+  font-weight: 700;
+}
+
+.adm-form-title {
+  margin: 6px 0 -4px;
+}
+
+.admission-prefill-banner {
+  grid-column: 1 / -1;
+  padding: 8px 10px;
+  border-left: 3px solid var(--gold);
+  border-radius: 8px;
+  background: #fff6ec;
+  color: #8a4b12 !important;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .adm-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

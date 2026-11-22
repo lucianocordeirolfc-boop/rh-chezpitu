@@ -471,15 +471,85 @@ try {
 
   await $eval(() => document.querySelector('[data-vagas-tab="admissoes"]').click());
   await $eval(() => document.getElementById("btnNewAdm").click());
+  s = await $eval(() => ({
+    steps: [...document.querySelectorAll("#vagasForm input[name^='step_']")].map((i) => i.name),
+    situation: Boolean(document.querySelector("#vagasForm [name='situation']")),
+    employees: AppData.getCompanyData("Chez Pitu").employees.length
+  }));
+  assert(s.steps.join("|") === "step_docsRecebidos|step_asoAgendado|step_asoLiberado|step_contabilidade|step_inicio" && !s.situation, "Nova admissão mostra as etapas do processo (não abre o cadastro)");
+  const employeesBefore = s.employees;
   await $eval((vid) => {
     const f = document.getElementById("vagasForm");
     f.elements.name.value = "Mariana Admitida";
     f.elements.vagaId.value = vid;
-    f.elements.situation.value = "Iniciou";
+    f.elements.step_docsRecebidos.value = "2026-11-10";
+    f.elements.step_asoAgendado.value = "2026-11-19";
     f.requestSubmit();
   }, vagaId);
-  s = await $eval(() => document.querySelector("#quadro-vagas .rh-table tbody").textContent);
-  assert(s.includes("Mariana Admitida") && s.includes("Garçom") && s.includes("Iniciou"), "admissão herda a função da vaga");
+  s = await $eval(() => {
+    const card = document.querySelector("[data-adm-card]");
+    return {
+      text: card.textContent.replace(/\s+/g, " "),
+      done: card.querySelectorAll(".adm-step.is-done").length,
+      next: card.querySelector(".adm-step.is-next .adm-step-label")?.textContent,
+      button: Boolean(card.querySelector("[data-register-adm]")),
+      employees: AppData.getCompanyData("Chez Pitu").employees.length
+    };
+  });
+  assert(s.text.includes("Mariana Admitida") && s.text.includes("Garçom") && /Exame agendado/.test(s.text), "admissão herda a função da vaga; situação vem das etapas (Exame agendado)");
+  assert(s.done === 2 && s.next === "ASO liberado" && /19\/11\/2026/.test(s.text), "linha do tempo: 2 etapas cumpridas com data, próxima destacada");
+  assert(!s.button && /Etapa 2 de 5/.test(s.text) && s.employees === employeesBefore, "processo incompleto: sem botão de cadastro e nenhum funcionário criado");
+  await $eval(() => {
+    document.querySelector("[data-edit-adm]").click();
+    const f = document.getElementById("vagasForm");
+    f.elements.step_asoLiberado.value = "2026-11-20";
+    f.elements.step_contabilidade.value = "2026-11-21";
+    f.elements.step_inicio.value = "2026-12-01";
+    f.requestSubmit();
+  });
+  s = await $eval(() => ({
+    text: document.querySelector("[data-adm-card]").textContent.replace(/\s+/g, " "),
+    button: Boolean(document.querySelector("[data-register-adm]"))
+  }));
+  assert(s.button && /Pronta para cadastro/.test(s.text) && /pronto para o cadastro/.test(s.text), "todas as etapas cumpridas: \"Cadastrar funcionário\" liberado");
+  await page.screenshot({ path: path.join(tmp, "admissoes.png") });
+
+  await $eval(() => document.querySelector("[data-register-adm]").click());
+  s = await $eval(() => {
+    const f = document.getElementById("employeeForm");
+    return {
+      title: document.getElementById("employeePopupTitle")?.textContent,
+      name: f.elements.name.value,
+      role: document.getElementById("roleSelect").value,
+      cbo: document.getElementById("roleCboDisplay")?.value,
+      dept: document.getElementById("departmentSelect").value,
+      newDept: document.getElementById("newDepartmentInput").value,
+      adm: f.elements.admissionDate.value,
+      banner: Boolean(document.querySelector(".admission-prefill-banner"))
+    };
+  });
+  assert(/admissão de Mariana Admitida/.test(s.title) && s.name === "Mariana Admitida" && s.role === "Garçom" && s.cbo === "5134-05", "cadastro completo aberto com nome e função (CBO) da admissão");
+  assert(s.adm === "2026-12-01" && (s.dept === "Restaurante" || (s.dept === "__new__" && s.newDept === "Restaurante")) && s.banner, "data de admissão = início e setor da vaga, com aviso para completar");
+  await $eval(() => document.getElementById("employeePopupClose").click());
+  s = await $eval(() => ({ n: AppData.getCompanyData("Chez Pitu").employees.length, adm: AppData.getCompanyData("Chez Pitu").admissoes[0] }));
+  assert(s.n === employeesBefore && !s.adm.employeeId && s.adm.situation === "Pronta para cadastro", "fechar o cadastro sem salvar não cria funcionário nem conclui a admissão");
+  await $eval(() => {
+    document.querySelector("[data-register-adm]").click();
+    const f = document.getElementById("employeeForm");
+    f.elements.cpf.value = "862.471.680-04";
+    f.elements.ctps.value = "123";
+    f.requestSubmit();
+  });
+  s = await $eval(() => {
+    const co = AppData.getCompanyData("Chez Pitu");
+    const emp = co.employees.find((e) => e.name === "Mariana Admitida");
+    return { emp, adm: co.admissoes[0], n: co.employees.length };
+  });
+  assert(s.emp && s.emp.roleId && s.emp.admissionDate === "2026-12-01" && s.n === employeesBefore + 1, "salvar cria o funcionário com função e admissão");
+  assert(s.adm.employeeId === s.emp.id && s.adm.situation === "Iniciou", "admissão concluída e vinculada ao funcionário (conta como admitido)");
+  await $eval(() => window.__render("quadro-vagas", "QuadroVagasModule"));
+  s = await $eval(() => ({ text: document.querySelector("[data-adm-card]").textContent, button: Boolean(document.querySelector("[data-register-adm]")) }));
+  assert(/Funcionário cadastrado/.test(s.text) && !s.button, "cartão mostra cadastrado e não permite cadastrar de novo");
 
   await $eval(() => document.querySelector('[data-vagas-tab="painel"]').click());
   s = await $eval(() => Object.fromEntries([...document.querySelectorAll(".rh-kpi")].map((k) => [k.querySelector("span").textContent, k.querySelector("strong").textContent])));

@@ -33,6 +33,7 @@
     Desistiu: "muted",
     Standby: "muted",
     Iniciou: "success",
+    "Pronta para cadastro": "success",
     "ASO liberado": "success"
   };
 
@@ -425,42 +426,93 @@
 
   // ── Admissões ─────────────────────────────────────────────────────────────
 
+  /** Linha do tempo das etapas da admissão. */
+  function admissionStepsHTML(progress) {
+    return `<ol class="adm-steps">${progress.steps
+      .map(
+        (s) => `<li class="adm-step ${s.done ? "is-done" : progress.next?.key === s.key && !progress.cancelled ? "is-next" : ""}">
+          <span class="adm-step-dot" aria-hidden="true">${s.done ? "✓" : ""}</span>
+          <span class="adm-step-label">${esc(s.short)}</span>
+          <span class="adm-step-date">${s.done ? esc(AppData.formatDateBR(s.date)) : "—"}</span>
+        </li>`
+      )
+      .join("")}</ol>`;
+  }
+
+  function admissionFooterHTML(a, progress) {
+    if (progress.cancelled) return `<p class="adm-footer help-text">Admissão cancelada.</p>`;
+    if (progress.registered) {
+      return `<p class="adm-footer adm-footer-done">✓ Funcionário cadastrado em Cadastro de Funcionários.</p>`;
+    }
+    if (progress.ready) {
+      return `<div class="adm-footer adm-footer-ready"><span>Processo concluído — pronto para o cadastro.</span>
+        <button type="button" class="primary btn-sm" data-register-adm="${esc(a.id)}">Cadastrar funcionário →</button></div>`;
+    }
+    return `<p class="adm-footer help-text">Etapa ${progress.doneCount} de ${progress.total}. Próxima: <strong>${esc(progress.next?.label || "")}</strong>. O cadastro do funcionário é liberado ao concluir todas as etapas.</p>`;
+  }
+
   function admissoesTabHTML() {
     const co = company();
     const list = RhCatalog.listRecords(co, "admissoes").sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    const rows = list.length
+    const vagas = new Map(RhCatalog.listRecords(co, "vagas").map((v) => [v.id, v]));
+    const cards = list.length
       ? list
           .map((a) => {
             const cargo = RhCatalog.getCargo(co, a.cargoId);
+            const progress = RhCatalog.admissionProgress(a);
             return `
-          <tr>
-            <td><strong>${esc(a.name)}</strong>${a.contact ? `<small class="help-text">${esc(a.contact)}</small>` : ""}</td>
-            <td>${esc(cargo?.name || a.role || "—")}</td>
-            <td>${dateBR(a.date)}</td>
-            <td>${pill(a.situation)}</td>
-            <td class="rh-notes">${esc(a.notes || "")}</td>
-            <td class="actions">
-              <button type="button" class="link-button" data-edit-adm="${esc(a.id)}">Editar</button>
-              <button type="button" class="link-button danger-link" data-remove-adm="${esc(a.id)}">Excluir</button>
-            </td>
-          </tr>`;
+          <article class="vaga-card adm-card" data-adm-card="${esc(a.id)}">
+            <header class="vaga-card-head">
+              <div class="vaga-card-title">
+                <h3>${esc(a.name)}</h3>
+                <span class="vaga-card-cbo">${esc(cargo?.name || a.role || "—")}${vagas.has(a.vagaId) ? ` · vaga ${esc(RhCatalog.vagaLabel(vagas.get(a.vagaId)))}` : ""}</span>
+                ${pill(a.situation)}
+              </div>
+              <span class="vaga-card-interviews">${a.contact ? `<span class="help-text">${esc(a.contact)}</span>` : ""}</span>
+              <div class="vaga-card-actions">
+                <button type="button" class="secondary btn-sm" data-edit-adm="${esc(a.id)}">Editar</button>
+                <button type="button" class="link-button danger-link" data-remove-adm="${esc(a.id)}">Excluir</button>
+              </div>
+            </header>
+            ${admissionStepsHTML(progress)}
+            ${a.notes ? `<div class="vaga-perfil-grid"><div class="vaga-perfil-item vaga-perfil-notes"><p class="eyebrow">Observações</p><p class="vaga-perfil-text">${esc(a.notes)}</p></div></div>` : ""}
+            ${admissionFooterHTML(a, progress)}
+          </article>`;
           })
           .join("")
-      : `<tr><td colspan="6" class="rh-empty">Nenhuma admissão registrada.</td></tr>`;
+      : `<p class="rh-empty">Nenhuma admissão registrada.</p>`;
     return `
       <article class="card">
         <div class="card-header card-header-compact">
           <div><p class="eyebrow">Andamento</p><h2>Admissões</h2>
-            <p class="help-text">Ao concluir, cadastre o funcionário em Cadastro de Funcionários (a função já leva salário e CBO).</p></div>
+            <p class="help-text">Registre a data de cada etapa. Concluídas todas, o botão "Cadastrar funcionário" abre o cadastro completo já preenchido.</p></div>
           <div class="rh-actions">${lixeiraButton()}<button type="button" class="primary btn-sm" id="btnNewAdm">+ Nova admissão</button></div>
         </div>
-        <div class="table-wrap">
-          <table class="table-premium rh-table">
-            <thead><tr><th>Admissão</th><th>Cargo</th><th>Prazo / data</th><th>Situação</th><th>Observações</th><th>Ações</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
+        <div class="vaga-card-list">${cards}</div>
       </article>`;
+  }
+
+  /** Fim do processo: vai para Cadastro de Funcionários com o formulário preenchido. */
+  function registerFromAdmission(container, admId) {
+    const co = company();
+    const a = RhCatalog.listRecords(co, "admissoes").find((row) => row.id === admId);
+    if (!a || !RhCatalog.admissionProgress(a).ready) return;
+    const cargo = RhCatalog.getCargo(co, a.cargoId);
+    const vaga = RhCatalog.listRecords(co, "vagas").find((v) => v.id === a.vagaId);
+    window.App?.render?.("funcionarios");
+    window.FuncionariosModule?.openEmployeeFromAdmission(
+      {
+        name: a.name,
+        role: cargo?.name || a.role || "",
+        roleId: cargo?.id || "",
+        department: vaga?.department || "",
+        admissionDate: a.steps?.inicio || ""
+      },
+      (employee) => {
+        RhCatalog.linkAdmissaoEmployee(co, a.id, employee.id);
+        window.App?.toast?.(`Admissão de ${a.name} concluída e vinculada ao cadastro.`, "success");
+      }
+    );
   }
 
   function openAdmForm(container, id) {
@@ -474,13 +526,27 @@
       </div>
       <div class="func-form-row cols-3">
         <label>Vaga (opcional)<select name="vagaId">${vagaOptions(a?.vagaId)}</select></label>
-        <label>Prazo / data<input type="date" name="date" value="${esc(a?.date || "")}"></label>
-        <label>Situação<select name="situation">${options(RhCatalog.ADMISSION_SITUATIONS, a?.situation || "Documentação", "Documentação")}</select></label>
+      </div>
+      <p class="eyebrow adm-form-title">Etapas do processo</p>
+      <div class="func-form-row cols-3">
+        ${RhCatalog.ADMISSION_STEPS.map(
+          (s) => `<label>${esc(s.label)}<input type="date" name="step_${s.key}" value="${esc(a?.steps?.[s.key] || "")}"></label>`
+        ).join("")}
+      </div>
+      ${a && !a.steps && a.situation ? `<p class="help-text">Situação anterior: ${esc(a.situation)}${a.date ? ` (${esc(AppData.formatDateBR(a.date))})` : ""} — informe as datas das etapas.</p>` : ""}
+      <div class="func-form-row">
+        <label class="rh-inline-check"><input type="checkbox" name="cancelled" ${a?.situation === "Cancelada" ? "checked" : ""} ${a?.employeeId ? "disabled" : ""}> Admissão cancelada</label>
       </div>
       <div class="func-form-row">
-        <label class="full">Observações (exame, ASO, documentos, contabilidade)<textarea name="notes" rows="3">${esc(a?.notes || "")}</textarea></label>
+        <label class="full">Observações<textarea name="notes" rows="3">${esc(a?.notes || "")}</textarea></label>
       </div>`, (payload) => {
-      RhCatalog.saveAdmissao(co, { ...payload, id: a?.id, role: payload.cargoId ? "" : a?.role });
+      RhCatalog.saveAdmissao(co, {
+        ...payload,
+        id: a?.id,
+        role: payload.cargoId ? "" : a?.role,
+        cancelled: payload.cancelled === true,
+        situation: payload.cancelled === true ? "Cancelada" : ""
+      });
       window.App?.toast?.("Admissão salva.", "success");
       render(container);
     });
@@ -567,6 +633,9 @@
     container.querySelector("#btnNewAdm")?.addEventListener("click", () => openAdmForm(container));
     container.querySelectorAll("[data-edit-vaga]").forEach((b) => b.addEventListener("click", () => openVagaForm(container, b.dataset.editVaga)));
     container.querySelectorAll("[data-edit-cand]").forEach((b) => b.addEventListener("click", () => openCandForm(container, b.dataset.editCand)));
+    container.querySelectorAll("[data-register-adm]").forEach((b) =>
+      b.addEventListener("click", () => registerFromAdmission(container, b.dataset.registerAdm))
+    );
     container.querySelectorAll("[data-edit-adm]").forEach((b) => b.addEventListener("click", () => openAdmForm(container, b.dataset.editAdm)));
     container.querySelectorAll("[data-remove-vaga]").forEach((b) =>
       b.addEventListener("click", () => confirmRemove(container, "esta vaga", () => RhCatalog.removeVaga(co, b.dataset.removeVaga)))

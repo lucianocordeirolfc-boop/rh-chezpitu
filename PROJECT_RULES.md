@@ -244,7 +244,17 @@ ações no topo e textos em bloco; candidato com situação "Agendado" vira
 **etiqueta de entrevista** no topo do cartão — `RhCatalog.interviewsForVaga`,
 só leitura, "hoje" pela data LOCAL — com horário opcional do candidato
 (`time`), +N e dica com todas; clique abre R&S), Painel RH (calculado, nunca grava), Recrutamento e Seleção
-(candidatos) e Admissões ("Iniciou" = admitido da vaga). Exclusões (vaga,
+(candidatos) e Admissões ("Iniciou" = admitido da vaga).
+
+**Admissões — etapas do processo (2026-11-22):** cada admissão registra a data
+de cada etapa (`steps`: Documentos recebidos, ASO agendado, ASO liberado,
+Documentação enviada à contabilidade, Início — `RhCatalog.ADMISSION_STEPS`).
+A situação é DERIVADA das etapas (cancelada e cadastrada têm prioridade;
+registro antigo sem etapas mantém a situação). "Nova admissão" NÃO cria
+funcionário: só com todas as etapas cumpridas aparece "Cadastrar funcionário",
+que abre o cadastro completo de Cadastro de Funcionários pré-preenchido (nome,
+função, setor da vaga, admissão = início); ao Salvar, a admissão é vinculada
+(`employeeId`, situação "Iniciou"). Fechar sem salvar não grava nada. Exclusões (vaga,
 candidato, admissão) vão para a Lixeira + tombstone. Dados pessoais de
 candidato: só o necessário (LGPD). Cobertura: `scripts/verify-quadro-vagas.mjs`,
 `scripts/verify-cargos-vagas-ui.mjs`.

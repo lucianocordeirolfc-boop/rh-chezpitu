@@ -915,7 +915,7 @@
     }
   }
 
-  function bindEmployeeForm(form, pageContainer) {
+  function bindEmployeeForm(form, pageContainer, options = {}) {
     const shiftSelect = form.querySelector("#shiftSelect");
     const newShiftInput = form.querySelector("#newShiftInput");
     shiftSelect?.addEventListener("change", () => {
@@ -1031,7 +1031,15 @@
       }
 
       try {
-        AppData.upsertEmployee(payload, targetCompany);
+        const saved = AppData.upsertEmployee(payload, targetCompany);
+        // Cadastro vindo de uma admissão concluída (Quadro de Vagas): avisa a origem.
+        if (typeof options.onSaved === "function" && saved?.id) {
+          try {
+            options.onSaved(saved, targetCompany);
+          } catch (hookError) {
+            console.error("[Cadastro] Falha ao concluir a admissão:", hookError);
+          }
+        }
         const previousSundays = String(existing?.sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean).sort().join(",");
         const nextSundays = String(payload.sundayOffWeeks || "").split(",").map((s) => s.trim()).filter(Boolean).sort().join(",");
         const fixedChanged = existing && String(previousFixedDay).trim() !== String(payload.fixedDay || "").trim();
@@ -1050,6 +1058,50 @@
         alert(error.message || "Não foi possível salvar o funcionário.");
       }
     });
+  }
+
+  /**
+   * Pré-preenche o cadastro com a admissão concluída (Quadro de Vagas): nome,
+   * função (catálogo), setor e data de admissão = início. O restante (CPF,
+   * CTPS, folgas, VT…) o usuário completa; nada é gravado antes de Salvar.
+   */
+  function applyAdmissionPrefill(overlay, form, prefill) {
+    const title = overlay.querySelector("#employeePopupTitle");
+    if (title) title.textContent = `Novo cadastro — admissão de ${prefill.name || ""}`.trim();
+    const banner = document.createElement("p");
+    banner.className = "help-text admission-prefill-banner";
+    banner.textContent = "Processo de admissão concluído no Quadro de Vagas. Confira os dados trazidos e complete o cadastro (CPF, CTPS, folgas, horário, VT).";
+    form.prepend(banner);
+    if (form.elements.name) form.elements.name.value = prefill.name || "";
+    if (form.elements.admissionDate && prefill.admissionDate) form.elements.admissionDate.value = prefill.admissionDate;
+    if (prefill.notes && form.elements.notes) form.elements.notes.value = prefill.notes;
+    const roleSelect = form.querySelector("#roleSelect");
+    if (roleSelect && (prefill.roleId || prefill.role)) {
+      const option =
+        [...roleSelect.options].find((o) => prefill.roleId && o.dataset.cargoId === prefill.roleId) ||
+        [...roleSelect.options].find((o) => o.value && AppData.normalizeSearchText(o.value) === AppData.normalizeSearchText(prefill.role));
+      if (option) roleSelect.value = option.value;
+      syncRoleCatalogInfo(form);
+    }
+    const deptSelect = form.querySelector("#departmentSelect");
+    const newDeptInput = form.querySelector("#newDepartmentInput");
+    if (deptSelect && prefill.department) {
+      const match = [...deptSelect.options].find(
+        (o) => o.value && o.value !== "__new__" && AppData.normalizeSearchText(o.value) === AppData.normalizeSearchText(prefill.department)
+      );
+      if (match) {
+        deptSelect.value = match.value;
+      } else {
+        deptSelect.value = "__new__";
+        if (newDeptInput) { newDeptInput.style.display = ""; newDeptInput.value = prefill.department; }
+      }
+    }
+  }
+
+  /** Abre o cadastro completo a partir de uma admissão concluída. */
+  function openEmployeeFromAdmission(prefill, onSaved) {
+    const container = document.getElementById("funcionarios");
+    openEmployeePopup(container, { prefill, onSaved });
   }
 
   function openEmployeePopup(pageContainer, options = {}) {
@@ -1075,12 +1127,13 @@
     document.body.appendChild(overlay);
 
     const form = overlay.querySelector("#employeeForm");
-    bindEmployeeForm(form, pageContainer);
+    bindEmployeeForm(form, pageContainer, options);
 
     if (isEdit) {
       fillEmployeeForm(form, options.employee, options.company);
     } else {
       resetEmployeeForm(form);
+      if (options.prefill) applyAdmissionPrefill(overlay, form, options.prefill);
     }
 
     overlay.querySelector("#employeePopupClose").addEventListener("click", closeEmployeePopup);
@@ -2030,5 +2083,5 @@
     }
   }
 
-  window.FuncionariosModule = { render, buildEmployeeExportSheet };
+  window.FuncionariosModule = { render, buildEmployeeExportSheet, openEmployeeFromAdmission };
 })();

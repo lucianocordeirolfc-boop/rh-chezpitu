@@ -115,6 +115,10 @@ Use este checklist antes de qualquer commit ou deploy.
       ao lado de Editar/Excluir; hoje em destaque, passada em alerta, +N;
       clique abre Recrutamento e Seleção.
 - [ ] Candidato (R&S) e admissão ligados à vaga; "Iniciou" conta como admitido.
+- [ ] Admissão: etapas com data; situação muda sozinha; sem todas as etapas
+      não há botão de cadastro.
+- [ ] "Cadastrar funcionário": abre o cadastro preenchido (nome, função, setor,
+      admissão); fechar não grava; salvar vincula e conclui a admissão.
 - [ ] Painel RH confere com as tabelas.
 - [ ] Mostrar concluídas/canceladas.
 - [ ] Excluir vaga/candidato/admissão → Lixeira → restaurar.

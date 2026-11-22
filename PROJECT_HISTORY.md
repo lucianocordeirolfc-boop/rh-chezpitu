@@ -7,6 +7,29 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (11) — Admissões: etapas do processo e cadastro só ao concluir
+
+Pedido do usuário: "Nova admissão" deve mostrar as etapas do processo (ASO
+marcado para tal data, documentação enviada à contabilidade em tal data…) e,
+só após o processo concluído, ir para o Cadastro de Funcionários. (Ideia
+anterior de abrir o cadastro direto foi descartada pelo usuário — evita
+funcionário na Escala/VT antes de começar.)
+
+- `js/rh-catalog.js`: `ADMISSION_STEPS` (5 etapas com data), `admissionProgress`,
+  situação derivada em `saveAdmissao` (nova situação "Pronta para cadastro"),
+  `linkAdmissaoEmployee`; compatível com admissões antigas.
+- `js/quadro-vagas.js`: Admissões em cartões com linha do tempo; formulário com
+  as datas das etapas e "Admissão cancelada"; botão "Cadastrar funcionário →"
+  só com todas as etapas → abre Cadastro de Funcionários pré-preenchido e, ao
+  salvar, vincula a admissão.
+- `js/funcionarios.js`: `openEmployeeFromAdmission(prefill, onSaved)` (pop-up
+  real do cadastro, pré-preenchido, aviso para completar; `onSaved` após
+  `upsertEmployee`). `js/rh-reports.js`: etapas no PDF. CSS das etapas.
+- Testes: `verify-quadro-vagas` 54, `verify-cargos-vagas-ui` 78 (fluxo
+  completo no Chrome: etapas parciais sem botão e sem funcionário; completas
+  liberam; cadastro pré-preenchido; fechar não grava; salvar vincula).
+- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (10) — Aprovação das versões 20261122.04 a .07
 
 Usuário: "tudo certo, aprovado". Aprovadas em produção: `.04` (escolaridade,

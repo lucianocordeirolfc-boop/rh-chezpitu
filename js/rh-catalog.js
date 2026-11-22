@@ -70,11 +70,46 @@
     "Exame agendado",
     "ASO liberado",
     "Enviado à contabilidade",
+    "Pronta para cadastro",
     "Iniciou",
     "Pendente",
     "Cancelada"
   ];
   const ADMISSION_DONE = "Iniciou";
+
+  /**
+   * Etapas do processo de admissão (2026-11-22), cada uma com a sua data.
+   * `situation` = situação equivalente quando é a última etapa cumprida.
+   * Todas cumpridas → "Pronta para cadastro" (libera "Cadastrar funcionário").
+   */
+  const ADMISSION_STEPS = [
+    { key: "docsRecebidos", label: "Documentos recebidos", short: "Documentos", situation: "Documentação" },
+    { key: "asoAgendado", label: "ASO agendado para", short: "ASO agendado", situation: "Exame agendado" },
+    { key: "asoLiberado", label: "ASO liberado em", short: "ASO liberado", situation: "ASO liberado" },
+    { key: "contabilidade", label: "Documentação enviada à contabilidade em", short: "Contabilidade", situation: "Enviado à contabilidade" },
+    { key: "inicio", label: "Início do funcionário", short: "Início", situation: "Pronta para cadastro" }
+  ];
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+  /** Etapas da admissão com data/feito, contagem e se está pronta para cadastro. */
+  function admissionProgress(adm) {
+    const steps = ADMISSION_STEPS.map((step) => {
+      const date = String(adm?.steps?.[step.key] || "");
+      return { ...step, date, done: ISO_DATE.test(date) };
+    });
+    const doneCount = steps.filter((s) => s.done).length;
+    const cancelled = adm?.situation === "Cancelada";
+    const registered = Boolean(adm?.employeeId);
+    return {
+      steps,
+      doneCount,
+      total: steps.length,
+      cancelled,
+      registered,
+      ready: !cancelled && !registered && doneCount === steps.length,
+      next: steps.find((s) => !s.done) || null
+    };
+  }
 
   function data(company) {
     return AppData.getCompanyData(company);
@@ -654,22 +689,62 @@
     return removeRecord(company, "candidatos", "candidato", id, `${row.name}${row.vagaLabel ? ` — ${row.vagaLabel}` : ""}`);
   }
 
+  /**
+   * Salva a admissão. A situação é DERIVADA das etapas (datas) — cancelada e
+   * cadastrada (employeeId) têm prioridade. Registro antigo sem etapas mantém a
+   * situação informada (compatibilidade).
+   */
   function saveAdmissao(company, input) {
     const name = clean(input.name);
     if (!name) throw new Error("Informe o nome do admitido.");
     const cargo = getCargo(company, input.cargoId);
     const vaga = data(company).vagas.find((row) => row.id === input.vagaId);
-    return upsertRecord(company, "admissoes", {
+    const previous = input.id ? data(company).admissoes.find((row) => row.id === input.id) : null;
+
+    const steps = {};
+    ADMISSION_STEPS.forEach((step) => {
+      const raw = Object.prototype.hasOwnProperty.call(input, `step_${step.key}`)
+        ? input[`step_${step.key}`]
+        : input.steps?.[step.key] ?? previous?.steps?.[step.key];
+      const value = clean(raw);
+      if (value && !ISO_DATE.test(value)) throw new Error(`Data inválida em "${step.label}".`);
+      if (value) steps[step.key] = value;
+    });
+    const employeeId = clean(input.employeeId ?? previous?.employeeId ?? "");
+    const cancelled = input.cancelled === true || input.cancelled === "on" || input.situation === "Cancelada";
+    const doneKeys = ADMISSION_STEPS.filter((s) => steps[s.key]);
+
+    let situation;
+    if (cancelled) situation = "Cancelada";
+    else if (employeeId) situation = ADMISSION_DONE;
+    else if (doneKeys.length === ADMISSION_STEPS.length) situation = "Pronta para cadastro";
+    else if (doneKeys.length) {
+      const last = ADMISSION_STEPS.filter((s) => s.key !== "inicio" && steps[s.key]).pop();
+      situation = last ? last.situation : "Documentação";
+    } else situation = ADMISSION_SITUATIONS.includes(input.situation) ? input.situation : previous?.situation || "Documentação";
+
+    const record = {
       id: input.id || "",
       name,
       contact: clean(input.contact),
       cargoId: cargo?.id || vaga?.cargoId || "",
       role: cargo?.name || vaga?.role || clean(input.role),
       vagaId: vaga?.id || "",
-      date: clean(input.date),
-      situation: ADMISSION_SITUATIONS.includes(input.situation) ? input.situation : "Documentação",
+      // Data de referência (ordenação, PDF): início; senão a data antiga.
+      date: steps.inicio || clean(input.date ?? previous?.date ?? ""),
+      situation,
       notes: String(input.notes || "").trim()
-    });
+    };
+    if (Object.keys(steps).length) record.steps = steps;
+    if (employeeId) record.employeeId = employeeId;
+    return upsertRecord(company, "admissoes", record);
+  }
+
+  /** Vincula a admissão ao funcionário cadastrado (fim do processo). */
+  function linkAdmissaoEmployee(company, admId, employeeId) {
+    const adm = data(company).admissoes.find((row) => row.id === admId);
+    if (!adm || !employeeId) return null;
+    return saveAdmissao(company, { ...adm, employeeId });
   }
 
   function removeAdmissao(company, id) {
@@ -727,6 +802,9 @@
     CANDIDATE_SITUATIONS,
     ADMISSION_SITUATIONS,
     ADMISSION_DONE,
+    ADMISSION_STEPS,
+    admissionProgress,
+    linkAdmissaoEmployee,
     parseMoney,
     INSALUBRIDADE_GRAUS,
     parsePercent,

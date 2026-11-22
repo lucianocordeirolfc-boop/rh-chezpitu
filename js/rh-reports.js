@@ -227,7 +227,7 @@
     { id: "admissoes", label: "Admissões", hint: "andamento das admissões" }
   ];
 
-  const PILL = { Urgente: "bad", "Concluída": "ok", Cancelada: "bad", Aprovado: "ok", Reprovado: "bad", Iniciou: "ok", Proposta: "warn", "Admissão": "warn" };
+  const PILL = { Urgente: "bad", "Concluída": "ok", Cancelada: "bad", Aprovado: "ok", Reprovado: "bad", Iniciou: "ok", "Pronta para cadastro": "ok", Proposta: "warn", "Admissão": "warn" };
   const pill = (text) => (text ? `<span class="pill ${PILL[text] || ""}">${esc(text)}</span>` : "—");
 
   function painelHTML(company) {
@@ -296,12 +296,15 @@
     const rows = list
       .map((a) => {
         const cargo = RhCatalog.getCargo(company, a.cargoId);
+        const etapas = RhCatalog.admissionProgress(a)
+          .steps.map((s) => `${esc(s.short)}: ${s.done ? fmtDate(s.date) : "—"}`)
+          .join("<br>");
         return `<tr><td><b>${esc(a.name)}</b>${a.contact ? `<small>${esc(a.contact)}</small>` : ""}</td><td>${esc(cargo?.name || a.role || "—")}</td>
-          <td>${fmtDate(a.date)}</td><td>${pill(a.situation)}</td><td class="notes">${esc(a.notes || "")}</td></tr>`;
+          <td>${fmtDate(a.date)}</td><td>${pill(a.situation)}</td><td>${etapas}</td><td class="notes">${esc(a.notes || "")}</td></tr>`;
       })
       .join("");
     return `<section><h2>Admissões<small>${list.length}</small></h2>
-      ${list.length ? `<table><thead><tr><th>Admissão</th><th>Cargo</th><th>Prazo / data</th><th>Situação</th><th style="width:40%">Observações</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="empty">Nenhuma admissão.</p>`}
+      ${list.length ? `<table><thead><tr><th>Admissão</th><th>Cargo</th><th>Início</th><th>Situação</th><th style="width:22%">Etapas</th><th style="width:28%">Observações</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="empty">Nenhuma admissão.</p>`}
     </section>`;
   }
 

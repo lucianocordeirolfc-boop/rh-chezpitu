@@ -115,6 +115,27 @@ assert(JSON.stringify(AppData.state.companies) === snapI, "etiqueta é só leitu
 [iFut, iHoje, iPass, iOutra, iAgendar, iSem].forEach((c) => RhCatalog.removeCandidato(CO, c.id));
 RhCatalog.listRecords(CO, "candidatos").filter((c) => c.name === "Hora Ruim").forEach((c) => RhCatalog.removeCandidato(CO, c.id));
 
+console.log("[2c] Etapas da admissão");
+const ad = RhCatalog.saveAdmissao(CO, { name: "Etapas Teste", cargoId: recep.id, step_docsRecebidos: "2026-11-10", step_asoAgendado: "2026-11-19" });
+assert(ad.situation === "Exame agendado" && ad.steps.docsRecebidos === "2026-11-10" && !ad.employeeId, "situação derivada da última etapa cumprida");
+let pg = RhCatalog.admissionProgress(ad);
+assert(pg.doneCount === 2 && pg.next.key === "asoLiberado" && !pg.ready, "progresso: 2 de 5, próxima ASO liberado, não pronta");
+let badDate = false;
+try { RhCatalog.saveAdmissao(CO, { ...ad, step_inicio: "01/12/2026" }); } catch (e) { badDate = /Data inválida/.test(e.message); }
+assert(badDate, "data de etapa inválida é recusada");
+const ad2 = RhCatalog.saveAdmissao(CO, { ...ad, step_asoLiberado: "2026-11-20", step_contabilidade: "2026-11-21", step_inicio: "2026-12-01" });
+pg = RhCatalog.admissionProgress(ad2);
+assert(ad2.situation === "Pronta para cadastro" && pg.ready && ad2.date === "2026-12-01", "todas as etapas: pronta para cadastro (data = início)");
+const ad3 = RhCatalog.saveAdmissao(CO, { ...ad2 });
+assert(ad3.steps.inicio === "2026-12-01" && ad3.id === ad2.id, "editar sem mexer nas etapas as mantém");
+const linked = RhCatalog.linkAdmissaoEmployee(CO, ad2.id, "func-x");
+assert(linked.situation === "Iniciou" && linked.employeeId === "func-x" && !RhCatalog.admissionProgress(linked).ready, "vincular ao funcionário conclui (Iniciou) e bloqueia novo cadastro");
+const ad4 = RhCatalog.saveAdmissao(CO, { name: "Cancelada Teste", step_docsRecebidos: "2026-11-10", cancelled: true });
+assert(ad4.situation === "Cancelada" && !RhCatalog.admissionProgress(ad4).ready, "cancelada tem prioridade e não libera cadastro");
+const legacy = RhCatalog.saveAdmissao(CO, { name: "Legado Teste", situation: "ASO liberado", date: "2026-11-18" });
+assert(legacy.situation === "ASO liberado" && !legacy.steps && legacy.date === "2026-11-18", "registro antigo sem etapas mantém a situação informada");
+[ad.id, ad4.id, legacy.id].forEach((id) => RhCatalog.removeAdmissao(CO, id));
+
 console.log("[3] Painel RH");
 const snapshot = JSON.stringify(AppData.state.companies);
 const p = RhCatalog.computePanel(CO);
