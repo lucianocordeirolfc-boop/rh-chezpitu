@@ -28,7 +28,9 @@ opção de gerar relatórios em PDF.
   `verify-cargos-vagas-ui` 44 (gera os 2 PDFs no Chrome),
   `verify-exportar-excel` 45 (A1:AC4).
 - Dados de produção: nenhum alterado.
-- **Publicação:** pendente de autorização.
+- **Publicação:** versão `20261122.02`, commit `66ad6d2` (feat, inclui a
+  entrada (2) — insalubridade) + carimbo; commit, push e deploy autorizados
+  pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (2) — Insalubridade na função (Cargos e Salários)
 
@@ -45,8 +47,8 @@ Pedido do usuário: opção para cadastrar insalubridade e informar o percentual
 - Docs: PROJECT_RULES (item 8), CLAUDE.md, manuais.
 - Testes: `verify-cargos-salarios` 84, `verify-cargos-vagas-ui` 37,
   `verify-exportar-excel` 44 (autofiltro A1:AA4).
-- Dados de produção: nenhum alterado. Base de cálculo em R$ não implementada.
-- **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. (Base de cálculo implementada em (3).)
+- **Publicação:** junto com (3), versão `20261122.02`.
 
 ## 2026-11-22 — Novas abas: Cargos e Salários + Quadro de Vagas
 
