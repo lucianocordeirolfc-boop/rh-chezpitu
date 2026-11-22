@@ -154,17 +154,23 @@
     </section>`;
   }
 
+  /**
+   * Comissões da empresa: só as que alguma função DESTA empresa recebe
+   * (marcada em Funções e Salários). As demais ficam fora do relatório — a
+   * tela de Comissões continua listando todas para edição.
+   */
   function cargosComissoesHTML(company) {
     const cargos = RhCatalog.listCargos(company);
     const items = RhCatalog.listComissoes(company)
-      .map((c) => {
-        const receivers = cargos.filter((cargo) => (cargo.commissions || []).includes(c.id)).map((cargo) => cargo.name);
-        return `<div class="commission"><b>${esc(c.name)}</b>
+      .map((c) => ({ c, receivers: cargos.filter((cargo) => (cargo.commissions || []).includes(c.id)).map((cargo) => cargo.name) }))
+      .filter(({ receivers }) => receivers.length)
+      .map(
+        ({ c, receivers }) => `<div class="commission"><b>${esc(c.name)}</b>
           <p>${c.description ? esc(c.description) : "<i>Sem explicação cadastrada.</i>"}</p>
-          <p class="meta">Funções: ${receivers.length ? esc(receivers.join(", ")) : "nenhuma"}</p></div>`;
-      })
+          <p class="meta">Funções: ${esc(receivers.join(", "))}</p></div>`
+      )
       .join("");
-    return `<section><h2>Comissões</h2>${items}</section>`;
+    return `<section><h2>Comissões</h2>${items || `<p class="empty">Nenhuma comissão vinculada a funções desta empresa.</p>`}</section>`;
   }
 
   function cargosFuncionariosHTML(company, includeInactive) {

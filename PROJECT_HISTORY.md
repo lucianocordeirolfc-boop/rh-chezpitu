@@ -7,6 +7,44 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (14) — Correção de dado: Camareira na Taxa de Serviço Frigobar
+
+Relato: o relatório de Cargos e Salários (Chez Pitu), na explicação da
+"Taxa de Serviço Bar", listava Camareira. Causa: **dado**, não código — a
+função Camareira estava marcada com `taxa-servico-bar` (a explicação da
+comissão diz que o Bar vai para garçons, barman e cozinha; a do Frigobar,
+"apenas para camareiras"). Relatório e tela já listam só as funções marcadas
+(`rh-reports.js` `cargosComissoesHTML`, `cargos.js` `comissoesTabHTML`).
+
+Com autorização explícita do usuário ("sim, pode trocar para frigobar"):
+na função Camareira (Chez Pitu) `taxa-servico-bar` → `taxa-servico-frigobar`,
+via `RhCatalog.saveCargo` (mesma rotina da tela; salário, CBO, insalubridade,
+gratificação e históricos preservados). Conferido após recarregar: gravado no
+Firebase; relatório mostra Frigobar → Camareira, Bar → nenhuma. Sem alteração
+de código, sem deploy.
+
+Usuário: "taxa de serviço bar só existe na empresa pengold". Conferido: na
+Pengold as funções de bar/cozinha já estão marcadas, mas `comissoes` da
+Pengold está vazio (todas as explicações foram escritas na Chez Pitu).
+
+## 2026-11-22 (15) — Relatório de Cargos: só comissões vinculadas à empresa
+
+Decisão do usuário: no relatório de cada empresa, a seção Comissões mostra só
+as comissões que alguma função **daquela empresa** recebe (some "Funções:
+nenhuma"); sem nenhuma, aviso "Nenhuma comissão vinculada a funções desta
+empresa". A tela de Comissões continua listando todas para edição.
+
+- `js/rh-reports.js` (`cargosComissoesHTML`): filtra comissões sem função.
+- `scripts/verify-rh-reports.mjs`: +3 testes (só funções marcadas; comissão
+  sem função fora; aviso para empresa sem comissão).
+- Testes: verify-rh-reports 29/29, `npm test` 47/47, `npm run validate` 36/36.
+
+Dado (autorizado pelo usuário — "Copiar as 3" / "pode copiar"): copiadas
+para a Pengold as explicações de Taxa de Serviço Bar, Comissão Ocupação e PL
+Anual da Chez Pitu, via `RhCatalog.saveComissao` em produção. A Pengold não
+tinha nenhuma explicação (nada sobrescrito); Chez Pitu intacta. Conferido após
+recarregar: gravado no Firebase.
+
 ## 2026-11-22 (13) — Aprovação das versões 20261122.08 e .09
 
 Usuário: "tudo certo, aprovado". Aprovadas em produção: `.08` (admissões por

@@ -77,6 +77,9 @@ assert(!all.includes("<script>alert(1)</script>") && all.includes("&lt;script&gt
 assert(!all.includes("<b>sem reserva</b>") && all.includes("&lt;b&gt;sem reserva"), "explicação da comissão escapada");
 const onlyCom = RhReports.buildCargosReportHTML(CO, { sections: ["comissoes"] });
 assert(onlyCom.includes("Walk-in") && !onlyCom.includes("Funcionários por função") && !onlyCom.includes("<th style=\"width:24%\">Função</th>"), "só a seção escolhida");
+assert(onlyCom.includes("Funções: Auxiliar de Limpeza") && !onlyCom.includes("Recepcionista"), "comissão lista só as funções marcadas nela");
+assert(!onlyCom.includes("Taxa de Serviço Bar") && !onlyCom.includes("Funções: nenhuma"), "comissão sem função marcada na empresa fica fora do relatório");
+assert(RhReports.buildCargosReportHTML(PG, { sections: ["comissoes"] }).includes("Nenhuma comissão vinculada"), "empresa sem comissão vinculada: aviso");
 const withInactive = RhReports.buildCargosReportHTML(CO, { sections: ["funcionarios"], includeInactive: true });
 assert(withInactive.includes("Bia Limpeza") && withInactive.includes("Inativo desde 01/10/2026"), "inativos quando pedido, com data de desligamento");
 
