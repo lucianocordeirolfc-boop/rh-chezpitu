@@ -25,7 +25,8 @@ novo campo Gratificação (R$, formato do salário).
 - Testes: `verify-cargos-salarios` 100, `verify-rh-reports` 23,
   `verify-cargos-vagas-ui` 49, `verify-exportar-excel` 46 (A1:AD4).
 - Dados de produção: nenhum alterado.
-- **Publicação:** pendente de autorização.
+- **Publicação:** versão `20261122.03`, commit `4c53b99` (feat) + carimbo;
+  commit, push e deploy autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (3) — Salário base da insalubridade + relatórios PDF
 

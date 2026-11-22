@@ -17,10 +17,11 @@
   jan/2027 cumprida (36/36, leitura de 2026-11-17). Aguardando o usuário salvar
   a escala de dezembro e aprovar.
 
-## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (EM PRODUÇÃO `20261122.02`)
+## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (EM PRODUÇÃO `20261122.03`)
 
 - Publicado em `20261122.01` (e130610) e `20261122.02` (66ad6d2: insalubridade
-  com salário base + relatórios PDF). validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22.
+  com salário base + relatórios PDF) e `20261122.03` (4c53b99: CBO repetido com aviso
+  e confirmação + Gratificação). validate 36/36, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22.
 - Próximo passo do usuário após o deploy: em cada empresa, Cargos e Salários →
   "Padronizar e importar do cadastro" → conferir grafias → preencher CBO/salário.
 - REGRA FIXA nova: uma função = um salário; um CBO = uma função; salário/CBO
