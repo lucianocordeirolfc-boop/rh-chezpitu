@@ -1,3 +1,10 @@
+2026-11-22 (6) - Admissoes por etapas; cadastro do funcionario so ao concluir (20261122.08)
+- [NOVO] Admissao com a data de cada etapa: documentos recebidos, ASO agendado, ASO liberado, documentacao enviada a contabilidade e inicio; linha do tempo no cartao; situacao atualizada pelas etapas
+- [NOVO] Concluidas todas as etapas, "Cadastrar funcionario" abre o Cadastro de Funcionarios completo ja preenchido (nome, funcao, setor, admissao = inicio); ao salvar, a admissao e concluida e vinculada
+- [NOTA] Nova admissao nao cria funcionario (evita aparecer na Escala/VT antes de comecar). Admissoes antigas mantem a situacao
+- Arquivos: js/rh-catalog.js, js/quadro-vagas.js, js/funcionarios.js, js/rh-reports.js, css/rh-catalog.css, js/manual.js
+- npm test 47/47; npm run validate 36/36
+
 2026-11-22 (5) - Vagas em aberto: etiqueta de entrevista agendada (20261122.07)
 - [NOVO] Candidato com situacao "Agendado" vira etiqueta no topo do cartao da vaga (linha de Editar/Excluir): data e horario, "Hoje" em destaque, data passada em alerta, +N; clique abre Recrutamento e Selecao
 - [NOVO] Candidato com horario da entrevista (opcional), tambem na tabela R&S e no PDF

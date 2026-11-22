@@ -28,7 +28,8 @@ funcionário na Escala/VT antes de começar.)
 - Testes: `verify-quadro-vagas` 54, `verify-cargos-vagas-ui` 78 (fluxo
   completo no Chrome: etapas parciais sem botão e sem funcionário; completas
   liberam; cadastro pré-preenchido; fechar não grava; salvar vincula).
-- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+- Dados de produção: nenhum alterado. **Publicação:** versão `20261122.08`,
+  commit `174d51f` + carimbo; autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-22 (10) — Aprovação das versões 20261122.04 a .07
 
