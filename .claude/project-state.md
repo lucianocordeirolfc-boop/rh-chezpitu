@@ -12,8 +12,8 @@
 - **Branch atual:** `main` — sincronizado com `origin/main`
 - **Último commit de código:** `cb96254` — feat(cargos): coluna de ativos com
   "+N inativo(s)" (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.12`. `.01` a `.10` aprovadas;
-  `.11` (sem botão Lixeira) e `.12` (+N inativos) aguardando conferência.
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.12`, **tudo aprovado pelo
+  usuário em 2026-11-22** (`.01` a `.12`). Nenhuma tarefa de código pendente.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.09`)
 

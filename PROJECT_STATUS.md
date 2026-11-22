@@ -11,7 +11,7 @@ Cursor: OK
 
 **Versão:** 20261122.12 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
 **Data:** 2026-11-22
-**Status:** ✅ Publicado em Produção (Firebase Hosting) — `.01`–`.10` aprovadas; `.11` e `.12` aguardando conferência do usuário
+**Status:** ✅ Publicado em Produção (Firebase Hosting) — **aprovado pelo usuário** em 2026-11-22 (`.01` a `.12`)
 
 ## Último Deploy
 

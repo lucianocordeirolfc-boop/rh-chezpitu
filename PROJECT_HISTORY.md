@@ -7,6 +7,13 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (19) — Aprovação das versões 20261122.11 e .12
+
+Usuário: "tudo certo, aprovado". Aprovadas em produção: `.11` (tela de
+Cargos sem botão Lixeira; função excluída sai da lista) e `.12` (coluna de
+ativos com "+N inativo(s)"). Todas as entregas do dia (`.01` a `.12`)
+aprovadas. Só documentação; sem deploy.
+
 ## 2026-11-22 (18) — Cargos: coluna de ativos com "+N inativo(s)"
 
 Dúvida do usuário: coluna "Funcionários ativos" mostrava "4" e embaixo "5 no
