@@ -97,9 +97,11 @@ Use este checklist antes de qualquer commit ou deploy.
       insalubridade) no pop-up.
 - [ ] Comissões: 6 padrão com explicação; lista suspensa na função.
 - [ ] "Padronizar e importar do cadastro": quadro só leitura até confirmar.
-- [ ] Excluir função com funcionário vinculado é recusado; sem vínculo vai
-      para a Lixeira e restaura.
-- [ ] Relatório PDF (funções, comissões, funcionários por função).
+- [ ] Excluir função com funcionário vinculado é recusado; sem vínculo sai da
+      lista na hora (sem botão Lixeira na tela; cópia em deletedArchive).
+- [ ] Coluna "Funcionários ativos": "+N inativo(s)" embaixo; nada sem inativos.
+- [ ] Relatório PDF (funções, comissões, funcionários por função); Comissões
+      só com as vinculadas a funções da empresa, cada uma com suas funções.
 
 ## Quadro de Vagas
 

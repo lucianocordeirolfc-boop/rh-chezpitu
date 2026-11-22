@@ -7,6 +7,13 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (20) — Encerramento da sessão: documentação atualizada
+
+Atualizados com as mudanças `.10`–`.12`: `MANUAL_USUARIO.md` (relatório de
+comissões por empresa, exclusão sem Lixeira, "+N inativos"), `TEST_CHECKLIST.md`
+(Cargos e Salários) e `js/manual.js` (comissões por empresa). Só
+documentação/texto do manual; publicação pendente de autorização.
+
 ## 2026-11-22 (19) — Aprovação das versões 20261122.11 e .12
 
 Usuário: "tudo certo, aprovado". Aprovadas em produção: `.11` (tela de

@@ -82,14 +82,15 @@ Cada empresa tem as suas funções. Duas sub-abas:
   - **CBO repetido:** se o CBO já estiver em outra função, o sistema **avisa** qual é a função e pergunta se deseja atribuir o mesmo CBO mesmo assim. Confirmando, a função é salva (fica registrado quem confirmou) e a tabela mostra "⚠ também em …". Níveis da mesma função (Cozinheiro I e Cozinheiro II, Recepcionista Júnior e Sênior) dividem o CBO sem aviso.
   - **Gratificação:** valor em R$, no mesmo formato do salário. Aparece na tabela, no pop-up do funcionário (somente leitura), no Exportar Excel e nos relatórios; as mudanças ficam no histórico.
   - Toda mudança de salário fica no **histórico** da função.
+  - **Funcionários ativos:** o número mostra os ativos da função; embaixo aparece "+1 inativo" / "+N inativos" quando houver desligados vinculados (passe o mouse para ver o total).
   - **Insalubridade:** em **Editar**, escolha *Não*, um grau da CLT (mínimo 10%, médio 20%, máximo 40%) ou *Outro percentual (CCT/laudo)* e informe o valor. Ao lado, informe o **Salário base para cálculo** (ex.: salário mínimo ou piso da categoria): o sistema mostra na hora o **valor da insalubridade** (base × percentual). Percentual, base e valor aparecem na tabela, no pop-up do funcionário (somente leitura) e no Exportar Excel; as mudanças ficam no histórico da função.
-- **Comissões:** Taxa de Serviço Bar, Taxa de Serviço Frigobar, Comissão Ocupação, Walk-in, Extensão de Diária e PL Anual — cada uma com um campo para explicar como funciona. Em *Funções e Salários* você marca (lista suspensa) quais comissões cada função recebe. É possível criar comissões novas.
+- **Comissões:** Taxa de Serviço Bar, Taxa de Serviço Frigobar, Comissão Ocupação, Walk-in, Extensão de Diária e PL Anual — cada uma com um campo para explicar como funciona. Em *Funções e Salários* você marca (lista suspensa) quais comissões cada função recebe. É possível criar comissões novas. As comissões e suas explicações são **por empresa**: escreva a explicação com a empresa certa selecionada.
 
 **Padronizar e importar do cadastro:** traz os cargos já usados no Cadastro de Funcionários (ativos e inativos) com a grafia padrão sugerida — por exemplo "GARÇON" → "Garçom", "Enc. De Manutenção" → "Encarregado de Manutenção", "SUB GERENTE" → "Subgerente". Você pode ajustar cada nome (dois grupos com o mesmo nome viram uma só função). Nada é gravado antes da confirmação, que mostra cada grafia alterada. A grafia antiga fica guardada no histórico do funcionário. Depois, preencha CBO e salário em **Editar**.
 
-**Relatório PDF:** o botão **Relatório PDF** abre a escolha das seções — *Funções e salários* (com a folha estimada de salário + gratificação + insalubridade), *Comissões* e *Funcionários por função* (opção de incluir inativos). Na janela de impressão, escolha **Salvar como PDF**.
+**Relatório PDF:** o botão **Relatório PDF** abre a escolha das seções — *Funções e salários* (com a folha estimada de salário + gratificação + insalubridade), *Comissões* (só as comissões que alguma função da empresa recebe, cada uma com as funções marcadas nela) e *Funcionários por função* (opção de incluir inativos). Na janela de impressão, escolha **Salvar como PDF**.
 
-**Excluir função** só é possível sem funcionários vinculados (ativos ou inativos) e sem vaga em andamento; ela vai para a **Lixeira** e pode ser restaurada.
+**Excluir função** só é possível sem funcionários vinculados (ativos ou inativos) e sem vaga em andamento; ao confirmar, a função sai da lista na hora (a tela de Cargos não tem Lixeira; o sistema guarda uma cópia interna, recuperável por suporte técnico).
 
 ## 4.2 Quadro de Vagas
 
