@@ -53,7 +53,8 @@ sub-abas).
   I…X, 1…99, Júnior/Pleno/Sênior no fim do nome) podem dividir o CBO
   (`cargoFamilyKey` em `findCargoConflict`); funções diferentes continuam com
   CBO exclusivo. `verify-cargos-salarios.mjs` → 75.
-- **Publicação:** pendente de autorização (commit/deploy).
+- **Publicação:** versão `20261122.01`, commit `e130610` (feat) + carimbo;
+  commit, push e deploy autorizados pelo usuário em 2026-11-22.
 
 ## 2026-11-17 (6) — REGRA FIXA: alteração de folga no cadastro não é retroativa
 

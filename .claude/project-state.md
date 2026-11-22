@@ -17,10 +17,10 @@
   jan/2027 cumprida (36/36, leitura de 2026-11-17). Aguardando o usuário salvar
   a escala de dezembro e aprovar.
 
-## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (LOCAL, não commitado)
+## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (EM PRODUÇÃO `20261122.01`)
 
-- Implementado e testado (validate 35/35, npm test 47/47); **sem commit/deploy**
-  (aguardando autorização). Ver PROJECT_HISTORY.md → 2026-11-22.
+- Publicado em `20261122.01` (commit `e130610` + carimbo, push e deploy
+  autorizados). validate 35/35, npm test 47/47. Ver PROJECT_HISTORY.md → 2026-11-22.
 - Próximo passo do usuário após o deploy: em cada empresa, Cargos e Salários →
   "Padronizar e importar do cadastro" → conferir grafias → preencher CBO/salário.
 - REGRA FIXA nova: uma função = um salário; um CBO = uma função; salário/CBO
