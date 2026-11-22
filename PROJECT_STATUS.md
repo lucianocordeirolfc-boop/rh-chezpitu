@@ -32,7 +32,7 @@ push em `origin/main`.
   (`20261122.04`; ajustes de fonte/quantidade em `.05`; dados do cartão em uma linha em `.06`;
   etiqueta de entrevista agendada em `.07`; admissões por etapas com cadastro
   do funcionário só ao concluir em `.08`; vaga amarrada à função na admissão
-  em `.09`; `.08`/`.09` aguardando aprovação).
+  em `.09`).
 - **Relatórios PDF** das duas abas, com escolha de seções.
 - Nenhum dado de produção alterado. **Pendente do usuário:** em cada empresa,
   "Padronizar e importar do cadastro" e preencher CBO/salário das funções.
@@ -303,9 +303,10 @@ empresas (Ctrl+F5) e comparar com os PDFs de referência. ✅ as duas entregas d
 produção, inclusive o critério de que lançamento com todos os campos zerados não
 aparece na grade da sub-aba Lançamentos (o registro continua gravado).
 
-✅ as entregas de 22/11/2026 (`20261122.01` a `.07` — Cargos e Salários,
+✅ as entregas de 22/11/2026 (`20261122.01` a `.09` — Cargos e Salários,
 Quadro de Vagas, insalubridade, gratificação, relatórios PDF, perfil da vaga,
-cartões e etiqueta de entrevista) foram **aprovadas pelo usuário**.
+cartões, etiqueta de entrevista, admissões por etapas e vaga amarrada à
+função) foram **aprovadas pelo usuário**.
 
 **Próximo deploy recomendado:** conforme novas demandas.
 

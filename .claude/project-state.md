@@ -12,11 +12,10 @@
 - **Branch atual:** `main` — sincronizado com `origin/main`
 - **Último commit de código:** `304c12b` — feat(vagas): na admissão, vaga
   amarrada à função (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.09`. `.01` a `.07` aprovados pelo
-  usuário; `.08` (admissões por etapas) e `.09` (vaga amarrada à função)
-  aguardando aprovação.
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.09`, **tudo aprovado pelo
+  usuário em 2026-11-22** (`.01` a `.09`). Nenhuma tarefa de código pendente.
 
-## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.07`)
+## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.09`)
 
 - `20261122.01` (e130610): abas Cargos e Salários e Quadro de Vagas.
 - `20261122.02` (66ad6d2): insalubridade com salário base + relatórios PDF.

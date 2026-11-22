@@ -7,6 +7,13 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (13) — Aprovação das versões 20261122.08 e .09
+
+Usuário: "tudo certo, aprovado". Aprovadas em produção: `.08` (admissões por
+etapas; cadastro do funcionário só ao concluir) e `.09` (vaga amarrada à
+função na admissão). Todas as entregas do dia (`.01` a `.09`) aprovadas. Só
+documentação; sem deploy.
+
 ## 2026-11-22 (12) — Admissão: vaga amarrada à função
 
 Pedido do usuário: na Nova admissão, após escolher a função, a lista de vagas
