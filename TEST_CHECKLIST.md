@@ -115,6 +115,7 @@ Use este checklist antes de qualquer commit ou deploy.
       ao lado de Editar/Excluir; hoje em destaque, passada em alerta, +N;
       clique abre Recrutamento e Seleção.
 - [ ] Candidato (R&S) e admissão ligados à vaga; "Iniciou" conta como admitido.
+- [ ] Admissão: lista de vagas só da função escolhida.
 - [ ] Admissão: etapas com data; situação muda sozinha; sem todas as etapas
       não há botão de cadastro.
 - [ ] "Cadastrar funcionário": abre o cadastro preenchido (nome, função, setor,

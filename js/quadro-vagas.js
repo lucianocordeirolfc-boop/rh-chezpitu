@@ -78,8 +78,12 @@
     return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }
 
-  function vagaOptions(selectedId) {
-    const vagas = RhCatalog.listRecords(company(), "vagas").sort((a, b) => String(b.openDate).localeCompare(String(a.openDate)));
+  /** Vagas da empresa; com `cargoId`, só as vagas dessa função. */
+  function vagaOptions(selectedId, cargoId = "") {
+    const vagas = RhCatalog.listRecords(company(), "vagas")
+      .filter((v) => !cargoId || v.cargoId === cargoId)
+      .sort((a, b) => String(b.openDate).localeCompare(String(a.openDate)));
+    if (cargoId && !vagas.length) return `<option value="">— Nenhuma vaga para esta função —</option>`;
     return (
       `<option value="">— Selecionar vaga —</option>` +
       vagas
@@ -518,14 +522,15 @@
   function openAdmForm(container, id) {
     const co = company();
     const a = id ? RhCatalog.listRecords(co, "admissoes").find((row) => row.id === id) : null;
-    openForm(a ? "Editar admissão" : "Nova admissão", `
+    const form = openForm(a ? "Editar admissão" : "Nova admissão", `
       <div class="func-form-row cols-3">
         <label>Nome<input name="name" required value="${esc(a?.name || "")}" autocomplete="off"></label>
         <label>Contato<input name="contact" value="${esc(a?.contact || "")}" autocomplete="off"></label>
         <label>Cargo / Função<select name="cargoId">${cargoOptions(a?.cargoId, a?.role)}</select></label>
       </div>
       <div class="func-form-row cols-3">
-        <label>Vaga (opcional)<select name="vagaId">${vagaOptions(a?.vagaId)}</select></label>
+        <label>Vaga (opcional)<select name="vagaId">${vagaOptions(a?.vagaId, a?.cargoId)}</select>
+          <small class="help-text">Só as vagas da função escolhida.</small></label>
       </div>
       <p class="eyebrow adm-form-title">Etapas do processo</p>
       <div class="func-form-row cols-3">
@@ -549,6 +554,24 @@
       });
       window.App?.toast?.("Admissão salva.", "success");
       render(container);
+    });
+    // Vaga amarrada à função: trocar a função refaz a lista de vagas (mantém a
+    // vaga só se for da função); escolher a vaga sem função preenche a função.
+    const cargoSelect = form.elements.cargoId;
+    const vagaSelect = form.elements.vagaId;
+    const refreshVagas = () => {
+      const current = RhCatalog.listRecords(co, "vagas").find((v) => v.id === vagaSelect.value);
+      const keep = current && current.cargoId === cargoSelect.value ? current.id : "";
+      vagaSelect.innerHTML = vagaOptions(keep, cargoSelect.value);
+    };
+    cargoSelect.addEventListener("change", refreshVagas);
+    vagaSelect.addEventListener("change", () => {
+      if (cargoSelect.value) return;
+      const vaga = RhCatalog.listRecords(co, "vagas").find((v) => v.id === vagaSelect.value);
+      if (vaga?.cargoId && [...cargoSelect.options].some((o) => o.value === vaga.cargoId)) {
+        cargoSelect.value = vaga.cargoId;
+        refreshVagas();
+      }
     });
   }
 

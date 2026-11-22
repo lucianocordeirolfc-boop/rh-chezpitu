@@ -7,6 +7,19 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-22 (12) — Admissão: vaga amarrada à função
+
+Pedido do usuário: na Nova admissão, após escolher a função, a lista de vagas
+mostrava todas as vagas; deve mostrar só as da função selecionada.
+
+- `js/quadro-vagas.js`: `vagaOptions(selectedId, cargoId)` filtra pela função
+  ("Nenhuma vaga para esta função" quando não houver); trocar a função refaz a
+  lista e limpa vaga de outra função; escolher a vaga sem função preenche a
+  função da vaga.
+- `js/rh-catalog.js`: `saveAdmissao` recusa vaga de outra função.
+- Testes: `verify-quadro-vagas` 56, `verify-cargos-vagas-ui` 82.
+- Dados de produção: nenhum alterado. **Publicação:** pendente de autorização.
+
 ## 2026-11-22 (11) — Admissões: etapas do processo e cadastro só ao concluir
 
 Pedido do usuário: "Nova admissão" deve mostrar as etapas do processo (ASO

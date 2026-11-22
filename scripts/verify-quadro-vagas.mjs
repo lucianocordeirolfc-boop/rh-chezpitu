@@ -134,7 +134,12 @@ const ad4 = RhCatalog.saveAdmissao(CO, { name: "Cancelada Teste", step_docsReceb
 assert(ad4.situation === "Cancelada" && !RhCatalog.admissionProgress(ad4).ready, "cancelada tem prioridade e não libera cadastro");
 const legacy = RhCatalog.saveAdmissao(CO, { name: "Legado Teste", situation: "ASO liberado", date: "2026-11-18" });
 assert(legacy.situation === "ASO liberado" && !legacy.steps && legacy.date === "2026-11-18", "registro antigo sem etapas mantém a situação informada");
-[ad.id, ad4.id, legacy.id].forEach((id) => RhCatalog.removeAdmissao(CO, id));
+let mismatch = false;
+try { RhCatalog.saveAdmissao(CO, { name: "Errada", cargoId: manut.id, vagaId: v1.id }); } catch (e) { mismatch = /outra função/.test(e.message); }
+assert(mismatch, "admissão com vaga de outra função é recusada");
+const okVaga = RhCatalog.saveAdmissao(CO, { name: "Certa", vagaId: v1.id });
+assert(okVaga.cargoId === recep.id, "vaga sem função escolhida: a função vem da vaga");
+[ad.id, ad4.id, legacy.id, okVaga.id].forEach((id) => RhCatalog.removeAdmissao(CO, id));
 
 console.log("[3] Painel RH");
 const snapshot = JSON.stringify(AppData.state.companies);

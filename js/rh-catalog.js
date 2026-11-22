@@ -699,6 +699,9 @@
     if (!name) throw new Error("Informe o nome do admitido.");
     const cargo = getCargo(company, input.cargoId);
     const vaga = data(company).vagas.find((row) => row.id === input.vagaId);
+    if (cargo && vaga?.cargoId && vaga.cargoId !== cargo.id) {
+      throw new Error(`A vaga selecionada é de outra função (${vaga.role}). Escolha uma vaga de ${cargo.name}.`);
+    }
     const previous = input.id ? data(company).admissoes.find((row) => row.id === input.id) : null;
 
     const steps = {};

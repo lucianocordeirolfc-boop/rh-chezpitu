@@ -478,6 +478,32 @@ try {
   }));
   assert(s.steps.join("|") === "step_docsRecebidos|step_asoAgendado|step_asoLiberado|step_contabilidade|step_inicio" && !s.situation, "Nova admissão mostra as etapas do processo (não abre o cadastro)");
   const employeesBefore = s.employees;
+  s = await $eval(() => {
+    const f = document.getElementById("vagasForm");
+    const opts = () => [...f.elements.vagaId.options].map((o) => o.textContent.trim());
+    const pick = (name) => {
+      f.elements.cargoId.value = name ? RhCatalog.findCargoByName("Chez Pitu", name).id : "";
+      f.elements.cargoId.dispatchEvent(new Event("change"));
+    };
+    const out = { inicial: opts() };
+    pick("Encarregado de Manutenção");
+    out.encarregado = opts();
+    pick("Garçom");
+    out.garcom = opts();
+    f.elements.vagaId.value = f.elements.vagaId.options[1].value;
+    pick("Encarregado de Manutenção");
+    out.trocaLimpa = f.elements.vagaId.value;
+    pick("");
+    f.elements.vagaId.value = f.elements.vagaId.options[1].value;
+    f.elements.vagaId.dispatchEvent(new Event("change"));
+    out.funcaoDaVaga = f.elements.cargoId.selectedOptions[0].textContent;
+    pick("");
+    return out;
+  });
+  assert(s.encarregado.length === 1 && /Nenhuma vaga para esta função/.test(s.encarregado[0]), "função sem vaga: lista mostra 'Nenhuma vaga para esta função'");
+  assert(s.garcom.length === 2 && s.garcom[1].startsWith("Garçom"), `função escolhida: só as vagas dela (${s.garcom.join(" | ")})`);
+  assert(s.trocaLimpa === "", "trocar para outra função limpa a vaga que não é dela");
+  assert(s.funcaoDaVaga === "Garçom", "escolher a vaga sem função preenche a função da vaga");
   await $eval((vid) => {
     const f = document.getElementById("vagasForm");
     f.elements.name.value = "Mariana Admitida";

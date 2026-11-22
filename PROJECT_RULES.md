@@ -254,7 +254,10 @@ registro antigo sem etapas mantém a situação). "Nova admissão" NÃO cria
 funcionário: só com todas as etapas cumpridas aparece "Cadastrar funcionário",
 que abre o cadastro completo de Cadastro de Funcionários pré-preenchido (nome,
 função, setor da vaga, admissão = início); ao Salvar, a admissão é vinculada
-(`employeeId`, situação "Iniciou"). Fechar sem salvar não grava nada. Exclusões (vaga,
+(`employeeId`, situação "Iniciou"). Fechar sem salvar não grava nada.
+A **vaga é amarrada à função**: no formulário só aparecem as vagas da função
+escolhida (trocar a função limpa vaga de outra; vaga escolhida antes preenche a
+função) e `saveAdmissao` recusa vaga de outra função. Exclusões (vaga,
 candidato, admissão) vão para a Lixeira + tombstone. Dados pessoais de
 candidato: só o necessário (LGPD). Cobertura: `scripts/verify-quadro-vagas.mjs`,
 `scripts/verify-cargos-vagas-ui.mjs`.
