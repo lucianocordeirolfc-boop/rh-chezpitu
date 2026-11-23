@@ -7,6 +7,12 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-23 (2) — Aprovação da versão 20261123.01
+
+Usuário: "tudo certo, aprovado". Aprovadas em produção a `20261123.01` (regra
+de data de compensação única por funcionário) e a correção dos dados de Carlos
+Mathews e André Elias (Pengold). Só documentação; sem deploy.
+
 ## 2026-11-23 — Feriados: data de compensação única (regra) + diagnóstico Carlos/André
 
 Relato: no Controle de Feriados (Pengold), Carlos Mathews e André Elias tinham a

@@ -11,7 +11,7 @@ Cursor: OK
 
 **Versão:** 20261123.01 (Feriados: data de compensação única por funcionário)
 **Data:** 2026-11-23
-**Status:** ✅ Publicado em Produção (Firebase Hosting) — aguardando aprovação do usuário. Versões `20261122.01` a `.13` aprovadas.
+**Status:** ✅ Publicado em Produção (Firebase Hosting) — **aprovado pelo usuário** em 2026-11-23. Versões `20261122.01` a `.13` também aprovadas.
 
 ## Último Deploy
 

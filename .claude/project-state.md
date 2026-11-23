@@ -12,17 +12,17 @@
 - **Branch atual:** `main` — sincronizado com `origin/main`
 - **Último commit de código:** `4986a82` — feat(feriados): data de compensação
   única por funcionário (+ carimbo)
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261123.01`, aguardando aprovação do
-  usuário. `20261122.01` a `.13` aprovadas.
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261123.01`, **aprovada pelo usuário
+  em 2026-11-23**. Nenhuma tarefa de código pendente.
 
-## 🆕 2026-11-23 — Data de compensação única (`20261123.01`, aguarda aprovação)
+## 🆕 2026-11-23 — Data de compensação única (APROVADO, `20261123.01`)
 
 - Regra fixa: mesma data de compensação não serve a dois feriados do mesmo
   funcionário (tabela, formulário, CO da escala, importação) — aviso com o
   feriado que já usa a data. `scripts/verify-compensacao-unica.mjs` 29/29.
 - Dados corrigidos com autorização: Carlos Mathews e André Elias (Pengold).
   Ver PROJECT_HISTORY.md → 2026-11-23.
-- Pendente do usuário: conferir na tela e aprovar.
+- Aprovado pelo usuário em 2026-11-23 ("tudo certo, aprovado").
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.09`)
 
