@@ -8,13 +8,21 @@
 ## Identificação
 
 - **Projeto:** RH Chez Pitu — Sistema de Gestão de Pessoal (SPA web)
-- **Versão atual:** `20261122.13` (exibida como `v2026.11.22.13`) — fonte: `js/version.js`
+- **Versão atual:** `20261123.01` (exibida como `v2026.11.23.01`) — fonte: `js/version.js`
 - **Branch atual:** `main` — sincronizado com `origin/main`
-- **Último commit de código:** `d41b08c` — docs: manual e checklist atualizados
-  (+ carimbo). Último de código: `cb96254`
-- **Status geral:** 🟢 EM PRODUÇÃO — `20261122.13`. `.01` a `.12` aprovadas;
-  `.13` só texto do manual. Nenhuma tarefa de código pendente. Sessão
-  encerrada em 2026-11-22.
+- **Último commit de código:** `4986a82` — feat(feriados): data de compensação
+  única por funcionário (+ carimbo)
+- **Status geral:** 🟢 EM PRODUÇÃO — `20261123.01`, aguardando aprovação do
+  usuário. `20261122.01` a `.13` aprovadas.
+
+## 🆕 2026-11-23 — Data de compensação única (`20261123.01`, aguarda aprovação)
+
+- Regra fixa: mesma data de compensação não serve a dois feriados do mesmo
+  funcionário (tabela, formulário, CO da escala, importação) — aviso com o
+  feriado que já usa a data. `scripts/verify-compensacao-unica.mjs` 29/29.
+- Dados corrigidos com autorização: Carlos Mathews e André Elias (Pengold).
+  Ver PROJECT_HISTORY.md → 2026-11-23.
+- Pendente do usuário: conferir na tela e aprovar.
 
 ## 🆕 2026-11-22 — Cargos e Salários + Quadro de Vagas (APROVADO, `20261122.09`)
 

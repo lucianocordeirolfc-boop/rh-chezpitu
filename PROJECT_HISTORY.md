@@ -49,6 +49,9 @@ fora do repositório. Conferido após recarregar e lendo direto do Firebase:
 datas conforme o pedido, nenhuma data repetida nos dois funcionários.
 Nenhum outro funcionário alterado.
 
+**Publicação:** versão `20261123.01`, commit `4986a82` + carimbo; autorizados
+pelo usuário em 2026-11-23 ("sim, pode fazer commit, push e deploy").
+
 ## 2026-11-22 (20) — Encerramento da sessão: documentação atualizada
 
 Atualizados com as mudanças `.10`–`.12`: `MANUAL_USUARIO.md` (relatório de

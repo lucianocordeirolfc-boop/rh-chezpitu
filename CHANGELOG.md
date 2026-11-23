@@ -1,3 +1,10 @@
+2026-11-23 (1) - Feriados: data de compensacao unica por funcionario (20261123.01)
+- [REGRA] Mesma data de compensacao nao pode servir a dois feriados diferentes do mesmo funcionario; aviso cita o feriado que ja usa a data (tabela, formulario de vinculo, CO da Escala, importacao)
+- [CORRECAO] Trocar o feriado de um CO ja lancado desfaz o vinculo anterior (causa da duplicidade)
+- [DADOS] Corrigidas as compensacoes de Carlos Mathews e Andre Elias (Pengold), com autorizacao
+- Arquivos: js/data.js, js/feriados.js, scripts/verify-compensacao-unica.mjs, scripts/run-validate.mjs
+- verify-compensacao-unica 29/29; npm test 47/47; npm run validate 37/37
+
 2026-11-22 (11) - Manual atualizado (20261122.13)
 - [DOC] Manual do sistema e MANUAL_USUARIO: comissoes por empresa, relatorio so com comissoes vinculadas, exclusao de funcao sem Lixeira, +N inativos; TEST_CHECKLIST de Cargos
 - Arquivos: js/manual.js, MANUAL_USUARIO.md, TEST_CHECKLIST.md

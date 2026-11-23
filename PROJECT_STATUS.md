@@ -9,11 +9,18 @@ Cursor: OK
 
 ## Status Geral
 
-**Versão:** 20261122.13 (Cargos e Salários, Quadro de Vagas com perfil da vaga, insalubridade, gratificação, relatórios PDF)
-**Data:** 2026-11-22
-**Status:** ✅ Publicado em Produção (Firebase Hosting) — **aprovado pelo usuário** em 2026-11-22 (`.01` a `.12`)
+**Versão:** 20261123.01 (Feriados: data de compensação única por funcionário)
+**Data:** 2026-11-23
+**Status:** ✅ Publicado em Produção (Firebase Hosting) — aguardando aprovação do usuário. Versões `20261122.01` a `.13` aprovadas.
 
 ## Último Deploy
+
+Data: 23/11/2026
+Versão: 20261123.01 (Firebase Hosting — chez-pitu-rh), commit `4986a82` (+ carimbo),
+push em `origin/main`. Regra: a mesma data de compensação não pode servir a dois
+feriados diferentes do mesmo funcionário (aviso com o feriado que já usa a data).
+
+## Deploy anterior
 
 Data: 22/11/2026
 Versões: 20261122.01 → 20261122.13 (Firebase Hosting — chez-pitu-rh), commits
