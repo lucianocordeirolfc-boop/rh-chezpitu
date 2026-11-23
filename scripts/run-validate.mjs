@@ -43,6 +43,7 @@ const SUITES = [
   { name: "Feriados — vínculos retroativos", script: "scripts/verify-feriados-retroativos.mjs" },
   { name: "Feriados — auto-vínculo não nasce Vencido", script: "scripts/verify-auto-vinculo-vencido-guard.mjs" },
   { name: "Vínculo manual de funcionário", script: "scripts/verify-vinculo-manual.mjs" },
+  { name: "Feriados — data de compensação única", script: "scripts/verify-compensacao-unica.mjs" },
   { name: "Vínculo — tombstone de exclusão", script: "scripts/verify-vinculo-tombstone.mjs" },
   { name: "Lixeira — nada some do sistema", script: "scripts/verify-lixeira.mjs" },
   { name: "Feriados — alerta 'Escala indica folga'", script: "scripts/verify-feriados-escala-folga.mjs" },

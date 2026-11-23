@@ -552,6 +552,28 @@ Histórico: a exclusão definitiva existiu de 2026-08-06 a 2026-10-30 e apagou
 Tiradentes, São Jorge, Trabalhador e Corpus Christi 2026 da Chez Pitu com todos
 os vínculos (ver PROJECT_HISTORY.md → 2026-10-30).
 
+### Data de compensação única por funcionário (REGRA FIXA)
+
+Vigente desde 2026-11-23, a pedido do usuário. A mesma data de compensação
+**nunca** pode servir a dois feriados diferentes do mesmo funcionário. Ao tentar,
+o sistema recusa e avisa: *"A data informada para compensação (dd/mm/aaaa) já
+está cadastrada com o vínculo do feriado X (dd/mm/aaaa)."*
+
+- Função única: `findCompensationDateConflict` + `compensationDateConflictMessage`
+  (js/data.js). Considera `compensationDate`, `scheduledCoDate` e `scaleCoDate`
+  de feriados não excluídos. **Só lê** — nunca altera dado.
+- Aplicada em: data de compensação na tabela do Controle de Feriados
+  (`setCompensationDate`, o campo volta ao valor anterior), formulário de vínculo
+  (`submitWorkedHolidayForm`), CO da Escala (`applyManualScaleEntry` checa antes
+  de mexer no lançamento do dia; `linkScaleCoToHoliday`) e importação
+  (`importHolidaysBatch`, checa antes de criar feriado).
+- Trocar o feriado de um CO já lançado na escala desfaz o vínculo anterior
+  daquela data (antes ficavam os dois feriados com a mesma data).
+- Dados antigos com data repetida não são corrigidos automaticamente — só com
+  autorização do usuário (regra de imutabilidade).
+
+Cobertura: `scripts/verify-compensacao-unica.mjs`.
+
 ### Exclusão de vínculo (definitiva)
 
 "Excluir vínculo" (funcionário × feriado) é **definitivo na tela** (vai para a

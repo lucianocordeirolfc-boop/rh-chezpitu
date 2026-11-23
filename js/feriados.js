@@ -658,6 +658,18 @@
     const workedEmployee = AppData.resolveWorkedEmployeeEntry(data, employeeId, holiday);
     if (!workedEmployee) return { ok: true };
 
+    // REGRA FIXA (2026-11-23): a mesma data não compensa dois feriados diferentes.
+    if (compensationDate) {
+      const conflict = AppData.findCompensationDateConflict(data, employeeId, compensationDate, {
+        excludeHolidayId: holiday.id
+      });
+      if (conflict) {
+        const message = AppData.compensationDateConflictMessage(compensationDate, conflict);
+        window.App?.toast?.(message, "warning", 8000);
+        return { ok: false, blocked: true, message };
+      }
+    }
+
     if (compensationDate && !AppData.isCompensationWithinDeadline(holiday.date, compensationDate)) {
       window.App?.toast?.(
         `Compensação agendada fora do prazo de ${AppData.HOLIDAY_COMPENSATION_DAYS} dias.`,
@@ -1082,7 +1094,11 @@
           return;
         }
         const [holidayId, employeeId] = input.dataset.compensationDate.split("|");
-        setCompensationDate(holidayId, employeeId, value);
+        const result = setCompensationDate(holidayId, employeeId, value);
+        if (result && result.ok === false) {
+          input.value = input.defaultValue;
+          return;
+        }
         refreshTable(container);
       };
       input.addEventListener("blur", commit);
@@ -1257,6 +1273,30 @@
       );
     }
 
+    const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
+    const existing = data.holidays.find(
+      (holiday) =>
+        holiday.date === date && AppData.normalizeSearchText(holiday.name) === AppData.normalizeSearchText(name)
+    );
+
+    // REGRA FIXA (2026-11-23): data de compensação única por funcionário.
+    if (compensationDate) {
+      const conflicts = selectedEmployees
+        .map((employeeId) => {
+          const conflict = AppData.findCompensationDateConflict(data, employeeId, compensationDate, {
+            excludeHolidayId: existing?.id || ""
+          });
+          if (!conflict) return "";
+          const who = (data.employees || []).find((emp) => emp.id === employeeId)?.name || employeeId;
+          return `${who}: ${AppData.compensationDateConflictMessage(compensationDate, conflict)}`;
+        })
+        .filter(Boolean);
+      if (conflicts.length) {
+        alert(`Vínculo não salvo.\n\n${conflicts.join("\n")}`);
+        return false;
+      }
+    }
+
     const workedEmployees = selectedEmployees.map((employeeId) => {
       const item = { employeeId, compensationDate: compensationDate || "" };
       if (compensationDate) {
@@ -1266,12 +1306,6 @@
       }
       return item;
     });
-
-    const data = AppData.getCompanyData(AppData.getPrimaryPageCompany("feriados"));
-    const existing = data.holidays.find(
-      (holiday) =>
-        holiday.date === date && AppData.normalizeSearchText(holiday.name) === AppData.normalizeSearchText(name)
-    );
 
     if (existing) {
       workedEmployees.forEach((item) => {

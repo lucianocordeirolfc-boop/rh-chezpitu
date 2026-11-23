@@ -7,6 +7,48 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-23 — Feriados: data de compensação única (regra) + diagnóstico Carlos/André
+
+Relato: no Controle de Feriados (Pengold), Carlos Mathews e André Elias tinham a
+mesma data de compensação em feriados distintos.
+
+Causa raiz (leitura em produção, sem gravar):
+- CO da escala ligado ao feriado errado (Carlos: CO 10/06 **e** 12/06 apontando
+  ambos para Corpus Christi; CO 13/06 → Padroeira, 23/08 → Finados, 26/10 →
+  Consciência Negra; André: CO 18/08 → Independência), enquanto outro feriado
+  recebia a mesma data pela tabela. `reconcileCoCompensationLinks` reimpõe a
+  ligação da escala, então corrigir só a data na tabela não basta.
+- Trocar o feriado de um CO no mesmo dia não desfazia o vínculo anterior.
+- Não existia checagem de data repetida na tabela, formulário ou importação.
+
+Código (regra nova — ver PROJECT_RULES.md → "Data de compensação única"):
+- `js/data.js`: `findCompensationDateConflict`, `compensationDateConflictMessage`;
+  aplicadas em `applyManualScaleEntry`, `linkScaleCoToHoliday` e
+  `importHolidaysBatch`; troca de feriado no CO desfaz o vínculo anterior.
+  `isCoDateAlreadyLinked` removida (substituída).
+- `js/feriados.js`: `setCompensationDate` e `submitWorkedHolidayForm` recusam
+  com o aviso.
+- `scripts/verify-compensacao-unica.mjs` (29 testes, inclui réplica do caso
+  Carlos) cadastrado em `run-validate.mjs`.
+- `npm test` 47/47, `npm run validate` 37/37.
+
+Correção de dados (Pengold), com autorização explícita do usuário ("sim pode
+corrigir os dados"), em 2026-11-23 ~19:40Z. Cada data pedida passou a ser um
+CO da escala ligado ao feriado certo (`manualScale` + `manualScaleMeta` carimbado
+com `AppData.now()`; item com `linkedFromScale` + `scaleCoDate`) — assim o merge
+entre PCs (que une `linkedFromScale` com OU) não traz a data antiga de volta:
+- Carlos Mathews: 10/06→Trabalhador, 11/06→Corpus Christi (novo CO),
+  12/06→Padroeira de Búzios, 13/06→Comércio Hoteleiro, 29/06→Finados (novo CO),
+  23/08→Aniversário de Búzios, 05/10→Consciência Negra (novo CO), 26/10→Natal.
+  Já corretos e intocados: 15/06 (12/10), 05/11 (01/01/27), 16/11 (09/02/27),
+  29/05 (Sexta-Feira Santa), 06/06 (São Jorge).
+- André Elias: 18/08→Padroeira de Búzios, 17/09→Independência (novo CO). Demais
+  intocados.
+Sem `runScaleIntegrations`/seed/migração. Backup do estado anterior guardado
+fora do repositório. Conferido após recarregar e lendo direto do Firebase:
+datas conforme o pedido, nenhuma data repetida nos dois funcionários.
+Nenhum outro funcionário alterado.
+
 ## 2026-11-22 (20) — Encerramento da sessão: documentação atualizada
 
 Atualizados com as mudanças `.10`–`.12`: `MANUAL_USUARIO.md` (relatório de

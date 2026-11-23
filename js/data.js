@@ -5193,14 +5193,45 @@
     return pending[0] || null;
   }
 
-  function isCoDateAlreadyLinked(data, employeeId, coDate, excludeHolidayId = "") {
-    return (data.holidays || []).some((holiday) => {
-      if (holiday.isDeleted) return false;
-      if (holiday.id === excludeHolidayId) return false;
-      return (holiday.workedEmployees || []).some(
-        (item) => item.employeeId === employeeId && item.linkedFromScale && item.scaleCoDate === coDate
-      );
-    });
+  /**
+   * REGRA FIXA (2026-11-23): a mesma data de compensação não pode servir a dois
+   * feriados diferentes do mesmo funcionário. Devolve { holiday, item } do
+   * vínculo que JÁ usa `date` (compensação manual, agendada ou CO da escala),
+   * ou null. Só lê — nunca altera dado.
+   *   options.excludeHolidayId  → feriado que está sendo editado (não conflita consigo).
+   *   options.replacingScaleCoOn → data cujo CO da escala está sendo substituído:
+   *                                o vínculo LFS daquela data será desfeito, não conta.
+   *   options.isSameHoliday(h)   → predicado p/ quando o feriado ainda não tem id
+   *                                (importação: mesmo nome + data = mesmo feriado).
+   */
+  function findCompensationDateConflict(data, employeeId, date, options = {}) {
+    const canonicalId = String(employeeId || "").trim();
+    const target = String(date || "").trim();
+    if (!canonicalId || !target) return null;
+    const excludeHolidayId = String(options.excludeHolidayId || "").trim();
+    const replacingOn = String(options.replacingScaleCoOn || "").trim();
+    for (const holiday of data?.holidays || []) {
+      if (!holiday || holiday.isDeleted) continue;
+      if (excludeHolidayId && holiday.id === excludeHolidayId) continue;
+      if (typeof options.isSameHoliday === "function" && options.isSameHoliday(holiday)) continue;
+      for (const item of holiday.workedEmployees || []) {
+        if (!item || item.employeeId !== canonicalId) continue;
+        const uses =
+          item.compensationDate === target || item.scheduledCoDate === target || item.scaleCoDate === target;
+        if (!uses) continue;
+        if (replacingOn && replacingOn === target && item.linkedFromScale && item.scaleCoDate === target) continue;
+        return { holiday, item };
+      }
+    }
+    return null;
+  }
+
+  function compensationDateConflictMessage(date, conflict) {
+    const holiday = conflict?.holiday || {};
+    return (
+      `A data informada para compensação (${formatDateBR(date)}) já está cadastrada ` +
+      `com o vínculo do feriado ${holiday.name || "—"} (${formatDateBR(holiday.date)}).`
+    );
   }
 
   function applyCoLinkToWorkedItem(holiday, item, coDate) {
@@ -5242,8 +5273,9 @@
         ) {
           return applyCoLinkToWorkedItem(holiday, item, coDate);
         }
-        if (isCoDateAlreadyLinked(data, employeeId, coDate, holiday.id)) {
-          return { linked: false, message: "Esta data de CO já está vinculada a outro feriado." };
+        const conflict = findCompensationDateConflict(data, employeeId, coDate, { excludeHolidayId: holiday.id });
+        if (conflict) {
+          return { linked: false, conflict: true, message: compensationDateConflictMessage(coDate, conflict) };
         }
         return applyCoLinkToWorkedItem(holiday, item, coDate);
       }
@@ -5255,8 +5287,9 @@
       return { linked: false, message: "Nenhum feriado trabalhado pendente encontrado para vincular ao CO." };
     }
 
-    if (isCoDateAlreadyLinked(data, employeeId, coDate, target.holiday.id)) {
-      return { linked: false, message: "Esta data de CO já está vinculada a outro feriado." };
+    const conflict = findCompensationDateConflict(data, employeeId, coDate, { excludeHolidayId: target.holiday.id });
+    if (conflict) {
+      return { linked: false, conflict: true, message: compensationDateConflictMessage(coDate, conflict) };
     }
 
     return applyCoLinkToWorkedItem(target.holiday, target.item, coDate);
@@ -5356,7 +5389,28 @@
     const previousCode = getPreviousManualScaleCode(data, employeeId, date);
     let coWarning = "";
 
-    if (previousCode === "CO" && code !== "CO") {
+    // REGRA FIXA (2026-11-23): data de compensação única por funcionário. Checa
+    // ANTES de mexer em qualquer coisa — se conflita, o lançamento anterior do
+    // dia fica intacto e o usuário recebe o aviso com o feriado que já usa a data.
+    if (code === "CO" && linkedHolidayId) {
+      const conflict = findCompensationDateConflict(data, employeeId, date, {
+        excludeHolidayId: linkedHolidayId,
+        replacingScaleCoOn: previousCode === "CO" ? date : ""
+      });
+      if (conflict) {
+        return { coWarning: compensationDateConflictMessage(date, conflict), blocked: true };
+      }
+    }
+
+    const previousEntry = data.manualScale[key];
+    const previousLinkedId =
+      previousEntry && typeof previousEntry === "object" ? String(previousEntry.linkedHolidayId || "") : "";
+    if (
+      previousCode === "CO" &&
+      (code !== "CO" || (linkedHolidayId && previousLinkedId && previousLinkedId !== linkedHolidayId))
+    ) {
+      // Troca de feriado no mesmo CO também desfaz o vínculo anterior; antes
+      // ficavam dois feriados com a mesma data de compensação.
       unlinkScaleCoFromHoliday(employeeId, date, { company: resolvedCompany });
     }
 
@@ -5740,6 +5794,21 @@
         return;
       }
 
+      // REGRA FIXA (2026-11-23): checada ANTES de criar o feriado, para a linha
+      // recusada não deixar feriado novo vazio para trás.
+      if (compensationDate) {
+        const exactName = String(holidayName || "").trim();
+        const conflict = findCompensationDateConflict(data, employee.id, compensationDate, {
+          // mesmo critério de findOrCreateHoliday (nome exato + data)
+          isSameHoliday: (h) => h.date === String(workedDate || "").trim() && h.name === exactName
+        });
+        if (conflict) {
+          result.skipped += 1;
+          result.messages.push(`Linha ${index + 1}: ${compensationDateConflictMessage(compensationDate, conflict)}`);
+          return;
+        }
+      }
+
       const holiday = findOrCreateHoliday(data, holidayName, workedDate, (created) =>
         createdHolidays.push({ date: created.date, name: created.name })
       );
@@ -6060,6 +6129,8 @@
     syncWorkedEmployeeStatus,
     linkScaleCoToHoliday,
     unlinkScaleCoFromHoliday,
+    findCompensationDateConflict,
+    compensationDateConflictMessage,
     getHolidayStats,
     normalizeSearchText,
     weekdayName,
