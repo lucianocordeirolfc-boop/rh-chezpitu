@@ -7,6 +7,14 @@ Este arquivo registra decisões, bugs recorrentes e correções importantes.
 > ANTES ou junto do commit. Ver `PROJECT_RULES.md` → "Registro obrigatório no
 > histórico".
 
+## 2026-11-23 (3) — Encerramento da sessão
+
+Sessão encerrada a pedido do usuário. Entregue e aprovado: `20261123.01`
+(data de compensação única) + correção dos dados de Carlos Mathews e André
+Elias. Sugestões adiadas pelo usuário ("agora não"): auditoria somente leitura
+de datas repetidas nos demais funcionários e conferência dos recibos de VT de
+jun/set/out da Pengold. Só documentação; sem deploy.
+
 ## 2026-11-23 (2) — Aprovação da versão 20261123.01
 
 Usuário: "tudo certo, aprovado". Aprovadas em produção a `20261123.01` (regra

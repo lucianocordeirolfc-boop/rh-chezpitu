@@ -13,7 +13,8 @@
 - **Último commit de código:** `4986a82` — feat(feriados): data de compensação
   única por funcionário (+ carimbo)
 - **Status geral:** 🟢 EM PRODUÇÃO — `20261123.01`, **aprovada pelo usuário
-  em 2026-11-23**. Nenhuma tarefa de código pendente.
+  em 2026-11-23**. Nenhuma tarefa de código pendente. Sessão encerrada em
+  2026-11-23.
 
 ## 🆕 2026-11-23 — Data de compensação única (APROVADO, `20261123.01`)
 
@@ -524,6 +525,13 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
 
 ## Próximas tarefas
 
+- **Sugerido em 2026-11-23 (usuário: "agora não"):** auditoria somente leitura
+  de outros funcionários com a mesma data de compensação em feriados
+  diferentes (a regra nova só impede casos novos); corrigir só com autorização.
+- **Sugerido em 2026-11-23:** conferir recibos de VT de jun/set/out da Pengold —
+  novos dias de CO (Carlos 11/06, 29/06, 05/10; André 17/09) abatem VT se o
+  recibo for recalculado.
+
 - **Prazo:** feriado 29/07/2026 na Pengold (recriado sem vínculos) vence em
   **2026-11-26** — vínculos entram ao salvar a escala de julho da Pengold ou
   por "+ Funcionário".
@@ -722,13 +730,33 @@ funções de exclusão de feriado recusam sempre. Fonte: `PROJECT_RULES.md`.
  M CHANGELOG.md
  M PROJECT_STATUS.md
 ```
-> Código em produção `20261117.08` (commitado e pushado em `c9ce1c2`). Os
-> registros de encerramento acima (só documentação) aguardam autorização do
-> usuário para commit/push — o commit automático foi bloqueado. Não exigem deploy.
+> Snapshot antigo (2026-11-17). Em 2026-11-23 o Git estava limpo após
+> `b9389d7`; só o registro de encerramento da sessão (documentação) aguarda
+> autorização para commit/push.
 
 ---
 
 ## Histórico de checkpoints
+
+### CHECKPOINT — ENCERRAMENTO DA SESSÃO
+- **Data:** 2026-11-23
+- **Versão:** 20261123.01 (em produção, aprovada pelo usuário)
+- **Branch:** main (sincronizado com `origin/main`; commits `4986a82` feat,
+  `2c74382` carimbo, `b9389d7` aprovação)
+- **Arquivos alterados:** `js/data.js`, `js/feriados.js`,
+  `scripts/verify-compensacao-unica.mjs` (novo), `scripts/run-validate.mjs`,
+  `PROJECT_RULES.md`, `PROJECT_HISTORY.md`, `CHANGELOG.md`,
+  `PROJECT_STATUS.md`, `index.html`, `js/version.js`, `.claude/project-state.md`
+- **Resumo:** Carlos Mathews e André Elias (Pengold) tinham a mesma data de
+  compensação em feriados distintos. Causa: CO da escala ligado ao feriado
+  errado (`reconcileCoCompensationLinks` reimpõe) + troca de feriado no CO não
+  desfazia o vínculo anterior + falta de checagem. Dados corrigidos com
+  autorização (cada data virou CO da escala ligado ao feriado certo, por causa
+  do merge OU de `linkedFromScale` entre PCs). Regra fixa nova: data de
+  compensação única por funcionário (tabela, formulário, CO da escala,
+  importação). Testes 29/29, npm test 47/47, validate 37/37.
+- **Próximo passo:** nenhum obrigatório. Sugestões em "Próximas tarefas".
+
 
 ### CHECKPOINT — ENCERRAMENTO DA SESSÃO
 - **Data:** 2026-09-07 20:46
